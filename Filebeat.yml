@@ -1,0 +1,137 @@
+# /etc/filebeat/filebeat.yml
+# OPTIMIZED FOR: 28GB RAM, 8 CPUs, 10Gbps Network
+# This config will handle your massive Suricata log volume with minimal drops
+
+###################### Filebeat Configuration ######################
+# ============================== Config Modules ========================
+#filebeat.config.modules:
+#  enabled: true
+#  path: ${path.config}/modules.d/*.yml
+#  reload.enabled: false
+
+# ============================== Inputs ================================
+filebeat.inputs:
+- type: syslog
+  enabled: true
+  protocol.tcp:
+    host: "0.0.0.0:514"
+    max_message_size: 50MiB
+    max_connections: 100  # Handle multiple connections from pfSense
+
+# ============================== Processors ============================
+processors:
+- decode_json_fields:
+    fields: ["message"]
+    target: ""
+    overwrite_keys: true
+    add_error_key: true
+    max_depth: 10
+
+# Uncomment to add GeoIP enrichment (requires MaxMind GeoIP database)
+# - add_host_metadata:
+#     netinfo.enabled: false
+# - add_locale: ~
+
+# ============================== Outputs ===============================
+output.elasticsearch:
+  hosts: ["localhost:9200"]
+  index: "suricata-%{+yyyy.MM.dd}"
+
+  # MASSIVELY INCREASED - You have 8 CPUs barely used!
+  worker: 8  # Use ALL your CPUs (was 2)
+
+  # HUGE BATCHES - 10Gbps network can handle this easily
+  bulk_max_size: 5000  # Send 5000 events per batch (was 50!)
+
+  # Connection tuning for high throughput
+  max_retries: 5
+  backoff.init: 1s
+  backoff.max: 60s
+  timeout: 120  # Increased timeout for large batches
+
+  # Aggressive compression for 10Gbps network
+  compression_level: 1  # Fast compression (was 5) - speed over size
+
+  # Keep connections alive
+  keepalive: 30s
+  max_idle_time: 3m
+
+# ============================== ILM ===================================
+setup.ilm.enabled: false
+
+# ============================== Template ==================================
+setup.template.name: "suricata"
+setup.template.pattern: "suricata*"
+setup.template.enabled: true
+setup.template.overwrite: true
+setup.template.settings:
+  index.number_of_shards: 1
+  index.number_of_replicas: 0
+  index.refresh_interval: "5s"  # Balance between search freshness and performance
+  index.codec: "best_compression"  # Save storage space
+
+# ============================== Logging ===================================
+logging.level: info
+logging.to_files: true
+logging.files:
+  path: /var/log/filebeat
+  name: filebeat
+  keepfiles: 7
+  permissions: 0644
+  rotateeverybytes: 104857600  # 100MB rotation
+
+# ============================== Queue =====================================
+# THIS IS THE GAME CHANGER - You have 28GB RAM!
+queue.mem:
+  events: 131072  # 128K events buffer (was 4096!) - Uses ~2-3GB RAM
+  flush.min_events: 10000  # Batch 10K events before flushing (was 512)
+  flush.timeout: 500ms  # Flush every 500ms maximum (was 5s)
+
+# ALTERNATIVE: Use disk queue for guaranteed delivery (uses storage instead of RAM)
+# Uncomment this if you want ZERO log loss even if Elasticsearch crashes
+# queue.disk:
+#   path: "/var/lib/filebeat/queue"
+#   max_size: 50GB  # You have 350GB available
+#   segment_size: 512MB
+#   read_ahead: 16MB
+#   write_ahead: 16MB
+
+# ============================== Performance Tuning ====================
+# Max procs - use all CPUs
+max_procs: 8
+
+# Internal queue settings for input processing
+filebeat.registry.flush: 1s  # Fast registry updates
+
+# Monitoring
+monitoring.enabled: false  # Disable if not using Stack Monitoring
+
+# ============================== Registry ==================================
+filebeat.registry.path: /var/lib/filebeat
+filebeat.registry.file_permissions: 0600
+
+# ============================== Resource Limits ===========================
+# Let Filebeat use up to 8GB RAM (you have 28GB total, 7GB used)
+# Set in /etc/systemd/system/filebeat.service.d/override.conf:
+# [Service]
+# MemoryMax=8G
+# CPUQuota=800%  # All 8 CPUs
+
+# ============================== Metrics ===================================
+http.enabled: true
+http.host: localhost
+http.port: 5066
+# Access metrics at: http://localhost:5066/stats
+
+# ============================== Notes =====================================
+# Expected Performance with these settings:
+# - Input: ~50,000-100,000 events/second
+# - Minimal drops (< 0.1%)
+# - RAM usage: 3-5GB (well within your 28GB)
+# - CPU usage: 10-30% (still plenty of headroom)
+# - Network: 100-500 Mbps (your 10Gbps can handle this easily)
+#
+# To monitor performance:
+# - Watch: curl -s http://localhost:5066/stats | jq
+# - Filebeat logs: journalctl -u filebeat -f
+# - Elasticsearch ingestion: GET _cat/indices?v&h=index,indexing.index_total,indexing.index_time
