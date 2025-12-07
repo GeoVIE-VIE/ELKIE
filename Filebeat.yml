@@ -24,9 +24,10 @@ filebeat.inputs:
 # ============================== Processors ============================
 processors:
 # Step 1: Extract JSON from message
-# Format from syslog-ng: "Sensei {json...}"
+# Format from syslog: "<priority>Month Day Time Hostname {json...}"
+# Example: "<13>Dec 7 10:30:20 Sensei {json...}"
 - dissect:
-    tokenizer: "%{syslog_hostname} %{json_payload}"
+    tokenizer: "<%{}>%{} %{} %{} %{syslog_hostname} %{json_payload}"
     field: "message"
     target_prefix: ""
     ignore_failure: true
