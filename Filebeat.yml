@@ -25,12 +25,10 @@ filebeat.inputs:
 processors:
 # Step 1: Extract JSON from message
 # Format from syslog-ng: "Sensei {json...}"
-# Use grok to flexibly extract JSON portion
-- grok:
-    field: message
-    patterns:
-      - "^%{NOTSPACE:syslog_hostname} %{GREEDYDATA:json_payload}$"
-      - "^%{GREEDYDATA:json_payload}$"
+- dissect:
+    tokenizer: "%{syslog_hostname} %{json_payload}"
+    field: "message"
+    target_prefix: ""
     ignore_failure: true
 
 # Step 2: Decode the extracted JSON
