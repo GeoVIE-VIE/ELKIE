@@ -87,8 +87,9 @@ sudo systemctl start filebeat
 
 ## Recent Fixes
 
-- **Dec 7, 2024**: Replaced `grok` processor with `dissect` (grok not available in this Filebeat version)
-- **Dec 7, 2024**: Fixed JSON extraction to handle syslog-ng format
+- **Dec 7, 2025**: Fixed `dissect` tokenizer to parse full syslog format with priority and timestamp
+- **Dec 7, 2025**: Replaced `grok` processor with `dissect` (grok not available in this Filebeat version)
+- **Dec 7, 2025**: Created automated deployment script and documentation
 
 ## Expected Performance
 
