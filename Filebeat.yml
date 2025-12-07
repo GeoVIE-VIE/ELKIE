@@ -24,10 +24,11 @@ filebeat.inputs:
 # ============================== Processors ============================
 processors:
 # Step 1: Extract JSON from message
-# Format from syslog: "<priority>Month Day Time Hostname {json...}"
-# Example: "<13>Dec 7 10:30:20 Sensei {json...}"
+# Format from syslog-ng: "Day Time Hostname {json...}"
+# Example: "7 10:34:28 Sensei {json...}"
+# Note: syslog-ng strips priority and month before forwarding
 - dissect:
-    tokenizer: "<%{}>%{} %{} %{} %{syslog_hostname} %{json_payload}"
+    tokenizer: "%{day} %{time} %{syslog_hostname} %{json_payload}"
     field: "message"
     target_prefix: ""
     ignore_failure: true
@@ -43,7 +44,7 @@ processors:
 
 # Step 3: Clean up temporary fields
 - drop_fields:
-    fields: ["json_payload", "message"]
+    fields: ["json_payload", "message", "day", "time"]
     ignore_missing: true
 
 # Uncomment to add GeoIP enrichment (requires MaxMind GeoIP database)
