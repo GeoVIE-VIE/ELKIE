@@ -23,13 +23,14 @@ filebeat.inputs:
 
 # ============================== Processors ============================
 processors:
-# Step 1: Extract JSON from syslog wrapper
-# Syslog format: <priority>timestamp hostname {json...}
-- dissect:
-    tokenizer: "%{syslog_header} %{+syslog_header} %{+syslog_header} %{syslog_hostname} %{json_payload}"
-    field: "message"
-    target_prefix: ""
-    overwrite_keys: true
+# Step 1: Extract JSON from message
+# Format from syslog-ng: "Sensei {json...}"
+# Use grok to flexibly extract JSON portion
+- grok:
+    field: message
+    patterns:
+      - "^%{NOTSPACE:syslog_hostname} %{GREEDYDATA:json_payload}$"
+      - "^%{GREEDYDATA:json_payload}$"
     ignore_failure: true
 
 # Step 2: Decode the extracted JSON
@@ -39,10 +40,11 @@ processors:
     overwrite_keys: true
     add_error_key: true
     max_depth: 10
+    process_array: false
 
 # Step 3: Clean up temporary fields
 - drop_fields:
-    fields: ["syslog_header", "json_payload"]
+    fields: ["json_payload", "message"]
     ignore_missing: true
 
 # Uncomment to add GeoIP enrichment (requires MaxMind GeoIP database)
