@@ -23,12 +23,27 @@ filebeat.inputs:
 
 # ============================== Processors ============================
 processors:
+# Step 1: Extract JSON from syslog wrapper
+# Syslog format: <priority>timestamp hostname {json...}
+- dissect:
+    tokenizer: "%{syslog_header} %{+syslog_header} %{+syslog_header} %{syslog_hostname} %{json_payload}"
+    field: "message"
+    target_prefix: ""
+    overwrite_keys: true
+    ignore_failure: true
+
+# Step 2: Decode the extracted JSON
 - decode_json_fields:
-    fields: ["message"]
+    fields: ["json_payload"]
     target: ""
     overwrite_keys: true
     add_error_key: true
     max_depth: 10
+
+# Step 3: Clean up temporary fields
+- drop_fields:
+    fields: ["syslog_header", "json_payload"]
+    ignore_missing: true
 
 # Uncomment to add GeoIP enrichment (requires MaxMind GeoIP database)
 # - add_host_metadata:
