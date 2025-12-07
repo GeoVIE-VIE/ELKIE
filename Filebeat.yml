@@ -23,28 +23,19 @@ filebeat.inputs:
 
 # ============================== Processors ============================
 processors:
-# Step 1: Extract JSON from message
-# Format from syslog-ng: "Day Time Hostname {json...}"
-# Example: "7 10:34:28 Sensei {json...}"
-# Note: syslog-ng strips priority and month before forwarding
-- dissect:
-    tokenizer: "%{day} %{time} %{syslog_hostname} %{json_payload}"
-    field: "message"
-    target_prefix: ""
-    ignore_failure: true
-
-# Step 2: Decode the extracted JSON
+# Decode JSON directly from message field
+# Requires syslog-ng template: template("$MESSAGE\n") to send raw JSON
 - decode_json_fields:
-    fields: ["json_payload"]
+    fields: ["message"]
     target: ""
     overwrite_keys: true
     add_error_key: true
     max_depth: 10
     process_array: false
 
-# Step 3: Clean up temporary fields
+# Clean up the original message field after decoding
 - drop_fields:
-    fields: ["json_payload", "message", "day", "time"]
+    fields: ["message"]
     ignore_missing: true
 
 # Uncomment to add GeoIP enrichment (requires MaxMind GeoIP database)
