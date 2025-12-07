@@ -11,12 +11,15 @@
 
 # ============================== Inputs ================================
 filebeat.inputs:
-- type: syslog
+- type: tcp
   enabled: true
-  protocol.tcp:
-    host: "0.0.0.0:514"
-    max_message_size: 50MiB
-    max_connections: 100  # Handle multiple connections from pfSense
+  host: "0.0.0.0:514"
+  max_message_size: 52428800  # 50MiB in bytes
+  max_connections: 100  # Handle multiple connections from pfSense
+
+  # Framing - each JSON line is a complete message
+  framing: delimiter
+  delimiter: "\n"
 
 # ============================== Processors ============================
 processors:
