@@ -25,7 +25,7 @@
       "type": "row"
     },
     {
-      "datasource": { "type": "elasticsearch", "uid": "${DS_ELASTICSEARCH}" },
+      "datasource": { "type": "elasticsearch", "uid": "af68payzal7nkd" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
@@ -47,7 +47,7 @@
       "pluginVersion": "10.0.0",
       "targets": [
         {
-          "datasource": { "type": "elasticsearch", "uid": "${DS_ELASTICSEARCH}" },
+          "datasource": { "type": "elasticsearch", "uid": "af68payzal7nkd" },
           "metrics": [{ "id": "1", "type": "count" }],
           "query": "*",
           "refId": "A",
@@ -58,7 +58,7 @@
       "type": "stat"
     },
     {
-      "datasource": { "type": "elasticsearch", "uid": "${DS_ELASTICSEARCH}" },
+      "datasource": { "type": "elasticsearch", "uid": "af68payzal7nkd" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
@@ -79,7 +79,7 @@
       },
       "targets": [
         {
-          "datasource": { "type": "elasticsearch", "uid": "${DS_ELASTICSEARCH}" },
+          "datasource": { "type": "elasticsearch", "uid": "af68payzal7nkd" },
           "metrics": [{ "id": "1", "type": "count" }],
           "query": "event_type:dns",
           "refId": "A",
@@ -90,7 +90,7 @@
       "type": "stat"
     },
     {
-      "datasource": { "type": "elasticsearch", "uid": "${DS_ELASTICSEARCH}" },
+      "datasource": { "type": "elasticsearch", "uid": "af68payzal7nkd" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
@@ -111,7 +111,7 @@
       },
       "targets": [
         {
-          "datasource": { "type": "elasticsearch", "uid": "${DS_ELASTICSEARCH}" },
+          "datasource": { "type": "elasticsearch", "uid": "af68payzal7nkd" },
           "metrics": [{ "id": "1", "type": "count" }],
           "query": "event_type:flow",
           "refId": "A",
@@ -122,7 +122,7 @@
       "type": "stat"
     },
     {
-      "datasource": { "type": "elasticsearch", "uid": "${DS_ELASTICSEARCH}" },
+      "datasource": { "type": "elasticsearch", "uid": "af68payzal7nkd" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "thresholds" },
@@ -150,7 +150,7 @@
       },
       "targets": [
         {
-          "datasource": { "type": "elasticsearch", "uid": "${DS_ELASTICSEARCH}" },
+          "datasource": { "type": "elasticsearch", "uid": "af68payzal7nkd" },
           "metrics": [{ "id": "1", "type": "count" }],
           "query": "event_type:alert",
           "refId": "A",
@@ -161,7 +161,7 @@
       "type": "stat"
     },
     {
-      "datasource": { "type": "elasticsearch", "uid": "${DS_ELASTICSEARCH}" },
+      "datasource": { "type": "elasticsearch", "uid": "af68payzal7nkd" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "thresholds" },
@@ -189,7 +189,7 @@
       },
       "targets": [
         {
-          "datasource": { "type": "elasticsearch", "uid": "${DS_ELASTICSEARCH}" },
+          "datasource": { "type": "elasticsearch", "uid": "af68payzal7nkd" },
           "metrics": [{ "id": "1", "type": "count" }],
           "query": "dest_ip:192.168.40.* OR src_ip:192.168.40.*",
           "refId": "A",
@@ -200,7 +200,7 @@
       "type": "stat"
     },
     {
-      "datasource": { "type": "elasticsearch", "uid": "${DS_ELASTICSEARCH}" },
+      "datasource": { "type": "elasticsearch", "uid": "af68payzal7nkd" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
@@ -221,7 +221,7 @@
       },
       "targets": [
         {
-          "datasource": { "type": "elasticsearch", "uid": "${DS_ELASTICSEARCH}" },
+          "datasource": { "type": "elasticsearch", "uid": "af68payzal7nkd" },
           "metrics": [{ "id": "1", "field": "flow.bytes_toserver", "type": "sum" }],
           "query": "event_type:flow",
           "refId": "A",
@@ -232,7 +232,7 @@
       "type": "stat"
     },
     {
-      "datasource": { "type": "elasticsearch", "uid": "${DS_ELASTICSEARCH}" },
+      "datasource": { "type": "elasticsearch", "uid": "af68payzal7nkd" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
@@ -268,7 +268,7 @@
       },
       "targets": [
         {
-          "datasource": { "type": "elasticsearch", "uid": "${DS_ELASTICSEARCH}" },
+          "datasource": { "type": "elasticsearch", "uid": "af68payzal7nkd" },
           "bucketAggs": [
             {
               "field": "@timestamp",
@@ -287,7 +287,7 @@
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "elasticsearch", "uid": "${DS_ELASTICSEARCH}" },
+      "datasource": { "type": "elasticsearch", "uid": "af68payzal7nkd" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
@@ -308,7 +308,7 @@
       },
       "targets": [
         {
-          "datasource": { "type": "elasticsearch", "uid": "${DS_ELASTICSEARCH}" },
+          "datasource": { "type": "elasticsearch", "uid": "af68payzal7nkd" },
           "bucketAggs": [
             {
               "field": "event_type",
@@ -327,7 +327,7 @@
       "type": "piechart"
     },
     {
-      "datasource": { "type": "elasticsearch", "uid": "${DS_ELASTICSEARCH}" },
+      "datasource": { "type": "elasticsearch", "uid": "af68payzal7nkd" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
@@ -347,7 +347,7 @@
       },
       "targets": [
         {
-          "datasource": { "type": "elasticsearch", "uid": "${DS_ELASTICSEARCH}" },
+          "datasource": { "type": "elasticsearch", "uid": "af68payzal7nkd" },
           "bucketAggs": [
             {
               "field": "proto",
@@ -372,7 +372,7 @@
       "type": "row"
     },
     {
-      "datasource": { "type": "elasticsearch", "uid": "${DS_ELASTICSEARCH}" },
+      "datasource": { "type": "elasticsearch", "uid": "af68payzal7nkd" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "thresholds" },
@@ -404,7 +404,7 @@
       },
       "targets": [
         {
-          "datasource": { "type": "elasticsearch", "uid": "${DS_ELASTICSEARCH}" },
+          "datasource": { "type": "elasticsearch", "uid": "af68payzal7nkd" },
           "bucketAggs": [
             {
               "field": "dns.rrname",
@@ -423,7 +423,7 @@
       "type": "table"
     },
     {
-      "datasource": { "type": "elasticsearch", "uid": "${DS_ELASTICSEARCH}" },
+      "datasource": { "type": "elasticsearch", "uid": "af68payzal7nkd" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "thresholds" },
@@ -455,7 +455,7 @@
       },
       "targets": [
         {
-          "datasource": { "type": "elasticsearch", "uid": "${DS_ELASTICSEARCH}" },
+          "datasource": { "type": "elasticsearch", "uid": "af68payzal7nkd" },
           "bucketAggs": [
             {
               "field": "http.hostname",
@@ -474,7 +474,7 @@
       "type": "table"
     },
     {
-      "datasource": { "type": "elasticsearch", "uid": "${DS_ELASTICSEARCH}" },
+      "datasource": { "type": "elasticsearch", "uid": "af68payzal7nkd" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "thresholds" },
@@ -506,7 +506,7 @@
       },
       "targets": [
         {
-          "datasource": { "type": "elasticsearch", "uid": "${DS_ELASTICSEARCH}" },
+          "datasource": { "type": "elasticsearch", "uid": "af68payzal7nkd" },
           "bucketAggs": [
             {
               "field": "tls.sni",
@@ -531,7 +531,7 @@
       "type": "row"
     },
     {
-      "datasource": { "type": "elasticsearch", "uid": "${DS_ELASTICSEARCH}" },
+      "datasource": { "type": "elasticsearch", "uid": "af68payzal7nkd" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
@@ -578,7 +578,7 @@
       "targets": [
         {
           "alias": "Download",
-          "datasource": { "type": "elasticsearch", "uid": "${DS_ELASTICSEARCH}" },
+          "datasource": { "type": "elasticsearch", "uid": "af68payzal7nkd" },
           "bucketAggs": [
             {
               "field": "@timestamp",
@@ -594,7 +594,7 @@
         },
         {
           "alias": "Upload",
-          "datasource": { "type": "elasticsearch", "uid": "${DS_ELASTICSEARCH}" },
+          "datasource": { "type": "elasticsearch", "uid": "af68payzal7nkd" },
           "bucketAggs": [
             {
               "field": "@timestamp",
@@ -613,7 +613,7 @@
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "elasticsearch", "uid": "${DS_ELASTICSEARCH}" },
+      "datasource": { "type": "elasticsearch", "uid": "af68payzal7nkd" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "thresholds" },
@@ -655,7 +655,7 @@
       },
       "targets": [
         {
-          "datasource": { "type": "elasticsearch", "uid": "${DS_ELASTICSEARCH}" },
+          "datasource": { "type": "elasticsearch", "uid": "af68payzal7nkd" },
           "bucketAggs": [
             {
               "field": "src_ip",
@@ -677,7 +677,7 @@
       "type": "table"
     },
     {
-      "datasource": { "type": "elasticsearch", "uid": "${DS_ELASTICSEARCH}" },
+      "datasource": { "type": "elasticsearch", "uid": "af68payzal7nkd" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "thresholds" },
@@ -711,7 +711,7 @@
       },
       "targets": [
         {
-          "datasource": { "type": "elasticsearch", "uid": "${DS_ELASTICSEARCH}" },
+          "datasource": { "type": "elasticsearch", "uid": "af68payzal7nkd" },
           "bucketAggs": [
             {
               "field": "dest_ip",
@@ -736,7 +736,7 @@
       "type": "row"
     },
     {
-      "datasource": { "type": "elasticsearch", "uid": "${DS_ELASTICSEARCH}" },
+      "datasource": { "type": "elasticsearch", "uid": "af68payzal7nkd" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "thresholds" },
@@ -780,7 +780,7 @@
       },
       "targets": [
         {
-          "datasource": { "type": "elasticsearch", "uid": "${DS_ELASTICSEARCH}" },
+          "datasource": { "type": "elasticsearch", "uid": "af68payzal7nkd" },
           "bucketAggs": [
             {
               "field": "destination.geo.location",
@@ -799,7 +799,7 @@
       "type": "geomap"
     },
     {
-      "datasource": { "type": "elasticsearch", "uid": "${DS_ELASTICSEARCH}" },
+      "datasource": { "type": "elasticsearch", "uid": "af68payzal7nkd" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "thresholds" },
@@ -831,7 +831,7 @@
       },
       "targets": [
         {
-          "datasource": { "type": "elasticsearch", "uid": "${DS_ELASTICSEARCH}" },
+          "datasource": { "type": "elasticsearch", "uid": "af68payzal7nkd" },
           "bucketAggs": [
             {
               "field": "destination.geo.country_name",
@@ -856,7 +856,7 @@
       "type": "row"
     },
     {
-      "datasource": { "type": "elasticsearch", "uid": "${DS_ELASTICSEARCH}" },
+      "datasource": { "type": "elasticsearch", "uid": "af68payzal7nkd" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
@@ -892,7 +892,7 @@
       },
       "targets": [
         {
-          "datasource": { "type": "elasticsearch", "uid": "${DS_ELASTICSEARCH}" },
+          "datasource": { "type": "elasticsearch", "uid": "af68payzal7nkd" },
           "bucketAggs": [
             {
               "field": "@timestamp",
@@ -911,7 +911,7 @@
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "elasticsearch", "uid": "${DS_ELASTICSEARCH}" },
+      "datasource": { "type": "elasticsearch", "uid": "af68payzal7nkd" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "thresholds" },
@@ -949,7 +949,7 @@
       },
       "targets": [
         {
-          "datasource": { "type": "elasticsearch", "uid": "${DS_ELASTICSEARCH}" },
+          "datasource": { "type": "elasticsearch", "uid": "af68payzal7nkd" },
           "bucketAggs": [
             {
               "field": "src_ip",
@@ -968,7 +968,7 @@
       "type": "table"
     },
     {
-      "datasource": { "type": "elasticsearch", "uid": "${DS_ELASTICSEARCH}" },
+      "datasource": { "type": "elasticsearch", "uid": "af68payzal7nkd" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "thresholds" },
@@ -1000,7 +1000,7 @@
       },
       "targets": [
         {
-          "datasource": { "type": "elasticsearch", "uid": "${DS_ELASTICSEARCH}" },
+          "datasource": { "type": "elasticsearch", "uid": "af68payzal7nkd" },
           "bucketAggs": [
             {
               "field": "dest_port",
@@ -1025,7 +1025,7 @@
       "type": "row"
     },
     {
-      "datasource": { "type": "elasticsearch", "uid": "${DS_ELASTICSEARCH}" },
+      "datasource": { "type": "elasticsearch", "uid": "af68payzal7nkd" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "thresholds" },
@@ -1055,7 +1055,7 @@
       },
       "targets": [
         {
-          "datasource": { "type": "elasticsearch", "uid": "${DS_ELASTICSEARCH}" },
+          "datasource": { "type": "elasticsearch", "uid": "af68payzal7nkd" },
           "bucketAggs": [],
           "metrics": [
             { "id": "1", "type": "raw_data", "settings": { "size": "100" } }
@@ -1120,7 +1120,7 @@
     "list": [
       {
         "current": { "selected": false, "text": "All", "value": "$__all" },
-        "datasource": { "type": "elasticsearch", "uid": "${DS_ELASTICSEARCH}" },
+        "datasource": { "type": "elasticsearch", "uid": "af68payzal7nkd" },
         "definition": "{\"find\": \"terms\", \"field\": \"src_ip\"}",
         "hide": 0,
         "includeAll": true,
@@ -1137,7 +1137,7 @@
       },
       {
         "current": { "selected": false, "text": "All", "value": "$__all" },
-        "datasource": { "type": "elasticsearch", "uid": "${DS_ELASTICSEARCH}" },
+        "datasource": { "type": "elasticsearch", "uid": "af68payzal7nkd" },
         "definition": "{\"find\": \"terms\", \"field\": \"event_type\"}",
         "hide": 0,
         "includeAll": true,
