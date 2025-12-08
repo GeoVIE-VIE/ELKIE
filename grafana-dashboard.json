@@ -802,7 +802,14 @@
       "gridPos": { "h": 12, "w": 16, "x": 0, "y": 34 },
       "id": 40,
       "options": {
-        "basemap": { "config": {}, "name": "ESRI World Imagery", "type": "esri-world-imagery" },
+        "basemap": {
+          "config": {
+            "url": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+            "attribution": "Esri, Maxar, Earthstar Geographics"
+          },
+          "name": "ESRI World Imagery",
+          "type": "xyz"
+        },
         "controls": { "mouseWheelZoom": true, "showAttribution": true, "showDebug": false, "showMeasure": false, "showScale": false, "showZoom": true },
         "layers": [
           {
