@@ -41,13 +41,21 @@
         "graphMode": "area",
         "justifyMode": "auto",
         "orientation": "auto",
-        "reduceOptions": { "calcs": ["count"], "fields": "", "values": false },
+        "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false },
         "textMode": "auto"
       },
       "pluginVersion": "10.0.0",
       "targets": [
         {
           "datasource": { "type": "elasticsearch", "uid": "af68payzal7nkd" },
+          "bucketAggs": [
+            {
+              "field": "@timestamp",
+              "id": "2",
+              "settings": { "interval": "auto" },
+              "type": "date_histogram"
+            }
+          ],
           "metrics": [{ "id": "1", "type": "count" }],
           "query": "*",
           "refId": "A",
@@ -74,12 +82,20 @@
         "graphMode": "area",
         "justifyMode": "auto",
         "orientation": "auto",
-        "reduceOptions": { "calcs": ["count"], "fields": "", "values": false },
+        "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false },
         "textMode": "auto"
       },
       "targets": [
         {
           "datasource": { "type": "elasticsearch", "uid": "af68payzal7nkd" },
+          "bucketAggs": [
+            {
+              "field": "@timestamp",
+              "id": "2",
+              "settings": { "interval": "auto" },
+              "type": "date_histogram"
+            }
+          ],
           "metrics": [{ "id": "1", "type": "count" }],
           "query": "event_type:dns",
           "refId": "A",
@@ -106,12 +122,20 @@
         "graphMode": "area",
         "justifyMode": "auto",
         "orientation": "auto",
-        "reduceOptions": { "calcs": ["count"], "fields": "", "values": false },
+        "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false },
         "textMode": "auto"
       },
       "targets": [
         {
           "datasource": { "type": "elasticsearch", "uid": "af68payzal7nkd" },
+          "bucketAggs": [
+            {
+              "field": "@timestamp",
+              "id": "2",
+              "settings": { "interval": "auto" },
+              "type": "date_histogram"
+            }
+          ],
           "metrics": [{ "id": "1", "type": "count" }],
           "query": "event_type:flow",
           "refId": "A",
@@ -145,12 +169,20 @@
         "graphMode": "area",
         "justifyMode": "auto",
         "orientation": "auto",
-        "reduceOptions": { "calcs": ["count"], "fields": "", "values": false },
+        "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false },
         "textMode": "auto"
       },
       "targets": [
         {
           "datasource": { "type": "elasticsearch", "uid": "af68payzal7nkd" },
+          "bucketAggs": [
+            {
+              "field": "@timestamp",
+              "id": "2",
+              "settings": { "interval": "auto" },
+              "type": "date_histogram"
+            }
+          ],
           "metrics": [{ "id": "1", "type": "count" }],
           "query": "event_type:alert",
           "refId": "A",
@@ -184,12 +216,20 @@
         "graphMode": "area",
         "justifyMode": "auto",
         "orientation": "auto",
-        "reduceOptions": { "calcs": ["count"], "fields": "", "values": false },
+        "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false },
         "textMode": "auto"
       },
       "targets": [
         {
           "datasource": { "type": "elasticsearch", "uid": "af68payzal7nkd" },
+          "bucketAggs": [
+            {
+              "field": "@timestamp",
+              "id": "2",
+              "settings": { "interval": "auto" },
+              "type": "date_histogram"
+            }
+          ],
           "metrics": [{ "id": "1", "type": "count" }],
           "query": "dest_ip:192.168.40.* OR src_ip:192.168.40.*",
           "refId": "A",
@@ -222,6 +262,14 @@
       "targets": [
         {
           "datasource": { "type": "elasticsearch", "uid": "af68payzal7nkd" },
+          "bucketAggs": [
+            {
+              "field": "@timestamp",
+              "id": "2",
+              "settings": { "interval": "auto" },
+              "type": "date_histogram"
+            }
+          ],
           "metrics": [{ "id": "1", "field": "flow.bytes_toserver", "type": "sum" }],
           "query": "event_type:flow",
           "refId": "A",
