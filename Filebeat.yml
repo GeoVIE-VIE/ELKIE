@@ -38,15 +38,14 @@ processors:
     fields: ["message"]
     ignore_missing: true
 
-# Uncomment to add GeoIP enrichment (requires MaxMind GeoIP database)
-# - add_host_metadata:
-#     netinfo.enabled: false
-# - add_locale: ~
-
 # ============================== Outputs ===============================
 output.elasticsearch:
   hosts: ["localhost:9200"]
   index: "suricata-%{+yyyy.MM.dd}"
+
+  # GeoIP enrichment via Elasticsearch ingest pipeline
+  # Create the pipeline first (see README or run the curl command below)
+  pipeline: "suricata-geoip"
 
   # MASSIVELY INCREASED - You have 8 CPUs barely used!
   worker: 8  # Use ALL your CPUs (was 2)
