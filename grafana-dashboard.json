@@ -1342,13 +1342,14 @@
   "templating": {
     "list": [
       {
-        "current": { "selected": false, "text": "All", "value": "$__all" },
+        "allValue": "*",
+        "current": { "selected": true, "text": "All", "value": "$__all" },
         "datasource": { "type": "elasticsearch", "uid": "af68payzal7nkd" },
         "definition": "{\"find\": \"terms\", \"field\": \"src_ip\"}",
         "hide": 0,
         "includeAll": true,
         "label": "Device",
-        "multi": false,
+        "multi": true,
         "name": "device",
         "options": [],
         "query": "{\"find\": \"terms\", \"field\": \"src_ip\"}",
