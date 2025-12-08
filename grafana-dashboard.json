@@ -802,7 +802,7 @@
       "gridPos": { "h": 12, "w": 16, "x": 0, "y": 34 },
       "id": 40,
       "options": {
-        "basemap": { "config": {}, "name": "Layer 0", "type": "dark" },
+        "basemap": { "config": {}, "name": "Layer 0", "type": "osm-standard" },
         "controls": { "mouseWheelZoom": true, "showAttribution": true, "showDebug": false, "showMeasure": false, "showScale": false, "showZoom": true },
         "layers": [
           {
@@ -817,7 +817,7 @@
                 "textConfig": { "fontSize": 12, "offsetX": 0, "offsetY": 0, "textAlign": "center", "textBaseline": "middle" }
               }
             },
-            "location": { "mode": "auto" },
+            "location": { "mode": "geohash", "geohash": "destination.geo.location" },
             "name": "Destinations",
             "tooltip": true,
             "type": "markers"
