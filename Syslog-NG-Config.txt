@@ -3,19 +3,13 @@
 # Do not edit manually !
 @version:4.8
 
-# Template to send raw JSON without syslog headers
-# This ensures eve.json content is sent as-is for proper parsing
-template t_json_only {
-  template("$MESSAGE\n");
-  template_escape(no);
-};
-
+# Send raw JSON without syslog headers using inline template
 destination d_elk_filebeat {
   network(
     "192.168.50.3"
     transport("tcp")
     port(514)
-    template(t_json_only)
+    template("$MESSAGE\n")
   );
 };
 destination _DEFAULT { file("/var/syslog-ng/default.log"); };
