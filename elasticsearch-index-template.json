@@ -1,0 +1,238 @@
+{
+  "index_patterns": ["suricata-*"],
+  "priority": 100,
+  "template": {
+    "settings": {
+      "number_of_shards": 1,
+      "number_of_replicas": 0,
+      "refresh_interval": "5s",
+      "codec": "best_compression"
+    },
+    "mappings": {
+      "properties": {
+        "source": {
+          "properties": {
+            "geo": {
+              "properties": {
+                "location": {
+                  "type": "geo_point"
+                },
+                "city_name": {
+                  "type": "keyword"
+                },
+                "country_name": {
+                  "type": "keyword"
+                },
+                "country_iso_code": {
+                  "type": "keyword"
+                },
+                "region_name": {
+                  "type": "keyword"
+                },
+                "continent_name": {
+                  "type": "keyword"
+                }
+              }
+            }
+          }
+        },
+        "destination": {
+          "properties": {
+            "geo": {
+              "properties": {
+                "location": {
+                  "type": "geo_point"
+                },
+                "city_name": {
+                  "type": "keyword"
+                },
+                "country_name": {
+                  "type": "keyword"
+                },
+                "country_iso_code": {
+                  "type": "keyword"
+                },
+                "region_name": {
+                  "type": "keyword"
+                },
+                "continent_name": {
+                  "type": "keyword"
+                }
+              }
+            }
+          }
+        },
+        "src_ip": {
+          "type": "ip"
+        },
+        "dest_ip": {
+          "type": "ip"
+        },
+        "event_type": {
+          "type": "keyword"
+        },
+        "timestamp": {
+          "type": "date"
+        },
+        "@timestamp": {
+          "type": "date"
+        },
+        "flow_id": {
+          "type": "long"
+        },
+        "proto": {
+          "type": "keyword"
+        },
+        "app_proto": {
+          "type": "keyword"
+        },
+        "src_port": {
+          "type": "integer"
+        },
+        "dest_port": {
+          "type": "integer"
+        },
+        "dns": {
+          "properties": {
+            "type": {
+              "type": "keyword"
+            },
+            "rrname": {
+              "type": "keyword"
+            },
+            "rrtype": {
+              "type": "keyword"
+            },
+            "rcode": {
+              "type": "keyword"
+            },
+            "answers": {
+              "properties": {
+                "rrname": {
+                  "type": "keyword"
+                },
+                "rrtype": {
+                  "type": "keyword"
+                },
+                "rdata": {
+                  "type": "keyword"
+                },
+                "ttl": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "http": {
+          "properties": {
+            "hostname": {
+              "type": "keyword"
+            },
+            "url": {
+              "type": "keyword"
+            },
+            "http_method": {
+              "type": "keyword"
+            },
+            "http_user_agent": {
+              "type": "text",
+              "fields": {
+                "keyword": {
+                  "type": "keyword",
+                  "ignore_above": 256
+                }
+              }
+            },
+            "status": {
+              "type": "integer"
+            },
+            "length": {
+              "type": "long"
+            },
+            "http_content_type": {
+              "type": "keyword"
+            }
+          }
+        },
+        "tls": {
+          "properties": {
+            "sni": {
+              "type": "keyword"
+            },
+            "version": {
+              "type": "keyword"
+            },
+            "subject": {
+              "type": "keyword"
+            },
+            "issuerdn": {
+              "type": "keyword"
+            },
+            "ja3": {
+              "properties": {
+                "hash": {
+                  "type": "keyword"
+                }
+              }
+            },
+            "ja3s": {
+              "properties": {
+                "hash": {
+                  "type": "keyword"
+                }
+              }
+            }
+          }
+        },
+        "alert": {
+          "properties": {
+            "signature": {
+              "type": "keyword"
+            },
+            "signature_id": {
+              "type": "long"
+            },
+            "category": {
+              "type": "keyword"
+            },
+            "severity": {
+              "type": "integer"
+            },
+            "action": {
+              "type": "keyword"
+            }
+          }
+        },
+        "flow": {
+          "properties": {
+            "pkts_toserver": {
+              "type": "long"
+            },
+            "pkts_toclient": {
+              "type": "long"
+            },
+            "bytes_toserver": {
+              "type": "long"
+            },
+            "bytes_toclient": {
+              "type": "long"
+            },
+            "start": {
+              "type": "date"
+            },
+            "end": {
+              "type": "date"
+            },
+            "state": {
+              "type": "keyword"
+            },
+            "reason": {
+              "type": "keyword"
+            }
+          }
+        }
+      }
+    }
+  }
+}

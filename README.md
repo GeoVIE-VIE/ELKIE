@@ -7,6 +7,8 @@ This repository contains the optimized Filebeat configuration for ingesting Suri
 - **Filebeat.yml** - Main Filebeat configuration (optimized for 28GB RAM, 8 CPUs, 10Gbps network)
 - **Syslog-NG-Config.txt** - Syslog-NG configuration reference
 - **deploy-filebeat-config.sh** - Deployment script
+- **elasticsearch-index-template.json** - Index template for proper field mappings (geo_point, etc.)
+- **grafana-dashboard.json** - Home network monitoring dashboard
 
 ## Quick Fix for Current Issue
 
@@ -77,7 +79,44 @@ curl -X PUT "localhost:9200/_ingest/pipeline/suricata-geoip" -H 'Content-Type: a
 '
 ```
 
-This adds geographic data (country, city, coordinates) to your Suricata events for map visualizations in Kibana.
+This adds geographic data (country, city, coordinates) to your Suricata events for map visualizations.
+
+### Index Template for Geo_Point Mapping
+
+For map visualizations to work properly, the `source.geo.location` and `destination.geo.location` fields must be mapped as `geo_point`. Create this index template before ingesting data:
+
+```bash
+curl -X PUT "localhost:9200/_index_template/suricata-template" \
+  -H 'Content-Type: application/json' \
+  -d @elasticsearch-index-template.json
+```
+
+**Note**: Existing indices won't be affected. To apply the new mapping, either:
+- Wait for new daily indices to be created (next day)
+- Or delete and recreate the current index: `curl -X DELETE "localhost:9200/suricata-$(date +%Y.%m.%d)"`
+
+## Grafana Dashboard
+
+Import the included `grafana-dashboard.json` for a complete home network monitoring dashboard.
+
+### Dashboard Features
+
+- **Network Overview**: Total events, unique IPs, protocols distribution
+- **Events Over Time**: Time series visualization of network activity
+- **DNS Queries**: Top visited domains with device filtering
+- **HTTP/TLS Traffic**: Website and application monitoring
+- **Geographic Map**: Traffic source/destination visualization (requires geo_point mapping)
+- **Honeypot Monitor**: Activity on subnet 192.168.40.0/24
+- **Security Alerts**: Suricata IDS alert monitoring
+
+### Import Dashboard
+
+1. Open Grafana → Dashboards → Import
+2. Upload `grafana-dashboard.json` or paste its contents
+3. Select your Elasticsearch datasource
+4. Click Import
+
+**Note**: The dashboard is configured for datasource UID `af68payzal7nkd`. Update if your datasource UID is different.
 
 ### Performance Optimizations
 
@@ -118,6 +157,8 @@ sudo systemctl start filebeat
 
 ## Recent Fixes
 
+- **Dec 8, 2025**: Added Elasticsearch index template for geo_point mapping (map visualizations)
+- **Dec 8, 2025**: Added Grafana dashboard for home network monitoring
 - **Dec 8, 2025**: Added GeoIP enrichment via Elasticsearch ingest pipeline
 - **Dec 8, 2025**: Simplified config to decode JSON directly (removed dissect processor)
 - **Dec 8, 2025**: Updated syslog-ng to send raw JSON with `template("$MESSAGE\n")`
