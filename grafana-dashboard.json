@@ -351,7 +351,7 @@
       "options": {
         "legend": { "displayMode": "table", "placement": "right", "showLegend": true, "values": ["value", "percent"] },
         "pieType": "donut",
-        "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false },
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": true },
         "tooltip": { "mode": "single", "sort": "none" }
       },
       "targets": [
@@ -390,7 +390,7 @@
       "options": {
         "legend": { "displayMode": "table", "placement": "right", "showLegend": true, "values": ["value", "percent"] },
         "pieType": "donut",
-        "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false },
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": true },
         "tooltip": { "mode": "single", "sort": "none" }
       },
       "targets": [
