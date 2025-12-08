@@ -44,9 +44,40 @@ sudo journalctl -u filebeat -f
 
 The configuration handles JSON logs from Suricata via syslog-ng with the following processors:
 
-1. **dissect** - Extracts JSON payload from syslog message format
-2. **decode_json_fields** - Parses the JSON payload
-3. **drop_fields** - Cleans up temporary fields
+1. **decode_json_fields** - Parses the JSON directly from the message field
+2. **drop_fields** - Cleans up the original message field
+
+**Note**: Syslog-NG must be configured with `template("$MESSAGE\n")` to send raw JSON without headers.
+
+### GeoIP Enrichment Setup
+
+The Filebeat config uses an Elasticsearch ingest pipeline for GeoIP enrichment. Create it before starting Filebeat:
+
+```bash
+curl -X PUT "localhost:9200/_ingest/pipeline/suricata-geoip" -H 'Content-Type: application/json' -d'
+{
+  "description": "Add GeoIP data to Suricata logs",
+  "processors": [
+    {
+      "geoip": {
+        "field": "src_ip",
+        "target_field": "source.geo",
+        "ignore_missing": true
+      }
+    },
+    {
+      "geoip": {
+        "field": "dest_ip",
+        "target_field": "destination.geo",
+        "ignore_missing": true
+      }
+    }
+  ]
+}
+'
+```
+
+This adds geographic data (country, city, coordinates) to your Suricata events for map visualizations in Kibana.
 
 ### Performance Optimizations
 
@@ -87,6 +118,9 @@ sudo systemctl start filebeat
 
 ## Recent Fixes
 
+- **Dec 8, 2025**: Added GeoIP enrichment via Elasticsearch ingest pipeline
+- **Dec 8, 2025**: Simplified config to decode JSON directly (removed dissect processor)
+- **Dec 8, 2025**: Updated syslog-ng to send raw JSON with `template("$MESSAGE\n")`
 - **Dec 7, 2025**: Fixed `dissect` tokenizer to parse full syslog format with priority and timestamp
 - **Dec 7, 2025**: Replaced `grok` processor with `dissect` (grok not available in this Filebeat version)
 - **Dec 7, 2025**: Created automated deployment script and documentation
