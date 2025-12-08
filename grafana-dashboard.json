@@ -961,21 +961,21 @@
           "datasource": { "type": "elasticsearch", "uid": "af68payzal7nkd" },
           "bucketAggs": [
             {
-              "field": "dest_ip",
-              "id": "3",
-              "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "50" },
-              "type": "terms"
-            },
-            {
               "field": "destination.geo.country_name",
-              "id": "4",
-              "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "1" },
+              "id": "3",
+              "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "20" },
               "type": "terms"
             },
             {
               "field": "destination.geo.city_name",
+              "id": "4",
+              "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "10" },
+              "type": "terms"
+            },
+            {
+              "field": "dest_ip",
               "id": "5",
-              "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "1" },
+              "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "20" },
               "type": "terms"
             }
           ],
@@ -985,7 +985,7 @@
           "timeField": "@timestamp"
         }
       ],
-      "title": "IP Geographic Details",
+      "title": "IP Geographic Details (Outbound by Destination)",
       "type": "table"
     },
     {
@@ -1045,21 +1045,21 @@
           "datasource": { "type": "elasticsearch", "uid": "af68payzal7nkd" },
           "bucketAggs": [
             {
-              "field": "src_ip",
-              "id": "3",
-              "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "50" },
-              "type": "terms"
-            },
-            {
               "field": "source.geo.country_name",
-              "id": "4",
-              "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "1" },
+              "id": "3",
+              "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "20" },
               "type": "terms"
             },
             {
               "field": "source.geo.city_name",
+              "id": "4",
+              "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "10" },
+              "type": "terms"
+            },
+            {
+              "field": "src_ip",
               "id": "5",
-              "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "1" },
+              "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "20" },
               "type": "terms"
             }
           ],
@@ -1069,7 +1069,7 @@
           "timeField": "@timestamp"
         }
       ],
-      "title": "Inbound Traffic by Source IP",
+      "title": "Inbound Traffic by Source Location",
       "type": "table"
     },
     {
