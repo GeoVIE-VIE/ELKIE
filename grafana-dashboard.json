@@ -191,7 +191,7 @@
         {
           "datasource": { "type": "elasticsearch", "uid": "${DS_ELASTICSEARCH}" },
           "metrics": [{ "id": "1", "type": "count" }],
-          "query": "dest_ip:$honeypot_ip OR src_ip:$honeypot_ip",
+          "query": "dest_ip:192.168.40.* OR src_ip:192.168.40.*",
           "refId": "A",
           "timeField": "@timestamp"
         }
@@ -902,7 +902,7 @@
             }
           ],
           "metrics": [{ "id": "1", "type": "count" }],
-          "query": "dest_ip:$honeypot_ip",
+          "query": "dest_ip:192.168.40.*",
           "refId": "A",
           "timeField": "@timestamp"
         }
@@ -959,7 +959,7 @@
             }
           ],
           "metrics": [{ "id": "1", "type": "count" }],
-          "query": "dest_ip:$honeypot_ip",
+          "query": "dest_ip:192.168.40.*",
           "refId": "A",
           "timeField": "@timestamp"
         }
@@ -1010,7 +1010,7 @@
             }
           ],
           "metrics": [{ "id": "1", "type": "count" }],
-          "query": "dest_ip:$honeypot_ip",
+          "query": "dest_ip:192.168.40.*",
           "refId": "A",
           "timeField": "@timestamp"
         }
@@ -1153,12 +1153,12 @@
         "type": "query"
       },
       {
-        "current": { "selected": false, "text": "192.168.1.100", "value": "192.168.1.100" },
+        "current": { "selected": false, "text": "192.168.40.*", "value": "192.168.40.*" },
         "hide": 0,
-        "label": "Honeypot IP",
-        "name": "honeypot_ip",
-        "options": [{ "selected": true, "text": "192.168.1.100", "value": "192.168.1.100" }],
-        "query": "192.168.1.100",
+        "label": "Honeypot Subnet",
+        "name": "honeypot_subnet",
+        "options": [{ "selected": true, "text": "192.168.40.*", "value": "192.168.40.*" }],
+        "query": "192.168.40.*",
         "skipUrlSync": false,
         "type": "textbox"
       }
