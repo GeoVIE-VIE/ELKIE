@@ -802,15 +802,15 @@
       "gridPos": { "h": 12, "w": 16, "x": 0, "y": 34 },
       "id": 40,
       "options": {
-        "basemap": { "config": {}, "name": "Layer 0", "type": "osm-standard" },
+        "basemap": { "config": {}, "name": "ESRI World Imagery", "type": "esri-world-imagery" },
         "controls": { "mouseWheelZoom": true, "showAttribution": true, "showDebug": false, "showMeasure": false, "showScale": false, "showZoom": true },
         "layers": [
           {
             "config": {
               "showLegend": true,
               "style": {
-                "color": { "field": "Count", "fixed": "dark-green" },
-                "opacity": 0.6,
+                "color": { "field": "Count", "fixed": "yellow" },
+                "opacity": 0.8,
                 "rotation": { "fixed": 0, "max": 360, "min": -360, "mode": "mod" },
                 "size": { "field": "Count", "fixed": 5, "max": 15, "min": 4 },
                 "symbol": { "fixed": "img/icons/marker/circle.svg", "mode": "fixed" },
