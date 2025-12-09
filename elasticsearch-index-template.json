@@ -12,34 +12,317 @@
       "dynamic": false,
       "properties": {
         "@timestamp": { "type": "date" },
+        "timestamp": { "type": "date" },
         "event_type": { "type": "keyword" },
+        "flow_id": { "type": "keyword" },
+        "tx_id": { "type": "long" },
+        "in_iface": { "type": "keyword" },
         "src_ip": { "type": "ip" },
-        "dest_ip": { "type": "ip" },
         "src_port": { "type": "integer" },
+        "dest_ip": { "type": "ip" },
         "dest_port": { "type": "integer" },
         "proto": { "type": "keyword" },
-        "dns": { "dynamic": false, "properties": { "rrname": { "type": "keyword" } } },
-        "http": { "dynamic": false, "properties": { "hostname": { "type": "keyword" } } },
-        "tls": { "dynamic": false, "properties": { "sni": { "type": "keyword" } } },
-        "flow": { "dynamic": false, "properties": {
-          "bytes_toserver": { "type": "long" },
-          "bytes_toclient": { "type": "long" }
-        }},
-        "alert": { "dynamic": false, "properties": {
-          "signature": { "type": "keyword" },
-          "category": { "type": "keyword" },
-          "severity": { "type": "integer" }
-        }},
-        "source": { "dynamic": false, "properties": { "geo": { "dynamic": false, "properties": {
-          "location": { "type": "geo_point" },
-          "city_name": { "type": "keyword" },
-          "country_name": { "type": "keyword" }
-        }}}},
-        "destination": { "dynamic": false, "properties": { "geo": { "dynamic": false, "properties": {
-          "location": { "type": "geo_point" },
-          "city_name": { "type": "keyword" },
-          "country_name": { "type": "keyword" }
-        }}}}
+        "app_proto": { "type": "keyword" },
+        "direction": { "type": "keyword" },
+        "hostname": { "type": "keyword" },
+        "message": { "type": "text" },
+        "packet": { "type": "keyword", "index": false },
+        "stream": { "type": "long" },
+        "pkt_src": { "type": "keyword" },
+        "icmp_type": { "type": "integer" },
+        "icmp_code": { "type": "integer" },
+        "response_icmp_type": { "type": "integer" },
+        "response_icmp_code": { "type": "integer" },
+
+        "agent": {
+          "dynamic": false,
+          "properties": {
+            "ephemeral_id": { "type": "keyword" },
+            "id": { "type": "keyword" },
+            "name": { "type": "keyword" },
+            "type": { "type": "keyword" },
+            "version": { "type": "keyword" }
+          }
+        },
+
+        "alert": {
+          "dynamic": false,
+          "properties": {
+            "action": { "type": "keyword" },
+            "category": { "type": "keyword" },
+            "gid": { "type": "integer" },
+            "rev": { "type": "integer" },
+            "severity": { "type": "integer" },
+            "signature": { "type": "keyword" },
+            "signature_id": { "type": "long" },
+            "metadata": {
+              "dynamic": false,
+              "properties": {
+                "affected_product": { "type": "keyword" },
+                "attack_target": { "type": "keyword" },
+                "confidence": { "type": "keyword" },
+                "created_at": { "type": "keyword" },
+                "deployment": { "type": "keyword" },
+                "signature_severity": { "type": "keyword" },
+                "tag": { "type": "keyword" },
+                "updated_at": { "type": "keyword" }
+              }
+            }
+          }
+        },
+
+        "dhcp": {
+          "dynamic": false,
+          "properties": {
+            "assigned_ip": { "type": "ip" },
+            "client_mac": { "type": "keyword" },
+            "dhcp_type": { "type": "keyword" },
+            "id": { "type": "long" },
+            "type": { "type": "keyword" }
+          }
+        },
+
+        "dns": {
+          "dynamic": false,
+          "properties": {
+            "flags": { "type": "keyword" },
+            "id": { "type": "integer" },
+            "opcode": { "type": "keyword" },
+            "qr": { "type": "boolean" },
+            "ra": { "type": "boolean" },
+            "rcode": { "type": "keyword" },
+            "rd": { "type": "boolean" },
+            "rrname": { "type": "keyword" },
+            "rrtype": { "type": "keyword" },
+            "tx_id": { "type": "long" },
+            "type": { "type": "keyword" },
+            "version": { "type": "integer" },
+            "answers": {
+              "dynamic": false,
+              "properties": {
+                "rdata": { "type": "keyword" },
+                "rrname": { "type": "keyword" },
+                "rrtype": { "type": "keyword" },
+                "ttl": { "type": "long" }
+              }
+            },
+            "grouped": {
+              "dynamic": false,
+              "properties": {
+                "A": { "type": "ip" }
+              }
+            }
+          }
+        },
+
+        "ecs": {
+          "dynamic": false,
+          "properties": {
+            "version": { "type": "keyword" }
+          }
+        },
+
+        "error": {
+          "dynamic": false,
+          "properties": {
+            "data": { "type": "keyword" },
+            "field": { "type": "keyword" },
+            "message": { "type": "text" },
+            "type": { "type": "keyword" }
+          }
+        },
+
+        "event": {
+          "dynamic": false,
+          "properties": {
+            "severity": { "type": "integer" }
+          }
+        },
+
+        "fileinfo": {
+          "dynamic": false,
+          "properties": {
+            "filename": { "type": "keyword" },
+            "gaps": { "type": "boolean" },
+            "magic": { "type": "keyword" },
+            "size": { "type": "long" },
+            "state": { "type": "keyword" },
+            "stored": { "type": "boolean" },
+            "tx_id": { "type": "long" }
+          }
+        },
+
+        "flow": {
+          "dynamic": false,
+          "properties": {
+            "age": { "type": "long" },
+            "alerted": { "type": "boolean" },
+            "bytes_toclient": { "type": "long" },
+            "bytes_toserver": { "type": "long" },
+            "dest_ip": { "type": "ip" },
+            "dest_port": { "type": "integer" },
+            "end": { "type": "date" },
+            "pkts_toclient": { "type": "long" },
+            "pkts_toserver": { "type": "long" },
+            "reason": { "type": "keyword" },
+            "src_ip": { "type": "ip" },
+            "src_port": { "type": "integer" },
+            "start": { "type": "date" },
+            "state": { "type": "keyword" }
+          }
+        },
+
+        "host": {
+          "dynamic": false,
+          "properties": {
+            "name": { "type": "keyword" }
+          }
+        },
+
+        "http": {
+          "dynamic": false,
+          "properties": {
+            "hostname": { "type": "keyword" },
+            "http_content_type": { "type": "keyword" },
+            "http_method": { "type": "keyword" },
+            "http_user_agent": { "type": "keyword" },
+            "length": { "type": "long" },
+            "protocol": { "type": "keyword" },
+            "status": { "type": "integer" },
+            "url": { "type": "keyword" },
+            "request_headers": {
+              "dynamic": false,
+              "properties": {
+                "name": { "type": "keyword" },
+                "value": { "type": "keyword" }
+              }
+            },
+            "response_headers": {
+              "dynamic": false,
+              "properties": {
+                "name": { "type": "keyword" },
+                "value": { "type": "keyword" }
+              }
+            }
+          }
+        },
+
+        "input": {
+          "dynamic": false,
+          "properties": {
+            "type": { "type": "keyword" }
+          }
+        },
+
+        "log": {
+          "dynamic": false,
+          "properties": {
+            "source": {
+              "dynamic": false,
+              "properties": {
+                "address": { "type": "keyword" }
+              }
+            }
+          }
+        },
+
+        "packet_info": {
+          "dynamic": false,
+          "properties": {
+            "linktype": { "type": "integer" }
+          }
+        },
+
+        "process": {
+          "dynamic": false,
+          "properties": {
+            "pid": { "type": "long" },
+            "program": { "type": "keyword" }
+          }
+        },
+
+        "snmp": {
+          "dynamic": false,
+          "properties": {
+            "community": { "type": "keyword" },
+            "pdu_type": { "type": "keyword" },
+            "vars": { "type": "keyword" },
+            "version": { "type": "integer" }
+          }
+        },
+
+        "syslog": {
+          "dynamic": false,
+          "properties": {
+            "facility": { "type": "integer" },
+            "facility_label": { "type": "keyword" },
+            "priority": { "type": "integer" },
+            "severity_label": { "type": "keyword" }
+          }
+        },
+
+        "tcp": {
+          "dynamic": false,
+          "properties": {
+            "ack": { "type": "boolean" },
+            "fin": { "type": "boolean" },
+            "psh": { "type": "boolean" },
+            "rst": { "type": "boolean" },
+            "state": { "type": "keyword" },
+            "syn": { "type": "boolean" },
+            "tc_max_regions": { "type": "integer" },
+            "tcp_flags": { "type": "keyword" },
+            "tcp_flags_tc": { "type": "keyword" },
+            "tcp_flags_ts": { "type": "keyword" },
+            "ts_max_regions": { "type": "integer" }
+          }
+        },
+
+        "tls": {
+          "dynamic": false,
+          "properties": {
+            "fingerprint": { "type": "keyword" },
+            "issuerdn": { "type": "keyword" },
+            "notafter": { "type": "date" },
+            "notbefore": { "type": "date" },
+            "serial": { "type": "keyword" },
+            "sni": { "type": "keyword" },
+            "subject": { "type": "keyword" },
+            "version": { "type": "keyword" }
+          }
+        },
+
+        "source": {
+          "dynamic": false,
+          "properties": {
+            "geo": {
+              "dynamic": false,
+              "properties": {
+                "location": { "type": "geo_point" },
+                "city_name": { "type": "keyword" },
+                "country_name": { "type": "keyword" },
+                "country_iso_code": { "type": "keyword" },
+                "region_name": { "type": "keyword" }
+              }
+            }
+          }
+        },
+
+        "destination": {
+          "dynamic": false,
+          "properties": {
+            "geo": {
+              "dynamic": false,
+              "properties": {
+                "location": { "type": "geo_point" },
+                "city_name": { "type": "keyword" },
+                "country_name": { "type": "keyword" },
+                "country_iso_code": { "type": "keyword" },
+                "region_name": { "type": "keyword" }
+              }
+            }
+          }
+        }
       }
     }
   }
