@@ -1,6 +1,7 @@
 {
   "index_patterns": ["suricata-*"],
-  "priority": 100,
+  "priority": 500,
+  "data_stream": {},
   "template": {
     "settings": {
       "number_of_shards": 1,
