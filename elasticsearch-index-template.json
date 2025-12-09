@@ -1,5 +1,5 @@
 {
-  "index_patterns": ["suricata-*"],
+  "index_patterns": ["suricata", "suricata-*"],
   "priority": 500,
   "data_stream": {},
   "template": {
