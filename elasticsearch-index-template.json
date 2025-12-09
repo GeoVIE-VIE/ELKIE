@@ -9,10 +9,13 @@
       "codec": "best_compression"
     },
     "mappings": {
+      "dynamic": false,
       "properties": {
         "source": {
+          "dynamic": false,
           "properties": {
             "geo": {
+              "dynamic": false,
               "properties": {
                 "location": {
                   "type": "geo_point"
@@ -37,8 +40,10 @@
           }
         },
         "destination": {
+          "dynamic": false,
           "properties": {
             "geo": {
+              "dynamic": false,
               "properties": {
                 "location": {
                   "type": "geo_point"
@@ -93,6 +98,7 @@
           "type": "integer"
         },
         "dns": {
+          "dynamic": false,
           "properties": {
             "type": {
               "type": "keyword"
@@ -107,6 +113,7 @@
               "type": "keyword"
             },
             "answers": {
+              "dynamic": false,
               "properties": {
                 "rrname": {
                   "type": "keyword"
@@ -125,6 +132,7 @@
           }
         },
         "http": {
+          "dynamic": false,
           "properties": {
             "hostname": {
               "type": "keyword"
@@ -156,6 +164,7 @@
           }
         },
         "tls": {
+          "dynamic": false,
           "properties": {
             "sni": {
               "type": "keyword"
@@ -170,6 +179,7 @@
               "type": "keyword"
             },
             "ja3": {
+              "dynamic": false,
               "properties": {
                 "hash": {
                   "type": "keyword"
@@ -177,6 +187,7 @@
               }
             },
             "ja3s": {
+              "dynamic": false,
               "properties": {
                 "hash": {
                   "type": "keyword"
@@ -186,6 +197,7 @@
           }
         },
         "alert": {
+          "dynamic": false,
           "properties": {
             "signature": {
               "type": "keyword"
@@ -205,6 +217,7 @@
           }
         },
         "flow": {
+          "dynamic": false,
           "properties": {
             "pkts_toserver": {
               "type": "long"
