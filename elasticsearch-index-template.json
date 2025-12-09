@@ -10,27 +10,36 @@
     },
     "mappings": {
       "dynamic": false,
-      "dynamic_templates": [
-        { "geo_points": { "match": "location", "mapping": { "type": "geo_point" } } },
-        { "ips": { "match": "*_ip", "mapping": { "type": "ip" } } },
-        { "ports": { "match": "*_port", "mapping": { "type": "integer" } } },
-        { "bytes": { "match": "bytes_*", "mapping": { "type": "long" } } },
-        { "packets": { "match": "pkts_*", "mapping": { "type": "long" } } },
-        { "dates": { "match": "*timestamp", "mapping": { "type": "date" } } },
-        { "strings": { "match_mapping_type": "string", "mapping": { "type": "keyword" } } }
-      ],
       "properties": {
         "@timestamp": { "type": "date" },
+        "event_type": { "type": "keyword" },
         "src_ip": { "type": "ip" },
         "dest_ip": { "type": "ip" },
         "src_port": { "type": "integer" },
         "dest_port": { "type": "integer" },
         "proto": { "type": "keyword" },
-        "app_proto": { "type": "keyword" },
-        "event_type": { "type": "keyword" },
-        "flow_id": { "type": "long" },
-        "source.geo.location": { "type": "geo_point" },
-        "destination.geo.location": { "type": "geo_point" }
+        "dns": { "dynamic": false, "properties": { "rrname": { "type": "keyword" } } },
+        "http": { "dynamic": false, "properties": { "hostname": { "type": "keyword" } } },
+        "tls": { "dynamic": false, "properties": { "sni": { "type": "keyword" } } },
+        "flow": { "dynamic": false, "properties": {
+          "bytes_toserver": { "type": "long" },
+          "bytes_toclient": { "type": "long" }
+        }},
+        "alert": { "dynamic": false, "properties": {
+          "signature": { "type": "keyword" },
+          "category": { "type": "keyword" },
+          "severity": { "type": "integer" }
+        }},
+        "source": { "dynamic": false, "properties": { "geo": { "dynamic": false, "properties": {
+          "location": { "type": "geo_point" },
+          "city_name": { "type": "keyword" },
+          "country_name": { "type": "keyword" }
+        }}}},
+        "destination": { "dynamic": false, "properties": { "geo": { "dynamic": false, "properties": {
+          "location": { "type": "geo_point" },
+          "city_name": { "type": "keyword" },
+          "country_name": { "type": "keyword" }
+        }}}}
       }
     }
   }
