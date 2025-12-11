@@ -730,22 +730,50 @@
             },
             "fieldConfig": {
                 "defaults": {
-                    "custom": {
-                        "drawStyle": "bars",
-                        "lineInterpolation": "smooth",
-                        "lineWidth": 1,
-                        "fillOpacity": 80,
-                        "showPoints": "never",
-                        "stacking": {
-                            "mode": "normal"
-                        }
-                    },
                     "color": {
-                        "mode": "palette-classic"
+                        "mode": "thresholds"
                     },
-                    "mappings": []
+                    "custom": {
+                        "align": "auto",
+                        "cellOptions": {
+                            "type": "auto"
+                        },
+                        "inspect": false
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            }
+                        ]
+                    }
                 },
-                "overrides": []
+                "overrides": [
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Count"
+                        },
+                        "properties": [
+                            {
+                                "id": "custom.cellOptions",
+                                "value": {
+                                    "mode": "gradient",
+                                    "type": "gauge"
+                                }
+                            },
+                            {
+                                "id": "color",
+                                "value": {
+                                    "mode": "continuous-BlYlRd"
+                                }
+                            }
+                        ]
+                    }
+                ]
             },
             "gridPos": {
                 "h": 8,
@@ -755,17 +783,22 @@
             },
             "id": 5,
             "options": {
-                "legend": {
-                    "displayMode": "table",
-                    "placement": "bottom",
-                    "showLegend": true,
-                    "calcs": [
+                "cellHeight": "sm",
+                "footer": {
+                    "countRows": false,
+                    "fields": "",
+                    "reducer": [
                         "sum"
-                    ]
+                    ],
+                    "show": false
                 },
-                "tooltip": {
-                    "mode": "multi"
-                }
+                "showHeader": true,
+                "sortBy": [
+                    {
+                        "desc": true,
+                        "displayName": "Count"
+                    }
+                ]
             },
             "pluginVersion": "10.0.0",
             "targets": [
@@ -796,7 +829,7 @@
                 }
             ],
             "title": "Top Attacker IPs",
-            "type": "bargauge",
+            "type": "table",
             "description": "Most active source IPs"
         },
         {
@@ -806,22 +839,50 @@
             },
             "fieldConfig": {
                 "defaults": {
-                    "custom": {
-                        "drawStyle": "bars",
-                        "lineInterpolation": "smooth",
-                        "lineWidth": 1,
-                        "fillOpacity": 80,
-                        "showPoints": "never",
-                        "stacking": {
-                            "mode": "normal"
-                        }
-                    },
                     "color": {
-                        "mode": "palette-classic"
+                        "mode": "thresholds"
                     },
-                    "mappings": []
+                    "custom": {
+                        "align": "auto",
+                        "cellOptions": {
+                            "type": "auto"
+                        },
+                        "inspect": false
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            }
+                        ]
+                    }
                 },
-                "overrides": []
+                "overrides": [
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Count"
+                        },
+                        "properties": [
+                            {
+                                "id": "custom.cellOptions",
+                                "value": {
+                                    "mode": "gradient",
+                                    "type": "gauge"
+                                }
+                            },
+                            {
+                                "id": "color",
+                                "value": {
+                                    "mode": "continuous-BlYlRd"
+                                }
+                            }
+                        ]
+                    }
+                ]
             },
             "gridPos": {
                 "h": 8,
@@ -831,17 +892,22 @@
             },
             "id": 6,
             "options": {
-                "legend": {
-                    "displayMode": "table",
-                    "placement": "bottom",
-                    "showLegend": true,
-                    "calcs": [
+                "cellHeight": "sm",
+                "footer": {
+                    "countRows": false,
+                    "fields": "",
+                    "reducer": [
                         "sum"
-                    ]
+                    ],
+                    "show": false
                 },
-                "tooltip": {
-                    "mode": "multi"
-                }
+                "showHeader": true,
+                "sortBy": [
+                    {
+                        "desc": true,
+                        "displayName": "Count"
+                    }
+                ]
             },
             "pluginVersion": "10.0.0",
             "targets": [
@@ -872,7 +938,7 @@
                 }
             ],
             "title": "Top Destination Ports",
-            "type": "bargauge",
+            "type": "table",
             "description": "Most targeted ports"
         },
         {
@@ -882,22 +948,50 @@
             },
             "fieldConfig": {
                 "defaults": {
-                    "custom": {
-                        "drawStyle": "bars",
-                        "lineInterpolation": "smooth",
-                        "lineWidth": 1,
-                        "fillOpacity": 80,
-                        "showPoints": "never",
-                        "stacking": {
-                            "mode": "normal"
-                        }
-                    },
                     "color": {
-                        "mode": "palette-classic"
+                        "mode": "thresholds"
                     },
-                    "mappings": []
+                    "custom": {
+                        "align": "auto",
+                        "cellOptions": {
+                            "type": "auto"
+                        },
+                        "inspect": false
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            }
+                        ]
+                    }
                 },
-                "overrides": []
+                "overrides": [
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Count"
+                        },
+                        "properties": [
+                            {
+                                "id": "custom.cellOptions",
+                                "value": {
+                                    "mode": "gradient",
+                                    "type": "gauge"
+                                }
+                            },
+                            {
+                                "id": "color",
+                                "value": {
+                                    "mode": "continuous-BlYlRd"
+                                }
+                            }
+                        ]
+                    }
+                ]
             },
             "gridPos": {
                 "h": 8,
@@ -907,17 +1001,22 @@
             },
             "id": 7,
             "options": {
-                "legend": {
-                    "displayMode": "table",
-                    "placement": "bottom",
-                    "showLegend": true,
-                    "calcs": [
+                "cellHeight": "sm",
+                "footer": {
+                    "countRows": false,
+                    "fields": "",
+                    "reducer": [
                         "sum"
-                    ]
+                    ],
+                    "show": false
                 },
-                "tooltip": {
-                    "mode": "multi"
-                }
+                "showHeader": true,
+                "sortBy": [
+                    {
+                        "desc": true,
+                        "displayName": "Count"
+                    }
+                ]
             },
             "pluginVersion": "10.0.0",
             "targets": [
@@ -948,7 +1047,7 @@
                 }
             ],
             "title": "Top Source Countries",
-            "type": "bargauge",
+            "type": "table",
             "description": "Attacks by country of origin"
         },
         {
@@ -1178,22 +1277,50 @@
             },
             "fieldConfig": {
                 "defaults": {
-                    "custom": {
-                        "drawStyle": "bars",
-                        "lineInterpolation": "smooth",
-                        "lineWidth": 1,
-                        "fillOpacity": 80,
-                        "showPoints": "never",
-                        "stacking": {
-                            "mode": "normal"
-                        }
-                    },
                     "color": {
-                        "mode": "palette-classic"
+                        "mode": "thresholds"
                     },
-                    "mappings": []
+                    "custom": {
+                        "align": "auto",
+                        "cellOptions": {
+                            "type": "auto"
+                        },
+                        "inspect": false
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            }
+                        ]
+                    }
                 },
-                "overrides": []
+                "overrides": [
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Count"
+                        },
+                        "properties": [
+                            {
+                                "id": "custom.cellOptions",
+                                "value": {
+                                    "mode": "gradient",
+                                    "type": "gauge"
+                                }
+                            },
+                            {
+                                "id": "color",
+                                "value": {
+                                    "mode": "continuous-BlYlRd"
+                                }
+                            }
+                        ]
+                    }
+                ]
             },
             "gridPos": {
                 "h": 8,
@@ -1203,24 +1330,29 @@
             },
             "id": 17,
             "options": {
-                "legend": {
-                    "displayMode": "table",
-                    "placement": "bottom",
-                    "showLegend": true,
-                    "calcs": [
+                "cellHeight": "sm",
+                "footer": {
+                    "countRows": false,
+                    "fields": "",
+                    "reducer": [
                         "sum"
-                    ]
+                    ],
+                    "show": false
                 },
-                "tooltip": {
-                    "mode": "multi"
-                }
+                "showHeader": true,
+                "sortBy": [
+                    {
+                        "desc": true,
+                        "displayName": "Count"
+                    }
+                ]
             },
             "pluginVersion": "10.0.0",
             "targets": [
                 {
                     "refId": "A",
                     "alias": "Usernames",
-                    "query": "(honeypot.username:* OR username:*)",
+                    "query": "container.id:$Container AND src_ip:$Attacker_IP AND (honeypot.username:* OR username:*)",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -1244,7 +1376,7 @@
                 }
             ],
             "title": "Top Usernames Attempted",
-            "type": "bargauge",
+            "type": "table",
             "description": "Most common usernames used in attacks"
         },
         {
@@ -1254,22 +1386,50 @@
             },
             "fieldConfig": {
                 "defaults": {
-                    "custom": {
-                        "drawStyle": "bars",
-                        "lineInterpolation": "smooth",
-                        "lineWidth": 1,
-                        "fillOpacity": 80,
-                        "showPoints": "never",
-                        "stacking": {
-                            "mode": "normal"
-                        }
-                    },
                     "color": {
-                        "mode": "palette-classic"
+                        "mode": "thresholds"
                     },
-                    "mappings": []
+                    "custom": {
+                        "align": "auto",
+                        "cellOptions": {
+                            "type": "auto"
+                        },
+                        "inspect": false
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            }
+                        ]
+                    }
                 },
-                "overrides": []
+                "overrides": [
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Count"
+                        },
+                        "properties": [
+                            {
+                                "id": "custom.cellOptions",
+                                "value": {
+                                    "mode": "gradient",
+                                    "type": "gauge"
+                                }
+                            },
+                            {
+                                "id": "color",
+                                "value": {
+                                    "mode": "continuous-BlYlRd"
+                                }
+                            }
+                        ]
+                    }
+                ]
             },
             "gridPos": {
                 "h": 8,
@@ -1279,24 +1439,29 @@
             },
             "id": 18,
             "options": {
-                "legend": {
-                    "displayMode": "table",
-                    "placement": "bottom",
-                    "showLegend": true,
-                    "calcs": [
+                "cellHeight": "sm",
+                "footer": {
+                    "countRows": false,
+                    "fields": "",
+                    "reducer": [
                         "sum"
-                    ]
+                    ],
+                    "show": false
                 },
-                "tooltip": {
-                    "mode": "multi"
-                }
+                "showHeader": true,
+                "sortBy": [
+                    {
+                        "desc": true,
+                        "displayName": "Count"
+                    }
+                ]
             },
             "pluginVersion": "10.0.0",
             "targets": [
                 {
                     "refId": "A",
                     "alias": "Passwords",
-                    "query": "(honeypot.password:* OR password:*)",
+                    "query": "container.id:$Container AND src_ip:$Attacker_IP AND (honeypot.password:* OR password:*)",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -1320,7 +1485,7 @@
                 }
             ],
             "title": "Top Passwords Attempted",
-            "type": "bargauge",
+            "type": "table",
             "description": "Most common passwords used in attacks"
         },
         {
@@ -1330,22 +1495,50 @@
             },
             "fieldConfig": {
                 "defaults": {
-                    "custom": {
-                        "drawStyle": "bars",
-                        "lineInterpolation": "smooth",
-                        "lineWidth": 1,
-                        "fillOpacity": 80,
-                        "showPoints": "never",
-                        "stacking": {
-                            "mode": "normal"
-                        }
-                    },
                     "color": {
-                        "mode": "palette-classic"
+                        "mode": "thresholds"
                     },
-                    "mappings": []
+                    "custom": {
+                        "align": "auto",
+                        "cellOptions": {
+                            "type": "auto"
+                        },
+                        "inspect": false
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            }
+                        ]
+                    }
                 },
-                "overrides": []
+                "overrides": [
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "Count"
+                        },
+                        "properties": [
+                            {
+                                "id": "custom.cellOptions",
+                                "value": {
+                                    "mode": "gradient",
+                                    "type": "gauge"
+                                }
+                            },
+                            {
+                                "id": "color",
+                                "value": {
+                                    "mode": "continuous-BlYlRd"
+                                }
+                            }
+                        ]
+                    }
+                ]
             },
             "gridPos": {
                 "h": 8,
@@ -1355,24 +1548,29 @@
             },
             "id": 19,
             "options": {
-                "legend": {
-                    "displayMode": "table",
-                    "placement": "bottom",
-                    "showLegend": true,
-                    "calcs": [
+                "cellHeight": "sm",
+                "footer": {
+                    "countRows": false,
+                    "fields": "",
+                    "reducer": [
                         "sum"
-                    ]
+                    ],
+                    "show": false
                 },
-                "tooltip": {
-                    "mode": "multi"
-                }
+                "showHeader": true,
+                "sortBy": [
+                    {
+                        "desc": true,
+                        "displayName": "Count"
+                    }
+                ]
             },
             "pluginVersion": "10.0.0",
             "targets": [
                 {
                     "refId": "A",
                     "alias": "Commands",
-                    "query": "(honeypot.input:* OR command:*)",
+                    "query": "container.id:$Container AND src_ip:$Attacker_IP AND (honeypot.input:* OR command:*)",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -1396,7 +1594,7 @@
                 }
             ],
             "title": "Top Commands Executed",
-            "type": "bargauge",
+            "type": "table",
             "description": "Most executed commands by attackers"
         },
         {
@@ -1448,7 +1646,7 @@
                 {
                     "refId": "A",
                     "alias": "OS",
-                    "query": "(honeypot.os:* OR os_fingerprint:*)",
+                    "query": "container.id:$Container AND src_ip:$Attacker_IP AND (honeypot.os:* OR os_fingerprint:*)",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
