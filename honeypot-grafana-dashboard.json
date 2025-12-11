@@ -369,7 +369,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "container.id:honeytrap",
+                    "query": "download_url:*",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
@@ -380,9 +380,9 @@
                     ]
                 }
             ],
-            "title": "Honeytrap Events",
+            "title": "Malware Downloads",
             "type": "stat",
-            "description": "Connection trap events"
+            "description": "Files downloaded by attackers"
         },
         {
             "datasource": {
@@ -523,20 +523,21 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "container.id:suricata",
+                    "query": "command:*",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
                         {
                             "id": "1",
-                            "type": "count"
+                            "type": "cardinality",
+                            "field": "command"
                         }
                     ]
                 }
             ],
-            "title": "Suricata Events",
+            "title": "Unique Commands",
             "type": "stat",
-            "description": "Network monitoring events"
+            "description": "Distinct commands executed"
         },
         {
             "datasource": {
@@ -595,20 +596,21 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "container.id:p0f",
+                    "query": "session_id:*",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
                         {
                             "id": "1",
-                            "type": "count"
+                            "type": "cardinality",
+                            "field": "session_id"
                         }
                     ]
                 }
             ],
-            "title": "p0f Events",
+            "title": "Active Sessions",
             "type": "stat",
-            "description": "OS fingerprint detections"
+            "description": "Unique sessions detected"
         },
         {
             "datasource": {
@@ -1643,14 +1645,14 @@
             "targets": [
                 {
                     "refId": "A",
-                    "alias": "Link Types",
-                    "query": "container.id:p0f AND honeypot.link:*",
+                    "alias": "OS",
+                    "query": "os_fingerprint:*",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
                             "id": "2",
                             "type": "terms",
-                            "field": "honeypot.link",
+                            "field": "os_fingerprint",
                             "settings": {
                                 "size": 10,
                                 "order": "desc",
@@ -1667,9 +1669,9 @@
                     ]
                 }
             ],
-            "title": "Connection Link Types (p0f)",
+            "title": "OS Fingerprint Distribution",
             "type": "bargauge",
-            "description": "Network link types detected by p0f"
+            "description": "Detected operating systems"
         },
         {
             "datasource": {
@@ -1976,7 +1978,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "container.id:honeytrap",
+                    "query": "download_url:*",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
@@ -2005,16 +2007,17 @@
                         "renameByName": {
                             "@timestamp": "Time",
                             "src_ip": "Source IP",
-                            "dest_port": "Port",
                             "source.geo.country_name": "Country",
-                            "container.id": "Honeypot"
+                            "container.id": "Honeypot",
+                            "download_url": "Download URL",
+                            "file_hash": "File Hash"
                         }
                     }
                 }
             ],
-            "title": "Honeytrap Events",
+            "title": "Malware Downloads",
             "type": "table",
-            "description": "Connection trap events captured by honeytrap"
+            "description": "Files downloaded by attackers with VirusTotal links"
         }
     ],
     "refresh": "30s",
