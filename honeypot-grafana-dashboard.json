@@ -12,7 +12,7 @@
       }
     ]
   },
-  "description": "Comprehensive honeypot monitoring dashboard for attack analysis and threat intelligence",
+  "description": "T-Pot Honeypot monitoring dashboard - Attack analysis and threat intelligence",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -22,7 +22,7 @@
     {
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
       "id": 100,
-      "title": "Honeypot Overview",
+      "title": "T-Pot Overview",
       "type": "row"
     },
     {
@@ -35,9 +35,9 @@
             "mode": "absolute",
             "steps": [
               { "color": "green", "value": null },
-              { "color": "yellow", "value": 100 },
-              { "color": "orange", "value": 500 },
-              { "color": "red", "value": 1000 }
+              { "color": "yellow", "value": 1000 },
+              { "color": "orange", "value": 10000 },
+              { "color": "red", "value": 50000 }
             ]
           },
           "unit": "short"
@@ -53,7 +53,6 @@
         "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false },
         "textMode": "auto"
       },
-      "pluginVersion": "10.0.0",
       "targets": [
         {
           "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
@@ -66,7 +65,7 @@
             }
           ],
           "metrics": [{ "id": "1", "type": "count" }],
-          "query": "*",
+          "query": "type:$honeypot_type",
           "refId": "A",
           "timeField": "@timestamp"
         }
@@ -84,9 +83,9 @@
             "mode": "absolute",
             "steps": [
               { "color": "green", "value": null },
-              { "color": "yellow", "value": 10 },
-              { "color": "orange", "value": 50 },
-              { "color": "red", "value": 100 }
+              { "color": "yellow", "value": 50 },
+              { "color": "orange", "value": 200 },
+              { "color": "red", "value": 500 }
             ]
           },
           "unit": "short"
@@ -107,14 +106,14 @@
           "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
           "bucketAggs": [
             {
-              "field": "source.ip",
+              "field": "src_ip",
               "id": "2",
               "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "0" },
               "type": "terms"
             }
           ],
           "metrics": [{ "id": "1", "type": "count" }],
-          "query": "*",
+          "query": "type:$honeypot_type",
           "refId": "A",
           "timeField": "@timestamp"
         }
@@ -132,9 +131,9 @@
             "mode": "absolute",
             "steps": [
               { "color": "green", "value": null },
-              { "color": "yellow", "value": 5 },
-              { "color": "orange", "value": 10 },
-              { "color": "red", "value": 20 }
+              { "color": "yellow", "value": 10 },
+              { "color": "orange", "value": 30 },
+              { "color": "red", "value": 50 }
             ]
           },
           "unit": "short"
@@ -155,14 +154,14 @@
           "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
           "bucketAggs": [
             {
-              "field": "source.geo.country_name",
+              "field": "geoip.country_name",
               "id": "2",
               "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "0" },
               "type": "terms"
             }
           ],
           "metrics": [{ "id": "1", "type": "count" }],
-          "query": "source.geo.country_name:*",
+          "query": "geoip.country_name:* AND type:$honeypot_type",
           "refId": "A",
           "timeField": "@timestamp"
         }
@@ -181,7 +180,7 @@
             "steps": [
               { "color": "green", "value": null },
               { "color": "yellow", "value": 5 },
-              { "color": "red", "value": 10 }
+              { "color": "red", "value": 15 }
             ]
           },
           "unit": "short"
@@ -202,14 +201,14 @@
           "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
           "bucketAggs": [
             {
-              "field": "destination.port",
+              "field": "dest_port",
               "id": "2",
               "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "0" },
               "type": "terms"
             }
           ],
           "metrics": [{ "id": "1", "type": "count" }],
-          "query": "*",
+          "query": "type:$honeypot_type",
           "refId": "A",
           "timeField": "@timestamp"
         }
@@ -227,8 +226,8 @@
             "mode": "absolute",
             "steps": [
               { "color": "green", "value": null },
-              { "color": "orange", "value": 10 },
-              { "color": "red", "value": 50 }
+              { "color": "orange", "value": 100 },
+              { "color": "red", "value": 500 }
             ]
           },
           "unit": "short"
@@ -256,7 +255,7 @@
             }
           ],
           "metrics": [{ "id": "1", "type": "count" }],
-          "query": "cowrie.username:* OR honeypot.username:* OR user.name:*",
+          "query": "(type:cowrie OR type:heralding OR type:dionaea) AND (cowrie.eventid:cowrie.login.* OR heralding.username:*)",
           "refId": "A",
           "timeField": "@timestamp"
         }
@@ -275,7 +274,7 @@
             "steps": [
               { "color": "green", "value": null },
               { "color": "yellow", "value": 1 },
-              { "color": "red", "value": 5 }
+              { "color": "red", "value": 10 }
             ]
           },
           "unit": "short"
@@ -303,7 +302,7 @@
             }
           ],
           "metrics": [{ "id": "1", "type": "count" }],
-          "query": "cowrie.outfile:* OR dionaea.download_url:* OR file.hash.sha256:* OR honeypot.download_url:*",
+          "query": "cowrie.eventid:cowrie.session.file_download OR dionaea.download_url:*",
           "refId": "A",
           "timeField": "@timestamp"
         }
@@ -351,6 +350,12 @@
           "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
           "bucketAggs": [
             {
+              "field": "type",
+              "id": "3",
+              "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "15" },
+              "type": "terms"
+            },
+            {
               "field": "@timestamp",
               "id": "2",
               "settings": { "interval": "auto", "min_doc_count": "0" },
@@ -358,12 +363,12 @@
             }
           ],
           "metrics": [{ "id": "1", "type": "count" }],
-          "query": "*",
+          "query": "type:$honeypot_type",
           "refId": "A",
           "timeField": "@timestamp"
         }
       ],
-      "title": "Attack Timeline",
+      "title": "Attack Timeline by Honeypot",
       "type": "timeseries"
     },
     {
@@ -390,9 +395,9 @@
           "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
           "bucketAggs": [
             {
-              "field": "event.dataset",
+              "field": "type",
               "id": "2",
-              "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "10" },
+              "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "20" },
               "type": "terms"
             }
           ],
@@ -402,7 +407,7 @@
           "timeField": "@timestamp"
         }
       ],
-      "title": "Event Sources",
+      "title": "Events by Honeypot Type",
       "type": "piechart"
     },
     {
@@ -421,9 +426,9 @@
             "mode": "absolute",
             "steps": [
               { "color": "green", "value": null },
-              { "color": "yellow", "value": 50 },
-              { "color": "orange", "value": 200 },
-              { "color": "red", "value": 500 }
+              { "color": "yellow", "value": 100 },
+              { "color": "orange", "value": 500 },
+              { "color": "red", "value": 1000 }
             ]
           }
         }
@@ -453,7 +458,7 @@
                 "textConfig": { "fontSize": 12, "offsetX": 0, "offsetY": 0, "textAlign": "center", "textBaseline": "middle" }
               }
             },
-            "location": { "mode": "geohash", "geohash": "source.geo.location" },
+            "location": { "mode": "geohash", "geohash": "geoip.location" },
             "name": "Attackers",
             "tooltip": true,
             "type": "markers"
@@ -467,14 +472,14 @@
           "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
           "bucketAggs": [
             {
-              "field": "source.geo.location",
+              "field": "geoip.location",
               "id": "2",
               "settings": { "precision": 3 },
               "type": "geohash_grid"
             }
           ],
           "metrics": [{ "id": "1", "type": "count" }],
-          "query": "source.geo.location:*",
+          "query": "geoip.location:* AND type:$honeypot_type",
           "refId": "A",
           "timeField": "@timestamp"
         }
@@ -518,14 +523,14 @@
           "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
           "bucketAggs": [
             {
-              "field": "source.geo.country_name",
+              "field": "geoip.country_name",
               "id": "2",
-              "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "25" },
+              "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "30" },
               "type": "terms"
             }
           ],
           "metrics": [{ "id": "1", "type": "count" }],
-          "query": "source.geo.country_name:*",
+          "query": "geoip.country_name:* AND type:$honeypot_type",
           "refId": "A",
           "timeField": "@timestamp"
         }
@@ -555,8 +560,8 @@
             "mode": "absolute",
             "steps": [
               { "color": "yellow", "value": null },
-              { "color": "orange", "value": 10 },
-              { "color": "red", "value": 50 }
+              { "color": "orange", "value": 50 },
+              { "color": "red", "value": 200 }
             ]
           }
         },
@@ -569,20 +574,20 @@
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "source.ip" },
+            "matcher": { "id": "byName", "options": "src_ip" },
             "properties": [
               { "id": "displayName", "value": "Attacker IP" },
               { "id": "custom.width", "value": 140 }
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "source.geo.country_name" },
+            "matcher": { "id": "byName", "options": "geoip.country_name" },
             "properties": [
               { "id": "displayName", "value": "Country" }
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "source.as.organization.name" },
+            "matcher": { "id": "byName", "options": "geoip.as_org" },
             "properties": [
               { "id": "displayName", "value": "ASN Org" }
             ]
@@ -602,26 +607,26 @@
           "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
           "bucketAggs": [
             {
-              "field": "source.ip",
+              "field": "src_ip",
               "id": "2",
               "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "25" },
               "type": "terms"
             },
             {
-              "field": "source.geo.country_name",
+              "field": "geoip.country_name",
               "id": "3",
               "settings": { "min_doc_count": "0", "order": "desc", "orderBy": "_count", "size": "1" },
               "type": "terms"
             },
             {
-              "field": "source.as.organization.name",
+              "field": "geoip.as_org",
               "id": "4",
               "settings": { "min_doc_count": "0", "order": "desc", "orderBy": "_count", "size": "1" },
               "type": "terms"
             }
           ],
           "metrics": [{ "id": "1", "type": "count" }],
-          "query": "*",
+          "query": "type:$honeypot_type",
           "refId": "A",
           "timeField": "@timestamp"
         }
@@ -646,7 +651,11 @@
             { "options": { "443": { "color": "green", "index": 3, "text": "443 (HTTPS)" } }, "type": "value" },
             { "options": { "445": { "color": "purple", "index": 4, "text": "445 (SMB)" } }, "type": "value" },
             { "options": { "3389": { "color": "yellow", "index": 5, "text": "3389 (RDP)" } }, "type": "value" },
-            { "options": { "21": { "color": "cyan", "index": 6, "text": "21 (FTP)" } }, "type": "value" }
+            { "options": { "21": { "color": "cyan", "index": 6, "text": "21 (FTP)" } }, "type": "value" },
+            { "options": { "25": { "color": "light-blue", "index": 7, "text": "25 (SMTP)" } }, "type": "value" },
+            { "options": { "5060": { "color": "light-green", "index": 8, "text": "5060 (SIP)" } }, "type": "value" },
+            { "options": { "5555": { "color": "dark-orange", "index": 9, "text": "5555 (ADB)" } }, "type": "value" },
+            { "options": { "9200": { "color": "dark-blue", "index": 10, "text": "9200 (ES)" } }, "type": "value" }
           ],
           "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }] }
         },
@@ -659,7 +668,7 @@
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "destination.port" },
+            "matcher": { "id": "byName", "options": "dest_port" },
             "properties": [
               { "id": "displayName", "value": "Port" }
             ]
@@ -679,14 +688,14 @@
           "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
           "bucketAggs": [
             {
-              "field": "destination.port",
+              "field": "dest_port",
               "id": "2",
-              "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "20" },
+              "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "25" },
               "type": "terms"
             }
           ],
           "metrics": [{ "id": "1", "type": "count" }],
-          "query": "*",
+          "query": "type:$honeypot_type",
           "refId": "A",
           "timeField": "@timestamp"
         }
@@ -698,45 +707,63 @@
       "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "palette-classic" },
+          "color": { "mode": "thresholds" },
           "custom": {
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false }
+            "align": "auto",
+            "cellOptions": { "type": "auto" },
+            "inspect": false
           },
-          "mappings": []
-        }
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Count" },
+            "properties": [
+              { "id": "custom.cellOptions", "value": { "mode": "gradient", "type": "gauge" } },
+              { "id": "color", "value": { "mode": "continuous-RdYlGr" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "p0f.os" },
+            "properties": [
+              { "id": "displayName", "value": "OS" }
+            ]
+          }
+        ]
       },
       "gridPos": { "h": 10, "w": 6, "x": 18, "y": 29 },
       "id": 32,
       "options": {
-        "legend": { "displayMode": "table", "placement": "right", "showLegend": true, "values": ["value", "percent"] },
-        "pieType": "donut",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": true },
-        "tooltip": { "mode": "single", "sort": "none" }
+        "cellHeight": "sm",
+        "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
+        "showHeader": true,
+        "sortBy": [{ "desc": true, "displayName": "Count" }]
       },
       "targets": [
         {
           "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
           "bucketAggs": [
             {
-              "field": "network.transport",
+              "field": "p0f.os",
               "id": "2",
-              "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "10" },
+              "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "15" },
               "type": "terms"
             }
           ],
           "metrics": [{ "id": "1", "type": "count" }],
-          "query": "*",
+          "query": "p0f.os:*",
           "refId": "A",
           "timeField": "@timestamp"
         }
       ],
-      "title": "Protocols",
-      "type": "piechart"
+      "title": "Attacker OS (p0f)",
+      "type": "table"
     },
     {
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 39 },
       "id": 103,
-      "title": "Credential Analysis (SSH/Telnet Honeypots)",
+      "title": "Credential Analysis (Cowrie/Heralding)",
       "type": "row"
     },
     {
@@ -763,13 +790,13 @@
           {
             "matcher": { "id": "byName", "options": "cowrie.username" },
             "properties": [
-              { "id": "displayName", "value": "Username" }
+              { "id": "displayName", "value": "Username (Cowrie)" }
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "user.name" },
+            "matcher": { "id": "byName", "options": "heralding.username" },
             "properties": [
-              { "id": "displayName", "value": "Username" }
+              { "id": "displayName", "value": "Username (Heralding)" }
             ]
           }
         ]
@@ -802,19 +829,19 @@
           "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
           "bucketAggs": [
             {
-              "field": "user.name",
+              "field": "heralding.username",
               "id": "2",
               "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "25" },
               "type": "terms"
             }
           ],
           "metrics": [{ "id": "1", "type": "count" }],
-          "query": "user.name:* AND NOT cowrie.username:*",
+          "query": "heralding.username:*",
           "refId": "B",
           "timeField": "@timestamp"
         }
       ],
-      "title": "Top Usernames Attempted",
+      "title": "Top Usernames",
       "type": "table"
     },
     {
@@ -841,7 +868,13 @@
           {
             "matcher": { "id": "byName", "options": "cowrie.password" },
             "properties": [
-              { "id": "displayName", "value": "Password" }
+              { "id": "displayName", "value": "Password (Cowrie)" }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "heralding.password" },
+            "properties": [
+              { "id": "displayName", "value": "Password (Heralding)" }
             ]
           }
         ]
@@ -869,9 +902,24 @@
           "query": "cowrie.password:*",
           "refId": "A",
           "timeField": "@timestamp"
+        },
+        {
+          "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
+          "bucketAggs": [
+            {
+              "field": "heralding.password",
+              "id": "2",
+              "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "25" },
+              "type": "terms"
+            }
+          ],
+          "metrics": [{ "id": "1", "type": "count" }],
+          "query": "heralding.password:*",
+          "refId": "B",
+          "timeField": "@timestamp"
         }
       ],
-      "title": "Top Passwords Attempted",
+      "title": "Top Passwords",
       "type": "table"
     },
     {
@@ -893,18 +941,6 @@
             "properties": [
               { "id": "custom.cellOptions", "value": { "mode": "gradient", "type": "gauge" } },
               { "id": "color", "value": { "mode": "continuous-RdYlGr" } }
-            ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "cowrie.username" },
-            "properties": [
-              { "id": "displayName", "value": "Username" }
-            ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "cowrie.password" },
-            "properties": [
-              { "id": "displayName", "value": "Password" }
             ]
           }
         ]
@@ -946,7 +982,7 @@
     {
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 50 },
       "id": 104,
-      "title": "Commands & Malware",
+      "title": "Commands & Malware (Cowrie)",
       "type": "row"
     },
     {
@@ -1030,15 +1066,14 @@
           {
             "matcher": { "id": "byName", "options": "cowrie.url" },
             "properties": [
-              { "id": "displayName", "value": "Download URL" },
-              { "id": "links", "value": [{ "title": "Open URL", "url": "${__value.text}" }] }
+              { "id": "displayName", "value": "Download URL" }
             ]
           },
           {
             "matcher": { "id": "byName", "options": "cowrie.shasum" },
             "properties": [
               { "id": "displayName", "value": "SHA256" },
-              { "id": "links", "value": [{ "title": "Check on VirusTotal", "url": "https://www.virustotal.com/gui/file/${__value.text}" }] }
+              { "id": "links", "value": [{ "title": "VirusTotal", "url": "https://www.virustotal.com/gui/file/${__value.text}" }] }
             ]
           }
         ]
@@ -1080,7 +1115,166 @@
     {
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 61 },
       "id": 105,
-      "title": "Recent Attack Events",
+      "title": "Web/Application Attacks (Tanner/Dionaea/Elasticpot)",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "custom": {
+            "align": "auto",
+            "cellOptions": { "type": "auto" },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Count" },
+            "properties": [
+              { "id": "custom.cellOptions", "value": { "mode": "gradient", "type": "gauge" } },
+              { "id": "color", "value": { "mode": "continuous-RdYlGr" } }
+            ]
+          }
+        ]
+      },
+      "gridPos": { "h": 10, "w": 8, "x": 0, "y": 62 },
+      "id": 60,
+      "options": {
+        "cellHeight": "sm",
+        "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
+        "showHeader": true,
+        "sortBy": [{ "desc": true, "displayName": "Count" }]
+      },
+      "targets": [
+        {
+          "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
+          "bucketAggs": [
+            {
+              "field": "tanner.path",
+              "id": "2",
+              "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "25" },
+              "type": "terms"
+            }
+          ],
+          "metrics": [{ "id": "1", "type": "count" }],
+          "query": "tanner.path:*",
+          "refId": "A",
+          "timeField": "@timestamp"
+        }
+      ],
+      "title": "Web Paths Attacked (Tanner)",
+      "type": "table"
+    },
+    {
+      "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "custom": {
+            "align": "auto",
+            "cellOptions": { "type": "auto" },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Count" },
+            "properties": [
+              { "id": "custom.cellOptions", "value": { "mode": "gradient", "type": "gauge" } },
+              { "id": "color", "value": { "mode": "continuous-RdYlGr" } }
+            ]
+          }
+        ]
+      },
+      "gridPos": { "h": 10, "w": 8, "x": 8, "y": 62 },
+      "id": 61,
+      "options": {
+        "cellHeight": "sm",
+        "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
+        "showHeader": true,
+        "sortBy": [{ "desc": true, "displayName": "Count" }]
+      },
+      "targets": [
+        {
+          "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
+          "bucketAggs": [
+            {
+              "field": "dionaea.connection_protocol",
+              "id": "2",
+              "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "15" },
+              "type": "terms"
+            }
+          ],
+          "metrics": [{ "id": "1", "type": "count" }],
+          "query": "dionaea.connection_protocol:*",
+          "refId": "A",
+          "timeField": "@timestamp"
+        }
+      ],
+      "title": "Dionaea Protocols",
+      "type": "table"
+    },
+    {
+      "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "custom": {
+            "align": "auto",
+            "cellOptions": { "type": "auto" },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "yellow", "value": null }] }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Count" },
+            "properties": [
+              { "id": "custom.cellOptions", "value": { "mode": "gradient", "type": "gauge" } },
+              { "id": "color", "value": { "mode": "continuous-RdYlGr" } }
+            ]
+          }
+        ]
+      },
+      "gridPos": { "h": 10, "w": 8, "x": 16, "y": 62 },
+      "id": 62,
+      "options": {
+        "cellHeight": "sm",
+        "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
+        "showHeader": true,
+        "sortBy": [{ "desc": true, "displayName": "Count" }]
+      },
+      "targets": [
+        {
+          "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
+          "bucketAggs": [
+            {
+              "field": "elasticpot.request_url",
+              "id": "2",
+              "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "20" },
+              "type": "terms"
+            }
+          ],
+          "metrics": [{ "id": "1", "type": "count" }],
+          "query": "elasticpot.request_url:*",
+          "refId": "A",
+          "timeField": "@timestamp"
+        }
+      ],
+      "title": "Elasticpot Requests",
+      "type": "table"
+    },
+    {
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 72 },
+      "id": 106,
+      "title": "Recent Events",
       "type": "row"
     },
     {
@@ -1098,28 +1292,28 @@
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "source.ip" },
+            "matcher": { "id": "byName", "options": "src_ip" },
             "properties": [
               { "id": "displayName", "value": "Attacker IP" },
               { "id": "custom.width", "value": 130 }
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "destination.port" },
+            "matcher": { "id": "byName", "options": "dest_port" },
             "properties": [
               { "id": "displayName", "value": "Port" },
               { "id": "custom.width", "value": 70 }
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "event.dataset" },
+            "matcher": { "id": "byName", "options": "type" },
             "properties": [
-              { "id": "displayName", "value": "Source" },
-              { "id": "custom.width", "value": 120 }
+              { "id": "displayName", "value": "Honeypot" },
+              { "id": "custom.width", "value": 100 }
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "source.geo.country_name" },
+            "matcher": { "id": "byName", "options": "geoip.country_name" },
             "properties": [
               { "id": "displayName", "value": "Country" },
               { "id": "custom.width", "value": 100 }
@@ -1133,8 +1327,8 @@
           }
         ]
       },
-      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 62 },
-      "id": 60,
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 73 },
+      "id": 70,
       "options": {
         "cellHeight": "sm",
         "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
@@ -1148,12 +1342,12 @@
           "metrics": [
             { "id": "1", "type": "raw_data", "settings": { "size": "200" } }
           ],
-          "query": "*",
+          "query": "type:$honeypot_type",
           "refId": "A",
           "timeField": "@timestamp"
         }
       ],
-      "title": "Recent Events (Raw)",
+      "title": "Recent Events",
       "transformations": [
         {
           "id": "organize",
@@ -1186,13 +1380,12 @@
             },
             "indexByName": {
               "@timestamp": 0,
-              "source.ip": 1,
-              "destination.port": 2,
-              "source.geo.country_name": 3,
-              "event.dataset": 4,
+              "type": 1,
+              "src_ip": 2,
+              "dest_port": 3,
+              "geoip.country_name": 4,
               "message": 5
-            },
-            "renameByName": {}
+            }
           }
         }
       ],
@@ -1201,7 +1394,7 @@
   ],
   "refresh": "30s",
   "schemaVersion": 38,
-  "tags": ["honeypot", "security", "threat-intel", "attacks"],
+  "tags": ["honeypot", "t-pot", "security", "threat-intel"],
   "templating": {
     "list": [
       {
@@ -1223,50 +1416,32 @@
         "allValue": "*",
         "current": { "selected": true, "text": "All", "value": "$__all" },
         "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
-        "definition": "{\"find\": \"terms\", \"field\": \"source.geo.country_name\"}",
+        "definition": "{\"find\": \"terms\", \"field\": \"type\"}",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Honeypot",
+        "multi": true,
+        "name": "honeypot_type",
+        "options": [],
+        "query": "{\"find\": \"terms\", \"field\": \"type\"}",
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allValue": "*",
+        "current": { "selected": true, "text": "All", "value": "$__all" },
+        "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
+        "definition": "{\"find\": \"terms\", \"field\": \"geoip.country_name\"}",
         "hide": 0,
         "includeAll": true,
         "label": "Country",
         "multi": true,
         "name": "country",
         "options": [],
-        "query": "{\"find\": \"terms\", \"field\": \"source.geo.country_name\"}",
-        "refresh": 2,
-        "regex": "",
-        "skipUrlSync": false,
-        "sort": 1,
-        "type": "query"
-      },
-      {
-        "allValue": "*",
-        "current": { "selected": true, "text": "All", "value": "$__all" },
-        "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
-        "definition": "{\"find\": \"terms\", \"field\": \"destination.port\"}",
-        "hide": 0,
-        "includeAll": true,
-        "label": "Port",
-        "multi": true,
-        "name": "port",
-        "options": [],
-        "query": "{\"find\": \"terms\", \"field\": \"destination.port\"}",
-        "refresh": 2,
-        "regex": "",
-        "skipUrlSync": false,
-        "sort": 1,
-        "type": "query"
-      },
-      {
-        "allValue": "*",
-        "current": { "selected": true, "text": "All", "value": "$__all" },
-        "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
-        "definition": "{\"find\": \"terms\", \"field\": \"event.dataset\"}",
-        "hide": 0,
-        "includeAll": true,
-        "label": "Dataset",
-        "multi": true,
-        "name": "dataset",
-        "options": [],
-        "query": "{\"find\": \"terms\", \"field\": \"event.dataset\"}",
+        "query": "{\"find\": \"terms\", \"field\": \"geoip.country_name\"}",
         "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
@@ -1278,8 +1453,8 @@
   "time": { "from": "now-24h", "to": "now" },
   "timepicker": {},
   "timezone": "",
-  "title": "Honeypot Monitor",
-  "uid": "honeypot-monitor",
+  "title": "T-Pot Honeypot Monitor",
+  "uid": "tpot-honeypot-monitor",
   "version": 1,
   "weekStart": ""
 }
