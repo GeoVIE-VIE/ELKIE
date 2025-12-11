@@ -17,7 +17,7 @@
     },
     "editable": true,
     "fiscalYearStartMonth": 0,
-    "graphTooltip": 0,
+    "graphTooltip": 1,
     "id": null,
     "links": [],
     "liveNow": false,
@@ -49,20 +49,21 @@
                                 "value": 1000
                             }
                         ]
-                    }
+                    },
+                    "unit": "short"
                 },
                 "overrides": []
             },
             "gridPos": {
                 "h": 4,
-                "w": 8,
+                "w": 6,
                 "x": 0,
                 "y": 0
             },
             "id": 1,
             "options": {
                 "colorMode": "value",
-                "graphMode": "none",
+                "graphMode": "area",
                 "justifyMode": "center",
                 "orientation": "horizontal",
                 "reduceOptions": {
@@ -72,13 +73,13 @@
                     "fields": "",
                     "values": false
                 },
-                "textMode": "value"
+                "textMode": "value_and_name"
             },
             "pluginVersion": "10.0.0",
             "targets": [
                 {
                     "refId": "A",
-                    "query": "dest_ip:192.168.40.3 AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country",
+                    "query": "dest_ip:192.168.40.3 AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND protocol:$Protocol",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
@@ -90,7 +91,8 @@
                 }
             ],
             "title": "Total Honeypot Hits",
-            "type": "stat"
+            "type": "stat",
+            "description": "Total number of attacks captured by honeypots"
         },
         {
             "datasource": {
@@ -119,20 +121,21 @@
                                 "value": 50
                             }
                         ]
-                    }
+                    },
+                    "unit": "short"
                 },
                 "overrides": []
             },
             "gridPos": {
                 "h": 4,
-                "w": 8,
-                "x": 8,
+                "w": 6,
+                "x": 6,
                 "y": 0
             },
             "id": 2,
             "options": {
                 "colorMode": "value",
-                "graphMode": "none",
+                "graphMode": "area",
                 "justifyMode": "center",
                 "orientation": "horizontal",
                 "reduceOptions": {
@@ -142,13 +145,13 @@
                     "fields": "",
                     "values": false
                 },
-                "textMode": "value"
+                "textMode": "value_and_name"
             },
             "pluginVersion": "10.0.0",
             "targets": [
                 {
                     "refId": "A",
-                    "query": "dest_ip:192.168.40.3 AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country",
+                    "query": "dest_ip:192.168.40.3 AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND protocol:$Protocol",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
@@ -161,7 +164,8 @@
                 }
             ],
             "title": "Unique Attacker IPs",
-            "type": "stat"
+            "type": "stat",
+            "description": "Number of unique source IPs"
         },
         {
             "datasource": {
@@ -190,20 +194,21 @@
                                 "value": 25
                             }
                         ]
-                    }
+                    },
+                    "unit": "short"
                 },
                 "overrides": []
             },
             "gridPos": {
                 "h": 4,
-                "w": 8,
-                "x": 16,
+                "w": 6,
+                "x": 12,
                 "y": 0
             },
             "id": 3,
             "options": {
                 "colorMode": "value",
-                "graphMode": "none",
+                "graphMode": "area",
                 "justifyMode": "center",
                 "orientation": "horizontal",
                 "reduceOptions": {
@@ -213,13 +218,13 @@
                     "fields": "",
                     "values": false
                 },
-                "textMode": "value"
+                "textMode": "value_and_name"
             },
             "pluginVersion": "10.0.0",
             "targets": [
                 {
                     "refId": "A",
-                    "query": "dest_ip:192.168.40.3 AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country",
+                    "query": "dest_ip:192.168.40.3 AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND protocol:$Protocol",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
@@ -232,7 +237,380 @@
                 }
             ],
             "title": "Attacker Countries",
-            "type": "stat"
+            "type": "stat",
+            "description": "Number of unique source countries"
+        },
+        {
+            "datasource": {
+                "type": "elasticsearch",
+                "uid": "ef6pmu9oze7eoc"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "orange",
+                                "value": 10
+                            },
+                            {
+                                "color": "red",
+                                "value": 50
+                            }
+                        ]
+                    },
+                    "unit": "short"
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 6,
+                "x": 18,
+                "y": 0
+            },
+            "id": 11,
+            "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "center",
+                "orientation": "horizontal",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "textMode": "value_and_name"
+            },
+            "pluginVersion": "10.0.0",
+            "targets": [
+                {
+                    "refId": "A",
+                    "query": "dest_ip:192.168.40.3 AND username:* AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND protocol:$Protocol",
+                    "timeField": "@timestamp",
+                    "bucketAggs": [],
+                    "metrics": [
+                        {
+                            "id": "1",
+                            "type": "count"
+                        }
+                    ]
+                }
+            ],
+            "title": "Login Attempts",
+            "type": "stat",
+            "description": "Total credential attempts"
+        },
+        {
+            "datasource": {
+                "type": "elasticsearch",
+                "uid": "ef6pmu9oze7eoc"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "orange",
+                                "value": 5
+                            },
+                            {
+                                "color": "red",
+                                "value": 10
+                            }
+                        ]
+                    },
+                    "unit": "short"
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 6,
+                "x": 0,
+                "y": 4
+            },
+            "id": 12,
+            "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "center",
+                "orientation": "horizontal",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "textMode": "value_and_name"
+            },
+            "pluginVersion": "10.0.0",
+            "targets": [
+                {
+                    "refId": "A",
+                    "query": "dest_ip:192.168.40.3 AND download_url:* AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND protocol:$Protocol",
+                    "timeField": "@timestamp",
+                    "bucketAggs": [],
+                    "metrics": [
+                        {
+                            "id": "1",
+                            "type": "count"
+                        }
+                    ]
+                }
+            ],
+            "title": "Malware Downloads",
+            "type": "stat",
+            "description": "Files downloaded by attackers"
+        },
+        {
+            "datasource": {
+                "type": "elasticsearch",
+                "uid": "ef6pmu9oze7eoc"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "orange",
+                                "value": 100
+                            },
+                            {
+                                "color": "red",
+                                "value": 500
+                            }
+                        ]
+                    },
+                    "unit": "reqps"
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 6,
+                "x": 6,
+                "y": 4
+            },
+            "id": 13,
+            "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "center",
+                "orientation": "horizontal",
+                "reduceOptions": {
+                    "calcs": [
+                        "mean"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "textMode": "value_and_name"
+            },
+            "pluginVersion": "10.0.0",
+            "targets": [
+                {
+                    "refId": "A",
+                    "query": "dest_ip:192.168.40.3 AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND protocol:$Protocol",
+                    "timeField": "@timestamp",
+                    "bucketAggs": [
+                        {
+                            "id": "2",
+                            "type": "date_histogram",
+                            "field": "@timestamp",
+                            "settings": {
+                                "interval": "1h",
+                                "min_doc_count": 0
+                            }
+                        }
+                    ],
+                    "metrics": [
+                        {
+                            "id": "1",
+                            "type": "count"
+                        }
+                    ]
+                }
+            ],
+            "title": "Attacks/Hour (Avg)",
+            "type": "stat",
+            "description": "Average attacks per hour"
+        },
+        {
+            "datasource": {
+                "type": "elasticsearch",
+                "uid": "ef6pmu9oze7eoc"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "orange",
+                                "value": 5
+                            },
+                            {
+                                "color": "red",
+                                "value": 10
+                            }
+                        ]
+                    },
+                    "unit": "short"
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 6,
+                "x": 12,
+                "y": 4
+            },
+            "id": 14,
+            "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "center",
+                "orientation": "horizontal",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "textMode": "value_and_name"
+            },
+            "pluginVersion": "10.0.0",
+            "targets": [
+                {
+                    "refId": "A",
+                    "query": "dest_ip:192.168.40.3 AND command:* AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND protocol:$Protocol",
+                    "timeField": "@timestamp",
+                    "bucketAggs": [],
+                    "metrics": [
+                        {
+                            "id": "1",
+                            "type": "cardinality",
+                            "field": "command"
+                        }
+                    ]
+                }
+            ],
+            "title": "Unique Commands",
+            "type": "stat",
+            "description": "Distinct commands executed"
+        },
+        {
+            "datasource": {
+                "type": "elasticsearch",
+                "uid": "ef6pmu9oze7eoc"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "orange",
+                                "value": 10
+                            },
+                            {
+                                "color": "red",
+                                "value": 20
+                            }
+                        ]
+                    },
+                    "unit": "short"
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 6,
+                "x": 18,
+                "y": 4
+            },
+            "id": 15,
+            "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "center",
+                "orientation": "horizontal",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "textMode": "value_and_name"
+            },
+            "pluginVersion": "10.0.0",
+            "targets": [
+                {
+                    "refId": "A",
+                    "query": "dest_ip:192.168.40.3 AND session_id:* AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND protocol:$Protocol",
+                    "timeField": "@timestamp",
+                    "bucketAggs": [],
+                    "metrics": [
+                        {
+                            "id": "1",
+                            "type": "cardinality",
+                            "field": "session_id"
+                        }
+                    ]
+                }
+            ],
+            "title": "Active Sessions",
+            "type": "stat",
+            "description": "Unique active sessions"
         },
         {
             "datasource": {
@@ -246,8 +624,16 @@
                         "lineInterpolation": "smooth",
                         "lineWidth": 2,
                         "fillOpacity": 20,
-                        "showPoints": "never"
-                    }
+                        "showPoints": "never",
+                        "stacking": {
+                            "group": "A",
+                            "mode": "normal"
+                        }
+                    },
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "mappings": []
                 },
                 "overrides": []
             },
@@ -255,16 +641,22 @@
                 "h": 8,
                 "w": 24,
                 "x": 0,
-                "y": 4
+                "y": 8
             },
             "id": 4,
             "options": {
                 "legend": {
-                    "displayMode": "list",
-                    "placement": "bottom"
+                    "displayMode": "table",
+                    "placement": "right",
+                    "showLegend": true,
+                    "calcs": [
+                        "sum",
+                        "max"
+                    ]
                 },
                 "tooltip": {
-                    "mode": "single"
+                    "mode": "multi",
+                    "sort": "desc"
                 }
             },
             "pluginVersion": "10.0.0",
@@ -272,7 +664,7 @@
                 {
                     "refId": "A",
                     "alias": "Total hits",
-                    "query": "dest_ip:192.168.40.3 AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country",
+                    "query": "dest_ip:192.168.40.3 AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND protocol:$Protocol",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -294,8 +686,8 @@
                 },
                 {
                     "refId": "B",
-                    "alias": "Top protocol",
-                    "query": "dest_ip:192.168.40.3 AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country",
+                    "alias": "By Honeypot Type",
+                    "query": "dest_ip:192.168.40.3 AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND protocol:$Protocol",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -310,9 +702,9 @@
                         {
                             "id": "3",
                             "type": "terms",
-                            "field": "honeypot.app_proto",
+                            "field": "honeypot_type",
                             "settings": {
-                                "size": 1,
+                                "size": 10,
                                 "order": "desc",
                                 "orderBy": "1",
                                 "min_doc_count": 1
@@ -328,7 +720,8 @@
                 }
             ],
             "title": "Attack Volume Over Time",
-            "type": "timeseries"
+            "type": "timeseries",
+            "description": "Total attacks and breakdown by honeypot type"
         },
         {
             "datasource": {
@@ -349,7 +742,8 @@
                     },
                     "color": {
                         "mode": "palette-classic"
-                    }
+                    },
+                    "mappings": []
                 },
                 "overrides": []
             },
@@ -357,15 +751,20 @@
                 "h": 8,
                 "w": 8,
                 "x": 0,
-                "y": 12
+                "y": 16
             },
             "id": 5,
             "options": {
                 "legend": {
-                    "displayMode": "hidden"
+                    "displayMode": "table",
+                    "placement": "bottom",
+                    "showLegend": true,
+                    "calcs": [
+                        "sum"
+                    ]
                 },
                 "tooltip": {
-                    "mode": "single"
+                    "mode": "multi"
                 }
             },
             "pluginVersion": "10.0.0",
@@ -373,7 +772,7 @@
                 {
                     "refId": "A",
                     "alias": "Attacks",
-                    "query": "dest_ip:192.168.40.3 AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country",
+                    "query": "dest_ip:192.168.40.3 AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND protocol:$Protocol",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -397,7 +796,8 @@
                 }
             ],
             "title": "Top Attacker IPs",
-            "type": "bargauge"
+            "type": "bargauge",
+            "description": "Most active source IPs"
         },
         {
             "datasource": {
@@ -418,7 +818,8 @@
                     },
                     "color": {
                         "mode": "palette-classic"
-                    }
+                    },
+                    "mappings": []
                 },
                 "overrides": []
             },
@@ -426,15 +827,20 @@
                 "h": 8,
                 "w": 8,
                 "x": 8,
-                "y": 12
+                "y": 16
             },
             "id": 6,
             "options": {
                 "legend": {
-                    "displayMode": "hidden"
+                    "displayMode": "table",
+                    "placement": "bottom",
+                    "showLegend": true,
+                    "calcs": [
+                        "sum"
+                    ]
                 },
                 "tooltip": {
-                    "mode": "single"
+                    "mode": "multi"
                 }
             },
             "pluginVersion": "10.0.0",
@@ -442,7 +848,7 @@
                 {
                     "refId": "A",
                     "alias": "Ports",
-                    "query": "dest_ip:192.168.40.3 AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country",
+                    "query": "dest_ip:192.168.40.3 AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND protocol:$Protocol",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -466,7 +872,8 @@
                 }
             ],
             "title": "Top Destination Ports",
-            "type": "bargauge"
+            "type": "bargauge",
+            "description": "Most targeted ports"
         },
         {
             "datasource": {
@@ -487,7 +894,8 @@
                     },
                     "color": {
                         "mode": "palette-classic"
-                    }
+                    },
+                    "mappings": []
                 },
                 "overrides": []
             },
@@ -495,15 +903,20 @@
                 "h": 8,
                 "w": 8,
                 "x": 16,
-                "y": 12
+                "y": 16
             },
             "id": 7,
             "options": {
                 "legend": {
-                    "displayMode": "hidden"
+                    "displayMode": "table",
+                    "placement": "bottom",
+                    "showLegend": true,
+                    "calcs": [
+                        "sum"
+                    ]
                 },
                 "tooltip": {
-                    "mode": "single"
+                    "mode": "multi"
                 }
             },
             "pluginVersion": "10.0.0",
@@ -511,7 +924,7 @@
                 {
                     "refId": "A",
                     "alias": "Countries",
-                    "query": "dest_ip:192.168.40.3 AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country",
+                    "query": "dest_ip:192.168.40.3 AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND protocol:$Protocol",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -535,7 +948,8 @@
                 }
             ],
             "title": "Top Source Countries",
-            "type": "bargauge"
+            "type": "bargauge",
+            "description": "Attacks by country of origin"
         },
         {
             "datasource": {
@@ -556,7 +970,8 @@
                     },
                     "color": {
                         "mode": "palette-classic"
-                    }
+                    },
+                    "mappings": []
                 },
                 "overrides": []
             },
@@ -564,15 +979,20 @@
                 "h": 8,
                 "w": 12,
                 "x": 0,
-                "y": 20
+                "y": 24
             },
             "id": 8,
             "options": {
                 "legend": {
-                    "displayMode": "hidden"
+                    "displayMode": "table",
+                    "placement": "bottom",
+                    "showLegend": true,
+                    "calcs": [
+                        "sum"
+                    ]
                 },
                 "tooltip": {
-                    "mode": "single"
+                    "mode": "multi"
                 }
             },
             "pluginVersion": "10.0.0",
@@ -580,7 +1000,7 @@
                 {
                     "refId": "A",
                     "alias": "Protocols",
-                    "query": "dest_ip:192.168.40.3 AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country",
+                    "query": "dest_ip:192.168.40.3 AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND protocol:$Protocol",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -604,7 +1024,84 @@
                 }
             ],
             "title": "Top Protocols / Services",
-            "type": "bargauge"
+            "type": "bargauge",
+            "description": "Attack distribution by protocol"
+        },
+        {
+            "datasource": {
+                "type": "elasticsearch",
+                "uid": "ef6pmu9oze7eoc"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "custom": {
+                        "drawStyle": "bars",
+                        "lineInterpolation": "smooth",
+                        "lineWidth": 1,
+                        "fillOpacity": 80,
+                        "showPoints": "never",
+                        "stacking": {
+                            "mode": "normal"
+                        }
+                    },
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "mappings": []
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 24
+            },
+            "id": 16,
+            "options": {
+                "legend": {
+                    "displayMode": "table",
+                    "placement": "bottom",
+                    "showLegend": true,
+                    "calcs": [
+                        "sum"
+                    ]
+                },
+                "tooltip": {
+                    "mode": "multi"
+                }
+            },
+            "pluginVersion": "10.0.0",
+            "targets": [
+                {
+                    "refId": "A",
+                    "alias": "Honeypots",
+                    "query": "dest_ip:192.168.40.3 AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND protocol:$Protocol",
+                    "timeField": "@timestamp",
+                    "bucketAggs": [
+                        {
+                            "id": "2",
+                            "type": "terms",
+                            "field": "honeypot_type",
+                            "settings": {
+                                "size": 10,
+                                "order": "desc",
+                                "orderBy": "1",
+                                "min_doc_count": 1
+                            }
+                        }
+                    ],
+                    "metrics": [
+                        {
+                            "id": "1",
+                            "type": "count"
+                        }
+                    ]
+                }
+            ],
+            "title": "Attacks by Honeypot Type",
+            "type": "bargauge",
+            "description": "Distribution across different honeypot services"
         },
         {
             "datasource": {
@@ -618,8 +1115,8 @@
             "gridPos": {
                 "h": 12,
                 "w": 12,
-                "x": 12,
-                "y": 20
+                "x": 0,
+                "y": 32
             },
             "id": 9,
             "options": {
@@ -659,7 +1156,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "dest_ip:192.168.40.3 AND source.geo.country_name:* AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country",
+                    "query": "dest_ip:192.168.40.3 AND source.geo.country_name:* AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND protocol:$Protocol",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
@@ -670,8 +1167,9 @@
                     ]
                 }
             ],
-            "title": "Attack Map (src \u2192 honeypot)",
-            "type": "geomap"
+            "title": "Attack Map (src → honeypot)",
+            "type": "geomap",
+            "description": "Geographic distribution of attack sources"
         },
         {
             "datasource": {
@@ -679,36 +1177,650 @@
                 "uid": "ef6pmu9oze7eoc"
             },
             "fieldConfig": {
-                "defaults": {},
+                "defaults": {
+                    "custom": {
+                        "drawStyle": "bars",
+                        "lineInterpolation": "smooth",
+                        "lineWidth": 1,
+                        "fillOpacity": 80,
+                        "showPoints": "never",
+                        "stacking": {
+                            "mode": "normal"
+                        }
+                    },
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "mappings": []
+                },
                 "overrides": []
             },
             "gridPos": {
-                "h": 10,
-                "w": 24,
-                "x": 0,
+                "h": 8,
+                "w": 12,
+                "x": 12,
                 "y": 32
             },
-            "id": 10,
+            "id": 17,
             "options": {
-                "showHeader": true
+                "legend": {
+                    "displayMode": "table",
+                    "placement": "bottom",
+                    "showLegend": true,
+                    "calcs": [
+                        "sum"
+                    ]
+                },
+                "tooltip": {
+                    "mode": "multi"
+                }
             },
             "pluginVersion": "10.0.0",
             "targets": [
                 {
                     "refId": "A",
-                    "query": "dest_ip:192.168.40.3 AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country",
+                    "alias": "Usernames",
+                    "query": "dest_ip:192.168.40.3 AND username:* AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND protocol:$Protocol",
+                    "timeField": "@timestamp",
+                    "bucketAggs": [
+                        {
+                            "id": "2",
+                            "type": "terms",
+                            "field": "username",
+                            "settings": {
+                                "size": 15,
+                                "order": "desc",
+                                "orderBy": "1",
+                                "min_doc_count": 1
+                            }
+                        }
+                    ],
+                    "metrics": [
+                        {
+                            "id": "1",
+                            "type": "count"
+                        }
+                    ]
+                }
+            ],
+            "title": "Top Usernames Attempted",
+            "type": "bargauge",
+            "description": "Most common usernames used in attacks"
+        },
+        {
+            "datasource": {
+                "type": "elasticsearch",
+                "uid": "ef6pmu9oze7eoc"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "custom": {
+                        "drawStyle": "bars",
+                        "lineInterpolation": "smooth",
+                        "lineWidth": 1,
+                        "fillOpacity": 80,
+                        "showPoints": "never",
+                        "stacking": {
+                            "mode": "normal"
+                        }
+                    },
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "mappings": []
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 44
+            },
+            "id": 18,
+            "options": {
+                "legend": {
+                    "displayMode": "table",
+                    "placement": "bottom",
+                    "showLegend": true,
+                    "calcs": [
+                        "sum"
+                    ]
+                },
+                "tooltip": {
+                    "mode": "multi"
+                }
+            },
+            "pluginVersion": "10.0.0",
+            "targets": [
+                {
+                    "refId": "A",
+                    "alias": "Passwords",
+                    "query": "dest_ip:192.168.40.3 AND password:* AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND protocol:$Protocol",
+                    "timeField": "@timestamp",
+                    "bucketAggs": [
+                        {
+                            "id": "2",
+                            "type": "terms",
+                            "field": "password",
+                            "settings": {
+                                "size": 15,
+                                "order": "desc",
+                                "orderBy": "1",
+                                "min_doc_count": 1
+                            }
+                        }
+                    ],
+                    "metrics": [
+                        {
+                            "id": "1",
+                            "type": "count"
+                        }
+                    ]
+                }
+            ],
+            "title": "Top Passwords Attempted",
+            "type": "bargauge",
+            "description": "Most common passwords used in attacks"
+        },
+        {
+            "datasource": {
+                "type": "elasticsearch",
+                "uid": "ef6pmu9oze7eoc"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "custom": {
+                        "drawStyle": "bars",
+                        "lineInterpolation": "smooth",
+                        "lineWidth": 1,
+                        "fillOpacity": 80,
+                        "showPoints": "never",
+                        "stacking": {
+                            "mode": "normal"
+                        }
+                    },
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "mappings": []
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 44
+            },
+            "id": 19,
+            "options": {
+                "legend": {
+                    "displayMode": "table",
+                    "placement": "bottom",
+                    "showLegend": true,
+                    "calcs": [
+                        "sum"
+                    ]
+                },
+                "tooltip": {
+                    "mode": "multi"
+                }
+            },
+            "pluginVersion": "10.0.0",
+            "targets": [
+                {
+                    "refId": "A",
+                    "alias": "Commands",
+                    "query": "dest_ip:192.168.40.3 AND command:* AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND protocol:$Protocol",
+                    "timeField": "@timestamp",
+                    "bucketAggs": [
+                        {
+                            "id": "2",
+                            "type": "terms",
+                            "field": "command",
+                            "settings": {
+                                "size": 15,
+                                "order": "desc",
+                                "orderBy": "1",
+                                "min_doc_count": 1
+                            }
+                        }
+                    ],
+                    "metrics": [
+                        {
+                            "id": "1",
+                            "type": "count"
+                        }
+                    ]
+                }
+            ],
+            "title": "Top Commands Executed",
+            "type": "bargauge",
+            "description": "Most executed commands by attackers"
+        },
+        {
+            "datasource": {
+                "type": "elasticsearch",
+                "uid": "ef6pmu9oze7eoc"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "custom": {
+                        "drawStyle": "bars",
+                        "lineInterpolation": "smooth",
+                        "lineWidth": 1,
+                        "fillOpacity": 80,
+                        "showPoints": "never",
+                        "stacking": {
+                            "mode": "normal"
+                        }
+                    },
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "mappings": []
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 52
+            },
+            "id": 20,
+            "options": {
+                "legend": {
+                    "displayMode": "table",
+                    "placement": "bottom",
+                    "showLegend": true,
+                    "calcs": [
+                        "sum"
+                    ]
+                },
+                "tooltip": {
+                    "mode": "multi"
+                }
+            },
+            "pluginVersion": "10.0.0",
+            "targets": [
+                {
+                    "refId": "A",
+                    "alias": "OS",
+                    "query": "dest_ip:192.168.40.3 AND os_fingerprint:* AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND protocol:$Protocol",
+                    "timeField": "@timestamp",
+                    "bucketAggs": [
+                        {
+                            "id": "2",
+                            "type": "terms",
+                            "field": "os_fingerprint",
+                            "settings": {
+                                "size": 10,
+                                "order": "desc",
+                                "orderBy": "1",
+                                "min_doc_count": 1
+                            }
+                        }
+                    ],
+                    "metrics": [
+                        {
+                            "id": "1",
+                            "type": "count"
+                        }
+                    ]
+                }
+            ],
+            "title": "OS Fingerprint Distribution",
+            "type": "bargauge",
+            "description": "Detected operating systems (p0f)"
+        },
+        {
+            "datasource": {
+                "type": "elasticsearch",
+                "uid": "ef6pmu9oze7eoc"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "custom": {
+                        "drawStyle": "line",
+                        "lineInterpolation": "smooth",
+                        "lineWidth": 2,
+                        "fillOpacity": 20,
+                        "showPoints": "never"
+                    },
+                    "mappings": []
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 52
+            },
+            "id": 21,
+            "options": {
+                "legend": {
+                    "displayMode": "table",
+                    "placement": "bottom",
+                    "showLegend": true,
+                    "calcs": [
+                        "sum",
+                        "max"
+                    ]
+                },
+                "tooltip": {
+                    "mode": "multi"
+                }
+            },
+            "pluginVersion": "10.0.0",
+            "targets": [
+                {
+                    "refId": "A",
+                    "alias": "Attacks per Hour",
+                    "query": "dest_ip:192.168.40.3 AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND protocol:$Protocol",
+                    "timeField": "@timestamp",
+                    "bucketAggs": [
+                        {
+                            "id": "2",
+                            "type": "date_histogram",
+                            "field": "@timestamp",
+                            "settings": {
+                                "interval": "1h",
+                                "min_doc_count": 0
+                            }
+                        }
+                    ],
+                    "metrics": [
+                        {
+                            "id": "1",
+                            "type": "count"
+                        }
+                    ]
+                }
+            ],
+            "title": "Hourly Attack Pattern",
+            "type": "timeseries",
+            "description": "Attack frequency by hour of day"
+        },
+        {
+            "datasource": {
+                "type": "elasticsearch",
+                "uid": "ef6pmu9oze7eoc"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "custom": {
+                        "align": "auto",
+                        "displayMode": "auto"
+                    },
+                    "mappings": []
+                },
+                "overrides": [
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "@timestamp"
+                        },
+                        "properties": [
+                            {
+                                "id": "custom.displayMode",
+                                "value": "date-time"
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "src_ip"
+                        },
+                        "properties": [
+                            {
+                                "id": "custom.width",
+                                "value": 120
+                            },
+                            {
+                                "id": "links",
+                                "value": [
+                                    {
+                                        "title": "View in Elasticsearch",
+                                        "url": "http://localhost:9200/_search?q=src_ip:${__value.raw}"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "download_url"
+                        },
+                        "properties": [
+                            {
+                                "id": "links",
+                                "value": [
+                                    {
+                                        "title": "Open URL",
+                                        "url": "${__value.raw}"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "file_hash"
+                        },
+                        "properties": [
+                            {
+                                "id": "links",
+                                "value": [
+                                    {
+                                        "title": "VirusTotal",
+                                        "url": "https://www.virustotal.com/gui/file/${__value.raw}"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            },
+            "gridPos": {
+                "h": 10,
+                "w": 24,
+                "x": 0,
+                "y": 60
+            },
+            "id": 10,
+            "options": {
+                "showHeader": true,
+                "sortBy": [
+                    {
+                        "desc": true,
+                        "displayName": "@timestamp"
+                    }
+                ]
+            },
+            "pluginVersion": "10.0.0",
+            "targets": [
+                {
+                    "refId": "A",
+                    "query": "dest_ip:192.168.40.3 AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND protocol:$Protocol",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
                         {
                             "id": "1",
-                            "type": "raw_document"
+                            "type": "raw_document",
+                            "settings": {
+                                "size": 100
+                            }
                         }
                     ]
                 }
             ],
+            "transformations": [
+                {
+                    "id": "organize",
+                    "options": {
+                        "excludeByName": {
+                            "_id": true,
+                            "_index": true,
+                            "_score": true,
+                            "_source": true,
+                            "_type": true
+                        },
+                        "indexByName": {},
+                        "renameByName": {
+                            "@timestamp": "Time",
+                            "src_ip": "Source IP",
+                            "dest_ip": "Dest IP",
+                            "dest_port": "Port",
+                            "source.geo.country_name": "Country",
+                            "honeypot_type": "Honeypot",
+                            "honeypot.app_proto": "Protocol",
+                            "username": "Username",
+                            "password": "Password",
+                            "command": "Command",
+                            "download_url": "Download URL",
+                            "file_hash": "File Hash",
+                            "event_type": "Event Type",
+                            "os_fingerprint": "OS",
+                            "request_path": "Path",
+                            "session_id": "Session"
+                        }
+                    }
+                }
+            ],
             "title": "Recent Honeypot Events",
-            "type": "table"
+            "type": "table",
+            "description": "Detailed event log with clickable links"
+        },
+        {
+            "datasource": {
+                "type": "elasticsearch",
+                "uid": "ef6pmu9oze7eoc"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "custom": {
+                        "align": "auto",
+                        "displayMode": "auto"
+                    },
+                    "mappings": []
+                },
+                "overrides": [
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "@timestamp"
+                        },
+                        "properties": [
+                            {
+                                "id": "custom.displayMode",
+                                "value": "date-time"
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "file_hash"
+                        },
+                        "properties": [
+                            {
+                                "id": "links",
+                                "value": [
+                                    {
+                                        "title": "VirusTotal",
+                                        "url": "https://www.virustotal.com/gui/file/${__value.raw}"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "download_url"
+                        },
+                        "properties": [
+                            {
+                                "id": "links",
+                                "value": [
+                                    {
+                                        "title": "Open URL",
+                                        "url": "${__value.raw}"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            },
+            "gridPos": {
+                "h": 10,
+                "w": 24,
+                "x": 0,
+                "y": 70
+            },
+            "id": 22,
+            "options": {
+                "showHeader": true,
+                "sortBy": [
+                    {
+                        "desc": true,
+                        "displayName": "@timestamp"
+                    }
+                ]
+            },
+            "pluginVersion": "10.0.0",
+            "targets": [
+                {
+                    "refId": "A",
+                    "query": "dest_ip:192.168.40.3 AND download_url:* AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND protocol:$Protocol",
+                    "timeField": "@timestamp",
+                    "bucketAggs": [],
+                    "metrics": [
+                        {
+                            "id": "1",
+                            "type": "raw_document",
+                            "settings": {
+                                "size": 50
+                            }
+                        }
+                    ]
+                }
+            ],
+            "transformations": [
+                {
+                    "id": "organize",
+                    "options": {
+                        "excludeByName": {
+                            "_id": true,
+                            "_index": true,
+                            "_score": true,
+                            "_source": true,
+                            "_type": true
+                        },
+                        "indexByName": {},
+                        "renameByName": {
+                            "@timestamp": "Time",
+                            "src_ip": "Source IP",
+                            "source.geo.country_name": "Country",
+                            "honeypot_type": "Honeypot",
+                            "download_url": "Download URL",
+                            "file_hash": "File Hash",
+                            "downloaded_file": "Filename"
+                        }
+                    }
+                }
+            ],
+            "title": "Malware Downloads",
+            "type": "table",
+            "description": "Files downloaded by attackers with VirusTotal links"
         }
     ],
     "refresh": "30s",
@@ -780,6 +1892,46 @@
                     "text": "All",
                     "value": "*"
                 }
+            },
+            {
+                "name": "Honeypot_Type",
+                "type": "query",
+                "datasource": {
+                    "type": "elasticsearch",
+                    "uid": "ef6pmu9oze7eoc"
+                },
+                "refresh": 1,
+                "hide": 0,
+                "query": "{\"find\":\"terms\",\"field\":\"honeypot_type\"}",
+                "includeAll": true,
+                "allValue": "*",
+                "multi": true,
+                "label": "Honeypot Type",
+                "current": {
+                    "selected": true,
+                    "text": "All",
+                    "value": "*"
+                }
+            },
+            {
+                "name": "Protocol",
+                "type": "query",
+                "datasource": {
+                    "type": "elasticsearch",
+                    "uid": "ef6pmu9oze7eoc"
+                },
+                "refresh": 1,
+                "hide": 0,
+                "query": "{\"find\":\"terms\",\"field\":\"honeypot.app_proto\"}",
+                "includeAll": true,
+                "allValue": "*",
+                "multi": true,
+                "label": "Protocol",
+                "current": {
+                    "selected": true,
+                    "text": "All",
+                    "value": "*"
+                }
             }
         ]
     },
@@ -804,6 +1956,6 @@
     "timezone": "",
     "title": "Honeypot Threat Overview",
     "uid": "tpot-attack-overview",
-    "version": 1,
+    "version": 2,
     "weekStart": ""
 }
