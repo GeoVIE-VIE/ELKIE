@@ -1266,8 +1266,8 @@
                             }
                         },
                         "location": {
-                            "latitude": "source.geo.location.lat",
-                            "longitude": "source.geo.location.lon",
+                            "latitude": "geoip.location.lat",
+                            "longitude": "geoip.location.lon",
                             "mode": "coords"
                         },
                         "name": "Attack Sources",
@@ -1290,11 +1290,11 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "source.geo.location.lat:* AND NOT src_ip:192.168.* AND NOT container.id:suricata",
+                    "query": "geoip.location.lat:* AND NOT src_ip:192.168.* AND NOT container.id:suricata",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
-                            "field": "source.geo.country_name",
+                            "field": "geoip.country_name",
                             "id": "3",
                             "settings": {
                                 "min_doc_count": "1",
@@ -1313,12 +1313,12 @@
                         {
                             "id": "2",
                             "type": "avg",
-                            "field": "source.geo.location.lat"
+                            "field": "geoip.location.lat"
                         },
                         {
                             "id": "4",
                             "type": "avg",
-                            "field": "source.geo.location.lon"
+                            "field": "geoip.location.lon"
                         }
                     ]
                 }
@@ -1327,15 +1327,15 @@
                 {
                     "id": "renameByRegex",
                     "options": {
-                        "regex": "Average source.geo.location.lat",
-                        "renamePattern": "source.geo.location.lat"
+                        "regex": "Average geoip.location.lat",
+                        "renamePattern": "geoip.location.lat"
                     }
                 },
                 {
                     "id": "renameByRegex",
                     "options": {
-                        "regex": "Average source.geo.location.lon",
-                        "renamePattern": "source.geo.location.lon"
+                        "regex": "Average geoip.location.lon",
+                        "renamePattern": "geoip.location.lon"
                     }
                 }
             ],
