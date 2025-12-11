@@ -297,7 +297,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "container.id:heralding",
+                    "query": "username:*",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
@@ -308,9 +308,9 @@
                     ]
                 }
             ],
-            "title": "Heralding Events",
+            "title": "Login Attempts",
             "type": "stat",
-            "description": "Credential honeypot events"
+            "description": "Total credential attempts"
         },
         {
             "datasource": {
@@ -1349,14 +1349,14 @@
             "targets": [
                 {
                     "refId": "A",
-                    "alias": "Event Types",
-                    "query": "container.id:$Container AND src_ip:$Attacker_IP",
+                    "alias": "Usernames",
+                    "query": "username:*",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
                             "id": "2",
                             "type": "terms",
-                            "field": "event_type",
+                            "field": "username",
                             "settings": {
                                 "size": 15,
                                 "order": "desc",
@@ -1373,9 +1373,9 @@
                     ]
                 }
             ],
-            "title": "Top Event Types",
+            "title": "Top Usernames Attempted",
             "type": "table",
-            "description": "Most common event types captured"
+            "description": "Most common usernames used in attacks"
         },
         {
             "datasource": {
@@ -1458,14 +1458,14 @@
             "targets": [
                 {
                     "refId": "A",
-                    "alias": "Log Sources",
-                    "query": "container.id:$Container AND src_ip:$Attacker_IP",
+                    "alias": "Passwords",
+                    "query": "password:*",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
                             "id": "2",
                             "type": "terms",
-                            "field": "log.file.path",
+                            "field": "password",
                             "settings": {
                                 "size": 15,
                                 "order": "desc",
@@ -1482,9 +1482,9 @@
                     ]
                 }
             ],
-            "title": "Top Log Sources",
+            "title": "Top Passwords Attempted",
             "type": "table",
-            "description": "Most active honeypot log files"
+            "description": "Most common passwords used in attacks"
         },
         {
             "datasource": {
@@ -1567,14 +1567,14 @@
             "targets": [
                 {
                     "refId": "A",
-                    "alias": "Honeypot Modules",
-                    "query": "container.id:$Container AND src_ip:$Attacker_IP AND honeypot.mod:*",
+                    "alias": "Commands",
+                    "query": "command:*",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
                             "id": "2",
                             "type": "terms",
-                            "field": "honeypot.mod",
+                            "field": "command",
                             "settings": {
                                 "size": 15,
                                 "order": "desc",
@@ -1591,9 +1591,9 @@
                     ]
                 }
             ],
-            "title": "Top Honeypot Modules",
+            "title": "Top Commands Executed",
             "type": "table",
-            "description": "Most triggered honeypot detection modules"
+            "description": "Most executed commands by attackers"
         },
         {
             "datasource": {
