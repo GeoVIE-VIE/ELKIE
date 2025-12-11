@@ -1,0 +1,210 @@
+# T-Pot Honeypot Ingest Pipeline - Copy/paste into Kibana Dev Tools
+
+PUT _ingest/pipeline/tpot-honeypot
+{
+  "description": "Parse and normalize T-Pot honeypot logs from message field",
+  "processors": [
+    {
+      "json": {
+        "field": "message",
+        "target_field": "honeypot",
+        "ignore_failure": true
+      }
+    },
+    {
+      "set": {
+        "field": "honeypot_type",
+        "copy_from": "container.name",
+        "ignore_failure": true
+      }
+    },
+    {
+      "script": {
+        "description": "Normalize IP and port fields across all honeypot types",
+        "lang": "painless",
+        "ignore_failure": true,
+        "source": "def hp = ctx.honeypot; if (hp == null) { return; } def src_ip = null; def dest_ip = null; def src_port = null; def dest_port = null; if (hp.src_ip != null) { src_ip = hp.src_ip; } else if (hp.client_ip != null) { src_ip = hp.client_ip; } else if (hp.sourceIp != null) { src_ip = hp.sourceIp; } else if (hp.source_ip != null) { src_ip = hp.source_ip; } else if (hp.peer != null && hp.peer.ip != null) { src_ip = hp.peer.ip; } else if (hp.remote_host != null) { src_ip = hp.remote_host; } if (hp.dest_ip != null) { dest_ip = hp.dest_ip; } else if (hp.dst_ip != null) { dest_ip = hp.dst_ip; } else if (hp.server_ip != null) { dest_ip = hp.server_ip; } else if (hp.destinationIp != null) { dest_ip = hp.destinationIp; } else if (hp.destination_ip != null) { dest_ip = hp.destination_ip; } else if (hp.local_host != null) { dest_ip = hp.local_host; } if (hp.src_port != null) { src_port = hp.src_port; } else if (hp.client_port != null) { src_port = hp.client_port; } else if (hp.sourcePort != null) { src_port = hp.sourcePort; } else if (hp.source_port != null) { src_port = hp.source_port; } else if (hp.peer != null && hp.peer.port != null) { src_port = hp.peer.port; } else if (hp.remote_port != null) { src_port = hp.remote_port; } if (hp.dest_port != null) { dest_port = hp.dest_port; } else if (hp.dst_port != null) { dest_port = hp.dst_port; } else if (hp.server_port != null) { dest_port = hp.server_port; } else if (hp.destinationPort != null) { dest_port = hp.destinationPort; } else if (hp.destination_port != null) { dest_port = hp.destination_port; } else if (hp.local_port != null) { dest_port = hp.local_port; } if (src_ip != null) { ctx.src_ip = src_ip; } if (dest_ip != null) { ctx.dest_ip = dest_ip; } if (src_port != null) { ctx.src_port = src_port; } if (dest_port != null) { ctx.dest_port = dest_port; }"
+      }
+    },
+    {
+      "script": {
+        "description": "Extract event type and protocol",
+        "lang": "painless",
+        "ignore_failure": true,
+        "source": "def hp = ctx.honeypot; if (hp == null) { return; } if (hp.event_type != null) { ctx.event_type = hp.event_type; } else if (hp.eventid != null) { ctx.event_type = hp.eventid; } else if (hp.type != null) { ctx.event_type = hp.type; } else if (hp.sip_method != null) { ctx.event_type = hp.sip_method; } else if (hp.request_method != null) { ctx.event_type = hp.request_method; } else if (hp.method != null) { ctx.event_type = hp.method; } if (hp.proto != null) { ctx.protocol = hp.proto; } else if (hp.protocol != null) { ctx.protocol = hp.protocol; } else if (hp.transport != null) { ctx.protocol = hp.transport; }"
+      }
+    },
+    {
+      "script": {
+        "description": "Extract Cowrie-specific fields (SSH/Telnet honeypot)",
+        "lang": "painless",
+        "ignore_failure": true,
+        "source": "def hp = ctx.honeypot; if (hp == null) { return; } if (ctx.honeypot_type == 'cowrie') { if (hp.username != null) { ctx.username = hp.username; } if (hp.password != null) { ctx.password = hp.password; } if (hp.input != null) { ctx.command = hp.input; } if (hp.message != null) { ctx.cowrie_message = hp.message; } if (hp.session != null) { ctx.session_id = hp.session; } if (hp.shasum != null) { ctx.file_hash = hp.shasum; } if (hp.url != null) { ctx.download_url = hp.url; } if (hp.outfile != null) { ctx.downloaded_file = hp.outfile; } }"
+      }
+    },
+    {
+      "script": {
+        "description": "Extract Dionaea-specific fields",
+        "lang": "painless",
+        "ignore_failure": true,
+        "source": "def hp = ctx.honeypot; if (hp == null) { return; } if (ctx.honeypot_type == 'dionaea') { if (hp.connection != null) { ctx.connection_type = hp.connection; } if (hp.credentials != null) { ctx.credentials = hp.credentials; } if (hp.download_md5 != null) { ctx.file_hash = hp.download_md5; } if (hp.download_url != null) { ctx.download_url = hp.download_url; } }"
+      }
+    },
+    {
+      "script": {
+        "description": "Extract Suricata-specific fields (IDS)",
+        "lang": "painless",
+        "ignore_failure": true,
+        "source": "def hp = ctx.honeypot; if (hp == null) { return; } if (ctx.honeypot_type == 'suricata') { if (hp.alert != null) { ctx.alert = hp.alert; if (hp.alert.signature != null) { ctx.alert_signature = hp.alert.signature; } if (hp.alert.category != null) { ctx.alert_category = hp.alert.category; } if (hp.alert.severity != null) { ctx.alert_severity = hp.alert.severity; } } if (hp.http != null) { ctx.http = hp.http; } if (hp.dns != null) { ctx.dns = hp.dns; } if (hp.tls != null) { ctx.tls = hp.tls; } if (hp.flow != null) { ctx.flow = hp.flow; } }"
+      }
+    },
+    {
+      "script": {
+        "description": "Extract p0f-specific fields (OS fingerprinting)",
+        "lang": "painless",
+        "ignore_failure": true,
+        "source": "def hp = ctx.honeypot; if (hp == null) { return; } if (ctx.honeypot_type == 'p0f') { if (hp.os != null) { ctx.os_fingerprint = hp.os; } if (hp.dist != null) { ctx.os_distance = hp.dist; } if (hp.params != null) { ctx.os_params = hp.params; } if (hp.raw_sig != null) { ctx.os_raw_sig = hp.raw_sig; } }"
+      }
+    },
+    {
+      "script": {
+        "description": "Extract SentryPeer-specific fields (VoIP honeypot)",
+        "lang": "painless",
+        "ignore_failure": true,
+        "source": "def hp = ctx.honeypot; if (hp == null) { return; } if (ctx.honeypot_type == 'sentrypeer') { if (hp.called_number != null) { ctx.called_number = hp.called_number; } if (hp.sip_message != null) { ctx.sip_message = hp.sip_message; } if (hp.sip_user_agent != null) { ctx.sip_user_agent = hp.sip_user_agent; } if (hp.transport_type != null) { ctx.transport_type = hp.transport_type; } }"
+      }
+    },
+    {
+      "script": {
+        "description": "Extract FATT-specific fields (fingerprinting)",
+        "lang": "painless",
+        "ignore_failure": true,
+        "source": "def hp = ctx.honeypot; if (hp == null) { return; } if (ctx.honeypot_type == 'fatt') { if (hp.ja3 != null) { ctx.ja3_hash = hp.ja3; } if (hp.ja3s != null) { ctx.ja3s_hash = hp.ja3s; } if (hp.hassh != null) { ctx.hassh = hp.hassh; } if (hp.hasshServer != null) { ctx.hassh_server = hp.hasshServer; } if (hp.serverName != null) { ctx.server_name = hp.serverName; } }"
+      }
+    },
+    {
+      "script": {
+        "description": "Extract Tanner/Snare-specific fields (web honeypot)",
+        "lang": "painless",
+        "ignore_failure": true,
+        "source": "def hp = ctx.honeypot; if (hp == null) { return; } if (ctx.honeypot_type == 'tanner') { if (hp.path != null) { ctx.request_path = hp.path; } if (hp.status != null) { ctx.http_status = hp.status; } if (hp.user_agent != null) { ctx.user_agent = hp.user_agent; } if (hp.cookies != null) { ctx.cookies = hp.cookies; } if (hp.detection != null) { ctx.attack_detection = hp.detection; } }"
+      }
+    },
+    {
+      "script": {
+        "description": "Extract Heralding-specific fields (credential honeypot)",
+        "lang": "painless",
+        "ignore_failure": true,
+        "source": "def hp = ctx.honeypot; if (hp == null) { return; } if (ctx.honeypot_type == 'heralding') { if (hp.username != null) { ctx.username = hp.username; } if (hp.password != null) { ctx.password = hp.password; } if (hp.protocol != null) { ctx.protocol = hp.protocol; } if (hp.session_id != null) { ctx.session_id = hp.session_id; } }"
+      }
+    },
+    {
+      "script": {
+        "description": "Extract H0neytr4p-specific fields (HTTP honeypot)",
+        "lang": "painless",
+        "ignore_failure": true,
+        "source": "def hp = ctx.honeypot; if (hp == null) { return; } if (ctx.honeypot_type == 'h0neytr4p') { if (hp.request_uri != null) { ctx.request_path = hp.request_uri; } if (hp.hostname != null) { ctx.hostname = hp.hostname; } if (hp.user_agent != null) { ctx.user_agent = hp.user_agent; } if (hp.request_body != null) { ctx.request_body = hp.request_body; } }"
+      }
+    },
+    {
+      "script": {
+        "description": "Extract Conpot-specific fields (ICS/SCADA honeypot)",
+        "lang": "painless",
+        "ignore_failure": true,
+        "source": "def hp = ctx.honeypot; if (hp == null) { return; } if (ctx.honeypot_type == 'conpot') { if (hp.data_type != null) { ctx.data_type = hp.data_type; } if (hp.public_ip != null) { ctx.public_ip = hp.public_ip; } if (hp.request != null) { ctx.request = hp.request; } if (hp.response != null) { ctx.response = hp.response; } }"
+      }
+    },
+    {
+      "script": {
+        "description": "Extract Honeytrap-specific fields",
+        "lang": "painless",
+        "ignore_failure": true,
+        "source": "def hp = ctx.honeypot; if (hp == null) { return; } if (ctx.honeypot_type == 'honeytrap') { if (hp.payload != null) { ctx.payload = hp.payload; } if (hp.payload_hex != null) { ctx.payload_hex = hp.payload_hex; } if (hp.service != null) { ctx.service = hp.service; } }"
+      }
+    },
+    {
+      "script": {
+        "description": "Extract ADBHoney-specific fields (Android Debug Bridge)",
+        "lang": "painless",
+        "ignore_failure": true,
+        "source": "def hp = ctx.honeypot; if (hp == null) { return; } if (ctx.honeypot_type == 'adbhoney') { if (hp.input != null) { ctx.command = hp.input; } if (hp.output != null) { ctx.output = hp.output; } }"
+      }
+    },
+    {
+      "script": {
+        "description": "Extract CiscoASA-specific fields",
+        "lang": "painless",
+        "ignore_failure": true,
+        "source": "def hp = ctx.honeypot; if (hp == null) { return; } if (ctx.honeypot_type == 'ciscoasa') { if (hp.username != null) { ctx.username = hp.username; } if (hp.password != null) { ctx.password = hp.password; } }"
+      }
+    },
+    {
+      "script": {
+        "description": "Extract Wordpot-specific fields (WordPress honeypot)",
+        "lang": "painless",
+        "ignore_failure": true,
+        "source": "def hp = ctx.honeypot; if (hp == null) { return; } if (ctx.honeypot_type == 'wordpot') { if (hp.path != null) { ctx.request_path = hp.path; } if (hp.user_agent != null) { ctx.user_agent = hp.user_agent; } if (hp.filename != null) { ctx.filename = hp.filename; } if (hp.plugin != null) { ctx.plugin = hp.plugin; } if (hp.theme != null) { ctx.theme = hp.theme; } }"
+      }
+    },
+    {
+      "script": {
+        "description": "Extract Miniprint-specific fields (printer honeypot)",
+        "lang": "painless",
+        "ignore_failure": true,
+        "source": "def hp = ctx.honeypot; if (hp == null) { return; } if (ctx.honeypot_type == 'miniprint') { if (hp.data != null) { ctx.print_data = hp.data; } if (hp.job_name != null) { ctx.job_name = hp.job_name; } }"
+      }
+    },
+    {
+      "geoip": {
+        "field": "src_ip",
+        "target_field": "geoip",
+        "ignore_missing": true,
+        "ignore_failure": true
+      }
+    },
+    {
+      "geoip": {
+        "field": "src_ip",
+        "target_field": "source.geo",
+        "ignore_missing": true,
+        "ignore_failure": true
+      }
+    },
+    {
+      "geoip": {
+        "field": "dest_ip",
+        "target_field": "destination.geo",
+        "ignore_missing": true,
+        "ignore_failure": true
+      }
+    },
+    {
+      "remove": {
+        "field": "message",
+        "ignore_missing": true,
+        "ignore_failure": true
+      }
+    }
+  ],
+  "on_failure": [
+    {
+      "set": {
+        "field": "ingest_error",
+        "value": "{{ _ingest.on_failure_message }}"
+      }
+    }
+  ]
+}
+
+# Test the pipeline with a sample document (optional)
+POST _ingest/pipeline/tpot-honeypot/_simulate
+{
+  "docs": [
+    {
+      "_source": {
+        "container": { "name": "cowrie" },
+        "message": "{\"eventid\":\"cowrie.login.success\",\"src_ip\":\"1.2.3.4\",\"src_port\":54321,\"dst_ip\":\"192.168.1.100\",\"dst_port\":22,\"username\":\"root\",\"password\":\"admin123\",\"session\":\"abc123\"}"
+      }
+    }
+  ]
+}
