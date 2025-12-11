@@ -79,7 +79,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "dest_ip:192.168.40.3 AND container.id:$Container AND src_ip:$Attacker_IP",
+                    "query": "container.id:$Container AND src_ip:$Attacker_IP",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
@@ -151,7 +151,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "dest_ip:192.168.40.3 AND container.id:$Container AND src_ip:$Attacker_IP",
+                    "query": "container.id:$Container AND src_ip:$Attacker_IP",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
@@ -224,7 +224,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "dest_ip:192.168.40.3 AND container.id:$Container AND src_ip:$Attacker_IP",
+                    "query": "container.id:$Container AND src_ip:$Attacker_IP",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
@@ -297,7 +297,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "dest_ip:192.168.40.3 AND (honeypot.username:* OR username:*)",
+                    "query": "(honeypot.username:* OR username:*)",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
@@ -369,7 +369,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "dest_ip:192.168.40.3 AND (honeypot.download_url:* OR download_url:*)",
+                    "query": "(honeypot.download_url:* OR download_url:*)",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
@@ -441,7 +441,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "dest_ip:192.168.40.3 AND container.id:$Container AND src_ip:$Attacker_IP",
+                    "query": "container.id:$Container AND src_ip:$Attacker_IP",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -523,7 +523,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "dest_ip:192.168.40.3 AND (honeypot.input:* OR command:*)",
+                    "query": "(honeypot.input:* OR command:*)",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
@@ -596,7 +596,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "dest_ip:192.168.40.3 AND (honeypot.session:* OR session_id:*)",
+                    "query": "(honeypot.session:* OR session_id:*)",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
@@ -664,7 +664,7 @@
                 {
                     "refId": "A",
                     "alias": "Total hits",
-                    "query": "dest_ip:192.168.40.3 AND container.id:$Container AND src_ip:$Attacker_IP",
+                    "query": "container.id:$Container AND src_ip:$Attacker_IP",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -687,7 +687,7 @@
                 {
                     "refId": "B",
                     "alias": "By Honeypot Type",
-                    "query": "dest_ip:192.168.40.3 AND container.id:$Container AND src_ip:$Attacker_IP",
+                    "query": "container.id:$Container AND src_ip:$Attacker_IP",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -772,7 +772,7 @@
                 {
                     "refId": "A",
                     "alias": "Attacks",
-                    "query": "dest_ip:192.168.40.3 AND container.id:$Container AND src_ip:$Attacker_IP",
+                    "query": "container.id:$Container AND src_ip:$Attacker_IP",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -848,7 +848,7 @@
                 {
                     "refId": "A",
                     "alias": "Ports",
-                    "query": "dest_ip:192.168.40.3 AND container.id:$Container AND src_ip:$Attacker_IP",
+                    "query": "container.id:$Container AND src_ip:$Attacker_IP",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -924,7 +924,7 @@
                 {
                     "refId": "A",
                     "alias": "Countries",
-                    "query": "dest_ip:192.168.40.3 AND container.id:$Container AND src_ip:$Attacker_IP",
+                    "query": "container.id:$Container AND src_ip:$Attacker_IP",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -1000,7 +1000,7 @@
                 {
                     "refId": "A",
                     "alias": "Protocols",
-                    "query": "dest_ip:192.168.40.3 AND container.id:$Container AND src_ip:$Attacker_IP",
+                    "query": "container.id:$Container AND src_ip:$Attacker_IP",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -1076,7 +1076,7 @@
                 {
                     "refId": "A",
                     "alias": "Honeypots",
-                    "query": "dest_ip:192.168.40.3 AND container.id:$Container AND src_ip:$Attacker_IP",
+                    "query": "container.id:$Container AND src_ip:$Attacker_IP",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -1156,7 +1156,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "dest_ip:192.168.40.3 AND source.geo.location.lat:*",
+                    "query": "source.geo.location.lat:*",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
@@ -1220,7 +1220,7 @@
                 {
                     "refId": "A",
                     "alias": "Usernames",
-                    "query": "dest_ip:192.168.40.3 AND (honeypot.username:* OR username:*)",
+                    "query": "(honeypot.username:* OR username:*)",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -1296,7 +1296,7 @@
                 {
                     "refId": "A",
                     "alias": "Passwords",
-                    "query": "dest_ip:192.168.40.3 AND (honeypot.password:* OR password:*)",
+                    "query": "(honeypot.password:* OR password:*)",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -1372,7 +1372,7 @@
                 {
                     "refId": "A",
                     "alias": "Commands",
-                    "query": "dest_ip:192.168.40.3 AND (honeypot.input:* OR command:*)",
+                    "query": "(honeypot.input:* OR command:*)",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -1448,7 +1448,7 @@
                 {
                     "refId": "A",
                     "alias": "OS",
-                    "query": "dest_ip:192.168.40.3 AND (honeypot.os:* OR os_fingerprint:*)",
+                    "query": "(honeypot.os:* OR os_fingerprint:*)",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -1519,7 +1519,7 @@
                 {
                     "refId": "A",
                     "alias": "Attacks per Hour",
-                    "query": "dest_ip:192.168.40.3 AND container.id:$Container AND src_ip:$Attacker_IP",
+                    "query": "container.id:$Container AND src_ip:$Attacker_IP",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -1647,7 +1647,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "dest_ip:192.168.40.3 AND container.id:$Container AND src_ip:$Attacker_IP",
+                    "query": "container.id:$Container AND src_ip:$Attacker_IP",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
@@ -1780,7 +1780,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "dest_ip:192.168.40.3 AND (honeypot.download_url:* OR download_url:*)",
+                    "query": "(honeypot.download_url:* OR download_url:*)",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
