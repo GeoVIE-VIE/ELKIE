@@ -79,7 +79,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "dest_ip:192.168.40.3 AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND protocol:$Protocol",
+                    "query": "container.name:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND (honeypot.app_proto:$Protocol OR protocol:$Protocol)",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
@@ -151,7 +151,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "dest_ip:192.168.40.3 AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND protocol:$Protocol",
+                    "query": "container.name:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND (honeypot.app_proto:$Protocol OR protocol:$Protocol)",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
@@ -224,7 +224,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "dest_ip:192.168.40.3 AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND protocol:$Protocol",
+                    "query": "container.name:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND (honeypot.app_proto:$Protocol OR protocol:$Protocol)",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
@@ -297,7 +297,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "dest_ip:192.168.40.3 AND username:* AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND protocol:$Protocol",
+                    "query": "username:* AND container.name:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND (honeypot.app_proto:$Protocol OR protocol:$Protocol)",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
@@ -369,7 +369,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "dest_ip:192.168.40.3 AND download_url:* AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND protocol:$Protocol",
+                    "query": "download_url:* AND container.name:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND (honeypot.app_proto:$Protocol OR protocol:$Protocol)",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
@@ -441,7 +441,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "dest_ip:192.168.40.3 AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND protocol:$Protocol",
+                    "query": "container.name:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND (honeypot.app_proto:$Protocol OR protocol:$Protocol)",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -523,7 +523,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "dest_ip:192.168.40.3 AND command:* AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND protocol:$Protocol",
+                    "query": "command:* AND container.name:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND (honeypot.app_proto:$Protocol OR protocol:$Protocol)",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
@@ -596,7 +596,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "dest_ip:192.168.40.3 AND session_id:* AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND protocol:$Protocol",
+                    "query": "session_id:* AND container.name:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND (honeypot.app_proto:$Protocol OR protocol:$Protocol)",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
@@ -664,7 +664,7 @@
                 {
                     "refId": "A",
                     "alias": "Total hits",
-                    "query": "dest_ip:192.168.40.3 AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND protocol:$Protocol",
+                    "query": "container.name:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND (honeypot.app_proto:$Protocol OR protocol:$Protocol)",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -687,7 +687,7 @@
                 {
                     "refId": "B",
                     "alias": "By Honeypot Type",
-                    "query": "dest_ip:192.168.40.3 AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND protocol:$Protocol",
+                    "query": "container.name:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND (honeypot.app_proto:$Protocol OR protocol:$Protocol)",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -772,7 +772,7 @@
                 {
                     "refId": "A",
                     "alias": "Attacks",
-                    "query": "dest_ip:192.168.40.3 AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND protocol:$Protocol",
+                    "query": "container.name:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND (honeypot.app_proto:$Protocol OR protocol:$Protocol)",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -848,7 +848,7 @@
                 {
                     "refId": "A",
                     "alias": "Ports",
-                    "query": "dest_ip:192.168.40.3 AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND protocol:$Protocol",
+                    "query": "container.name:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND (honeypot.app_proto:$Protocol OR protocol:$Protocol)",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -924,7 +924,7 @@
                 {
                     "refId": "A",
                     "alias": "Countries",
-                    "query": "dest_ip:192.168.40.3 AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND protocol:$Protocol",
+                    "query": "container.name:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND (honeypot.app_proto:$Protocol OR protocol:$Protocol)",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -1000,7 +1000,7 @@
                 {
                     "refId": "A",
                     "alias": "Protocols",
-                    "query": "dest_ip:192.168.40.3 AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND protocol:$Protocol",
+                    "query": "container.name:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND (honeypot.app_proto:$Protocol OR protocol:$Protocol)",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -1076,7 +1076,7 @@
                 {
                     "refId": "A",
                     "alias": "Honeypots",
-                    "query": "dest_ip:192.168.40.3 AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND protocol:$Protocol",
+                    "query": "container.name:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND (honeypot.app_proto:$Protocol OR protocol:$Protocol)",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -1156,7 +1156,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "dest_ip:192.168.40.3 AND source.geo.country_name:* AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND protocol:$Protocol",
+                    "query": "source.geo.country_name:* AND container.name:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND (honeypot.app_proto:$Protocol OR protocol:$Protocol)",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
@@ -1220,7 +1220,7 @@
                 {
                     "refId": "A",
                     "alias": "Usernames",
-                    "query": "dest_ip:192.168.40.3 AND username:* AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND protocol:$Protocol",
+                    "query": "username:* AND container.name:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND (honeypot.app_proto:$Protocol OR protocol:$Protocol)",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -1296,7 +1296,7 @@
                 {
                     "refId": "A",
                     "alias": "Passwords",
-                    "query": "dest_ip:192.168.40.3 AND password:* AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND protocol:$Protocol",
+                    "query": "password:* AND container.name:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND (honeypot.app_proto:$Protocol OR protocol:$Protocol)",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -1372,7 +1372,7 @@
                 {
                     "refId": "A",
                     "alias": "Commands",
-                    "query": "dest_ip:192.168.40.3 AND command:* AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND protocol:$Protocol",
+                    "query": "command:* AND container.name:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND (honeypot.app_proto:$Protocol OR protocol:$Protocol)",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -1448,7 +1448,7 @@
                 {
                     "refId": "A",
                     "alias": "OS",
-                    "query": "dest_ip:192.168.40.3 AND os_fingerprint:* AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND protocol:$Protocol",
+                    "query": "os_fingerprint:* AND container.name:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND (honeypot.app_proto:$Protocol OR protocol:$Protocol)",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -1519,7 +1519,7 @@
                 {
                     "refId": "A",
                     "alias": "Attacks per Hour",
-                    "query": "dest_ip:192.168.40.3 AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND protocol:$Protocol",
+                    "query": "container.name:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND (honeypot.app_proto:$Protocol OR protocol:$Protocol)",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -1647,7 +1647,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "dest_ip:192.168.40.3 AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND protocol:$Protocol",
+                    "query": "container.name:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND (honeypot.app_proto:$Protocol OR protocol:$Protocol)",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
@@ -1780,7 +1780,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "dest_ip:192.168.40.3 AND download_url:* AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND protocol:$Protocol",
+                    "query": "download_url:* AND container.name:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country AND honeypot_type:$Honeypot_Type AND (honeypot.app_proto:$Protocol OR protocol:$Protocol)",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
@@ -1842,7 +1842,7 @@
                 },
                 "refresh": 1,
                 "hide": 0,
-                "query": "{\"find\":\"terms\",\"field\":\"container.id\"}",
+                "query": "{\"find\":\"terms\",\"field\":\"container.name\"}",
                 "includeAll": true,
                 "allValue": "*",
                 "multi": true,
