@@ -79,7 +79,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "NOT src_ip:192.168.*",
+                    "query": "NOT src_ip:192.168.* AND NOT container.id:suricata",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
@@ -151,7 +151,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "NOT src_ip:192.168.*",
+                    "query": "NOT src_ip:192.168.* AND NOT container.id:suricata",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
@@ -224,7 +224,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "source.geo.country_name:* AND NOT src_ip:192.168.*",
+                    "query": "source.geo.country_name:* AND NOT src_ip:192.168.* AND NOT container.id:suricata",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
@@ -297,7 +297,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "honeypot.username:*",
+                    "query": "honeypot.username:* AND NOT container.id:suricata",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
@@ -369,7 +369,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "honeypot.download_url:*",
+                    "query": "honeypot.download_url:* AND NOT container.id:suricata",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
@@ -441,7 +441,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "container.id:$Container AND src_ip:$Attacker_IP",
+                    "query": "NOT src_ip:192.168.* AND NOT container.id:suricata",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -523,7 +523,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "honeypot.input:*",
+                    "query": "honeypot.input:* AND NOT container.id:suricata",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
@@ -596,7 +596,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "honeypot.session:*",
+                    "query": "honeypot.session:* AND NOT container.id:suricata",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
@@ -664,7 +664,7 @@
                 {
                     "refId": "A",
                     "alias": "Total hits",
-                    "query": "container.id:$Container AND src_ip:$Attacker_IP",
+                    "query": "NOT src_ip:192.168.* AND NOT container.id:suricata",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -687,7 +687,7 @@
                 {
                     "refId": "B",
                     "alias": "By Honeypot Type",
-                    "query": "container.id:$Container AND src_ip:$Attacker_IP",
+                    "query": "NOT src_ip:192.168.* AND NOT container.id:suricata",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -805,7 +805,7 @@
                 {
                     "refId": "A",
                     "alias": "Attacks",
-                    "query": "NOT src_ip:192.168.40.*",
+                    "query": "NOT src_ip:192.168.* AND NOT container.id:suricata",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -814,6 +814,17 @@
                             "field": "src_ip",
                             "settings": {
                                 "size": 10,
+                                "order": "desc",
+                                "orderBy": "1",
+                                "min_doc_count": 1
+                            }
+                        },
+                        {
+                            "id": "3",
+                            "type": "terms",
+                            "field": "dest_port",
+                            "settings": {
+                                "size": 3,
                                 "order": "desc",
                                 "orderBy": "1",
                                 "min_doc_count": 1
@@ -828,7 +839,7 @@
                     ]
                 }
             ],
-            "title": "Top Attacker IPs",
+            "title": "Top Attacker IPs & Ports",
             "type": "table",
             "description": "Most active source IPs"
         },
@@ -914,7 +925,7 @@
                 {
                     "refId": "A",
                     "alias": "Ports",
-                    "query": "NOT dest_port:9200 AND NOT src_ip:192.168.40.*",
+                    "query": "NOT dest_port:9200 AND NOT src_ip:192.168.* AND NOT (dest_ip:192.168.50.3 AND dest_port:9200) AND NOT container.id:suricata",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -1023,7 +1034,7 @@
                 {
                     "refId": "A",
                     "alias": "Countries",
-                    "query": "NOT src_ip:192.168.40.*",
+                    "query": "NOT src_ip:192.168.* AND NOT container.id:suricata",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -1093,7 +1104,7 @@
                 {
                     "refId": "A",
                     "alias": "Protocols",
-                    "query": "NOT src_ip:192.168.40.*",
+                    "query": "NOT src_ip:192.168.* AND NOT container.id:suricata",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -1163,7 +1174,7 @@
                 {
                     "refId": "A",
                     "alias": "Honeypots",
-                    "query": "NOT src_ip:192.168.40.*",
+                    "query": "NOT src_ip:192.168.* AND NOT container.id:suricata",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -1243,13 +1254,16 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "source.geo.location.lat:* AND NOT src_ip:192.168.*",
+                    "query": "(source.geo.location.lat:* OR geoip.location.lat:*) AND NOT src_ip:192.168.* AND NOT container.id:suricata",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
                         {
                             "id": "1",
-                            "type": "raw_document"
+                            "type": "raw_document",
+                            "settings": {
+                                "size": 500
+                            }
                         }
                     ]
                 }
@@ -1340,7 +1354,7 @@
                 {
                     "refId": "A",
                     "alias": "Usernames",
-                    "query": "honeypot.username:*",
+                    "query": "honeypot.username:* AND NOT container.id:suricata",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -1449,7 +1463,7 @@
                 {
                     "refId": "A",
                     "alias": "Passwords",
-                    "query": "honeypot.password:*",
+                    "query": "honeypot.password:* AND NOT container.id:suricata",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -1558,7 +1572,7 @@
                 {
                     "refId": "A",
                     "alias": "Commands",
-                    "query": "honeypot.input:*",
+                    "query": "honeypot.input:* AND NOT container.id:suricata",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -1628,7 +1642,7 @@
                 {
                     "refId": "A",
                     "alias": "OS",
-                    "query": "honeypot.os:*",
+                    "query": "honeypot.os:* AND NOT container.id:suricata",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -1699,7 +1713,7 @@
                 {
                     "refId": "A",
                     "alias": "Attacks per Hour",
-                    "query": "container.id:$Container AND src_ip:$Attacker_IP",
+                    "query": "NOT src_ip:192.168.* AND NOT container.id:suricata",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -1827,7 +1841,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "container.id:$Container AND src_ip:$Attacker_IP",
+                    "query": "NOT src_ip:192.168.* AND NOT container.id:suricata",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
@@ -1960,7 +1974,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "honeypot.download_url:*",
+                    "query": "honeypot.download_url:* AND NOT container.id:suricata",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
