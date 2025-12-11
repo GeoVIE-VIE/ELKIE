@@ -1174,7 +1174,7 @@
                 {
                     "refId": "A",
                     "alias": "Honeypots",
-                    "query": "NOT src_ip:192.168.* AND NOT container.id:suricata",
+                    "query": "NOT src_ip:192.168.* AND NOT container.id:suricata AND NOT container.id:p0f",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -1219,56 +1219,127 @@
             "id": 9,
             "options": {
                 "basemap": {
+                    "config": {},
+                    "name": "Layer 0",
                     "type": "carto"
                 },
-                "view": {
-                    "id": "world",
-                    "zoom": 1
+                "controls": {
+                    "mouseWheelZoom": true,
+                    "showAttribution": true,
+                    "showDebug": false,
+                    "showMeasure": false,
+                    "showScale": false,
+                    "showZoom": true
                 },
                 "layers": [
                     {
-                        "type": "heatmap",
-                        "name": "Attack heatmap",
-                        "visibility": true,
                         "config": {
-                            "color": {
-                                "scheme": "Spectral"
-                            },
-                            "opacity": 0.7,
-                            "radius": 20
+                            "showLegend": true,
+                            "style": {
+                                "color": {
+                                    "fixed": "red"
+                                },
+                                "opacity": 0.6,
+                                "rotation": {
+                                    "fixed": 0,
+                                    "max": 360,
+                                    "min": -360,
+                                    "mode": "mod"
+                                },
+                                "size": {
+                                    "field": "Count",
+                                    "fixed": 5,
+                                    "max": 15,
+                                    "min": 4
+                                },
+                                "symbol": {
+                                    "fixed": "img/icons/marker/circle.svg",
+                                    "mode": "fixed"
+                                },
+                                "textConfig": {
+                                    "fontSize": 12,
+                                    "offsetX": 0,
+                                    "offsetY": 0,
+                                    "textAlign": "center",
+                                    "textBaseline": "middle"
+                                }
+                            }
                         },
                         "location": {
-                            "mode": "coords",
-                            "latField": "source.geo.location.lat",
-                            "lonField": "source.geo.location.lon"
+                            "latitude": "source.geo.location.lat",
+                            "longitude": "source.geo.location.lon",
+                            "mode": "coords"
                         },
-                        "metrics": [
-                            {
-                                "type": "count"
-                            }
-                        ]
+                        "name": "Attack Sources",
+                        "tooltip": true,
+                        "type": "markers"
                     }
-                ]
+                ],
+                "tooltip": {
+                    "mode": "details"
+                },
+                "view": {
+                    "allLayers": true,
+                    "id": "zero",
+                    "lat": 0,
+                    "lon": 0,
+                    "zoom": 1
+                }
             },
             "pluginVersion": "10.0.0",
             "targets": [
                 {
                     "refId": "A",
-                    "query": "(source.geo.location.lat:* OR geoip.location.lat:*) AND NOT src_ip:192.168.* AND NOT container.id:suricata",
+                    "query": "source.geo.location.lat:* AND NOT src_ip:192.168.* AND NOT container.id:suricata",
                     "timeField": "@timestamp",
-                    "bucketAggs": [],
+                    "bucketAggs": [
+                        {
+                            "field": "source.geo.country_name",
+                            "id": "3",
+                            "settings": {
+                                "min_doc_count": "1",
+                                "order": "desc",
+                                "orderBy": "_count",
+                                "size": "50"
+                            },
+                            "type": "terms"
+                        }
+                    ],
                     "metrics": [
                         {
                             "id": "1",
-                            "type": "raw_document",
-                            "settings": {
-                                "size": 500
-                            }
+                            "type": "count"
+                        },
+                        {
+                            "id": "2",
+                            "type": "avg",
+                            "field": "source.geo.location.lat"
+                        },
+                        {
+                            "id": "4",
+                            "type": "avg",
+                            "field": "source.geo.location.lon"
                         }
                     ]
                 }
             ],
-            "title": "Attack Map (src → honeypot)",
+            "transformations": [
+                {
+                    "id": "renameByRegex",
+                    "options": {
+                        "regex": "Average source.geo.location.lat",
+                        "renamePattern": "source.geo.location.lat"
+                    }
+                },
+                {
+                    "id": "renameByRegex",
+                    "options": {
+                        "regex": "Average source.geo.location.lon",
+                        "renamePattern": "source.geo.location.lon"
+                    }
+                }
+            ],
+            "title": "Attack Map by Country",
             "type": "geomap",
             "description": "Geographic distribution of attack sources"
         },
