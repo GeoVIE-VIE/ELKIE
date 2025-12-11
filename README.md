@@ -157,13 +157,27 @@ sudo systemctl reset-failed filebeat
 sudo systemctl start filebeat
 ```
 
-## Honeypot Monitoring Setup
+## T-Pot Honeypot Monitoring Setup
 
-The honeypot dashboard visualizes data from your honeypot systems using the `filebeat-8.19.8*` index pattern.
+The honeypot dashboard visualizes data from T-Pot honeypot systems using the `.ds-filebeat-8.19.8-*` data stream pattern.
 
-### Honeypot Index Template
+### Step 1: Create the Ingest Pipeline
 
-Apply the index template for proper field mappings:
+The ingest pipeline parses JSON from the message field and normalizes fields across all T-Pot honeypot types.
+
+**Option A: Using Kibana Dev Tools** (recommended)
+Copy and paste the contents of `honeypot-ingest-pipeline-devtools.txt` into Kibana Dev Tools.
+
+**Option B: Using curl**
+```bash
+curl -X PUT "localhost:9200/_ingest/pipeline/tpot-honeypot" \
+  -H 'Content-Type: application/json' \
+  -d @honeypot-ingest-pipeline.json
+```
+
+### Step 2: Apply the Index Template
+
+The index template references the ingest pipeline and defines proper field mappings:
 
 ```bash
 curl -X PUT "localhost:9200/_index_template/honeypot-template" \
@@ -171,19 +185,42 @@ curl -X PUT "localhost:9200/_index_template/honeypot-template" \
   -d @honeypot-elasticsearch-index-template.json
 ```
 
-### Add Honeypot Datasource in Grafana
+### Step 3: Reindex Existing Data (Optional)
+
+To apply the pipeline to existing data, reindex to a new index:
+
+```bash
+POST _reindex
+{
+  "source": {
+    "index": ".ds-filebeat-8.19.8-*"
+  },
+  "dest": {
+    "index": "honeypot-processed",
+    "pipeline": "tpot-honeypot"
+  }
+}
+```
+
+Or update T-Pot's Filebeat config to use the pipeline for new data:
+```yaml
+output.elasticsearch:
+  pipeline: tpot-honeypot
+```
+
+### Step 4: Add Honeypot Datasource in Grafana
 
 1. Go to **Configuration → Data Sources → Add data source**
 2. Select **Elasticsearch**
 3. Configure:
    - **Name**: `Elasticsearch - Honeypot`
    - **URL**: `http://localhost:9200`
-   - **Index name**: `filebeat-8.19.8*`
+   - **Index name**: `.ds-filebeat-8.19.8-*` (or `honeypot-processed` if reindexed)
    - **Time field**: `@timestamp`
    - **Version**: Select your ES version
 4. Click **Save & Test**
 
-### Import Honeypot Dashboard
+### Step 5: Import Honeypot Dashboard
 
 1. Open Grafana → **Dashboards → Import**
 2. Upload `honeypot-grafana-dashboard.json`
@@ -193,52 +230,53 @@ curl -X PUT "localhost:9200/_index_template/honeypot-template" \
 ### Honeypot Dashboard Features
 
 - **Overview Stats**: Total events, unique attackers, countries, targeted ports, login attempts, malware downloads
-- **Attack Timeline**: Time series of honeypot activity
+- **Attack Timeline**: Time series of honeypot activity by honeypot type
 - **Geographic Map**: Visual map showing attacker origins
 - **Top Attackers**: IPs with most connection attempts, including country and ASN info
 - **Targeted Ports**: Most scanned/attacked ports with service name mappings
-- **Credential Analysis**: Top usernames and passwords attempted (for SSH/Telnet honeypots like Cowrie)
+- **Credential Analysis**: Top usernames and passwords attempted (normalized across all honeypots)
 - **Commands Executed**: Commands run by attackers in honeypot sessions
 - **Malware Downloads**: URLs and SHA256 hashes of downloaded malware (with VirusTotal links)
+- **Attacker OS**: OS fingerprinting from p0f
 - **Raw Events**: Recent events table for detailed analysis
 
-### Supported Honeypot Types
+### Supported T-Pot Honeypot Types
 
-The dashboard supports common honeypot field formats:
-- **Cowrie** (SSH/Telnet): usernames, passwords, commands, sessions
-- **Dionaea**: connection types, download URLs
-- **T-Pot**: Multiple honeypot types combined
-- **Generic ECS fields**: Standard Elastic Common Schema fields
+The pipeline parses and normalizes fields from all T-Pot honeypots:
+- **Cowrie** (SSH/Telnet): usernames, passwords, commands, sessions, file downloads
+- **Dionaea** (multi-protocol): connection types, credentials, download URLs
+- **Suricata** (IDS): alerts, signatures, categories, severity
+- **p0f** (passive fingerprinting): OS detection, network distance
+- **SentryPeer** (VoIP): SIP methods, called numbers
+- **FATT** (fingerprinting): JA3/JA3S hashes, HASSH
+- **Tanner/Snare** (web): request paths, attack detection
+- **Heralding** (credential): usernames, passwords, protocols
+- **H0neytr4p** (HTTP): request URIs, user agents
+- **Conpot** (ICS/SCADA): data types, requests
+- **Honeytrap**: payloads, services
+- **ADBHoney** (Android Debug Bridge): commands
+- **CiscoASA**: credentials
+- **Wordpot** (WordPress): attacked paths, plugins, themes
+- **Miniprint** (printer): print data
 
-### GeoIP for Honeypot Data
+### Normalized Fields
 
-Create a GeoIP pipeline for attacker location enrichment:
-
-```bash
-curl -X PUT "localhost:9200/_ingest/pipeline/honeypot-geoip" -H 'Content-Type: application/json' -d'
-{
-  "description": "Add GeoIP data to honeypot logs",
-  "processors": [
-    {
-      "geoip": {
-        "field": "source.ip",
-        "target_field": "source.geo",
-        "ignore_missing": true
-      }
-    }
-  ]
-}
-'
-```
-
-Then configure your Filebeat to use this pipeline in the output section:
-```yaml
-output.elasticsearch:
-  pipeline: honeypot-geoip
-```
+The pipeline creates consistent field names across all honeypots:
+- `honeypot_type` - The honeypot container name
+- `src_ip`, `dest_ip` - Normalized source/destination IPs
+- `src_port`, `dest_port` - Normalized ports
+- `username`, `password` - Credentials from any honeypot
+- `command` - Commands executed
+- `download_url`, `file_hash` - Malware info
+- `request_path` - Web paths attacked
+- `os_fingerprint` - OS detection
+- `event_type` - Event type/method
+- `geoip.*` - GeoIP data for attacker locations
 
 ## Recent Fixes
 
+- **Dec 11, 2025**: Added comprehensive T-Pot ingest pipeline for parsing all honeypot JSON formats
+- **Dec 11, 2025**: Updated dashboard to use normalized fields (works across all T-Pot honeypots)
 - **Dec 11, 2025**: Added dedicated honeypot Grafana dashboard with credential analysis, commands, malware tracking
 - **Dec 11, 2025**: Added honeypot Elasticsearch index template for filebeat-8.19.8* pattern
 - **Dec 11, 2025**: Updated main dashboard to use configurable honeypot subnet variable

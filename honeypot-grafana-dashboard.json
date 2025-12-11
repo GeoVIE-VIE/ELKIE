@@ -65,7 +65,7 @@
             }
           ],
           "metrics": [{ "id": "1", "type": "count" }],
-          "query": "type:$honeypot_type",
+          "query": "honeypot_type:$honeypot_type",
           "refId": "A",
           "timeField": "@timestamp"
         }
@@ -113,7 +113,7 @@
             }
           ],
           "metrics": [{ "id": "1", "type": "count" }],
-          "query": "type:$honeypot_type",
+          "query": "honeypot_type:$honeypot_type",
           "refId": "A",
           "timeField": "@timestamp"
         }
@@ -208,7 +208,7 @@
             }
           ],
           "metrics": [{ "id": "1", "type": "count" }],
-          "query": "type:$honeypot_type",
+          "query": "honeypot_type:$honeypot_type",
           "refId": "A",
           "timeField": "@timestamp"
         }
@@ -255,7 +255,7 @@
             }
           ],
           "metrics": [{ "id": "1", "type": "count" }],
-          "query": "(type:cowrie OR type:heralding OR type:dionaea) AND (cowrie.eventid:cowrie.login.* OR heralding.username:*)",
+          "query": "username:* OR password:*",
           "refId": "A",
           "timeField": "@timestamp"
         }
@@ -302,7 +302,7 @@
             }
           ],
           "metrics": [{ "id": "1", "type": "count" }],
-          "query": "cowrie.eventid:cowrie.session.file_download OR dionaea.download_url:*",
+          "query": "download_url:* OR file_hash:*",
           "refId": "A",
           "timeField": "@timestamp"
         }
@@ -350,7 +350,7 @@
           "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
           "bucketAggs": [
             {
-              "field": "type",
+              "field": "honeypot_type",
               "id": "3",
               "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "15" },
               "type": "terms"
@@ -363,7 +363,7 @@
             }
           ],
           "metrics": [{ "id": "1", "type": "count" }],
-          "query": "type:$honeypot_type",
+          "query": "honeypot_type:$honeypot_type",
           "refId": "A",
           "timeField": "@timestamp"
         }
@@ -395,7 +395,7 @@
           "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
           "bucketAggs": [
             {
-              "field": "type",
+              "field": "honeypot_type",
               "id": "2",
               "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "20" },
               "type": "terms"
@@ -626,7 +626,7 @@
             }
           ],
           "metrics": [{ "id": "1", "type": "count" }],
-          "query": "type:$honeypot_type",
+          "query": "honeypot_type:$honeypot_type",
           "refId": "A",
           "timeField": "@timestamp"
         }
@@ -695,7 +695,7 @@
             }
           ],
           "metrics": [{ "id": "1", "type": "count" }],
-          "query": "type:$honeypot_type",
+          "query": "honeypot_type:$honeypot_type",
           "refId": "A",
           "timeField": "@timestamp"
         }
@@ -725,7 +725,7 @@
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "p0f.os" },
+            "matcher": { "id": "byName", "options": "os_fingerprint" },
             "properties": [
               { "id": "displayName", "value": "OS" }
             ]
@@ -745,19 +745,19 @@
           "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
           "bucketAggs": [
             {
-              "field": "p0f.os",
+              "field": "os_fingerprint",
               "id": "2",
               "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "15" },
               "type": "terms"
             }
           ],
           "metrics": [{ "id": "1", "type": "count" }],
-          "query": "p0f.os:*",
+          "query": "os_fingerprint:*",
           "refId": "A",
           "timeField": "@timestamp"
         }
       ],
-      "title": "Attacker OS (p0f)",
+      "title": "Attacker OS",
       "type": "table"
     },
     {
@@ -788,15 +788,9 @@
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "cowrie.username" },
+            "matcher": { "id": "byName", "options": "username" },
             "properties": [
-              { "id": "displayName", "value": "Username (Cowrie)" }
-            ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "heralding.username" },
-            "properties": [
-              { "id": "displayName", "value": "Username (Heralding)" }
+              { "id": "displayName", "value": "Username" }
             ]
           }
         ]
@@ -814,30 +808,15 @@
           "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
           "bucketAggs": [
             {
-              "field": "cowrie.username",
+              "field": "username",
               "id": "2",
               "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "25" },
               "type": "terms"
             }
           ],
           "metrics": [{ "id": "1", "type": "count" }],
-          "query": "cowrie.username:*",
+          "query": "username:*",
           "refId": "A",
-          "timeField": "@timestamp"
-        },
-        {
-          "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
-          "bucketAggs": [
-            {
-              "field": "heralding.username",
-              "id": "2",
-              "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "25" },
-              "type": "terms"
-            }
-          ],
-          "metrics": [{ "id": "1", "type": "count" }],
-          "query": "heralding.username:*",
-          "refId": "B",
           "timeField": "@timestamp"
         }
       ],
@@ -866,15 +845,9 @@
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "cowrie.password" },
+            "matcher": { "id": "byName", "options": "password" },
             "properties": [
-              { "id": "displayName", "value": "Password (Cowrie)" }
-            ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "heralding.password" },
-            "properties": [
-              { "id": "displayName", "value": "Password (Heralding)" }
+              { "id": "displayName", "value": "Password" }
             ]
           }
         ]
@@ -892,30 +865,15 @@
           "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
           "bucketAggs": [
             {
-              "field": "cowrie.password",
+              "field": "password",
               "id": "2",
               "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "25" },
               "type": "terms"
             }
           ],
           "metrics": [{ "id": "1", "type": "count" }],
-          "query": "cowrie.password:*",
+          "query": "password:*",
           "refId": "A",
-          "timeField": "@timestamp"
-        },
-        {
-          "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
-          "bucketAggs": [
-            {
-              "field": "heralding.password",
-              "id": "2",
-              "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "25" },
-              "type": "terms"
-            }
-          ],
-          "metrics": [{ "id": "1", "type": "count" }],
-          "query": "heralding.password:*",
-          "refId": "B",
           "timeField": "@timestamp"
         }
       ],
@@ -958,20 +916,20 @@
           "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
           "bucketAggs": [
             {
-              "field": "cowrie.username",
+              "field": "username",
               "id": "2",
               "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "15" },
               "type": "terms"
             },
             {
-              "field": "cowrie.password",
+              "field": "password",
               "id": "3",
               "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "3" },
               "type": "terms"
             }
           ],
           "metrics": [{ "id": "1", "type": "count" }],
-          "query": "cowrie.username:* AND cowrie.password:*",
+          "query": "username:* AND password:*",
           "refId": "A",
           "timeField": "@timestamp"
         }
@@ -1007,7 +965,7 @@
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "cowrie.input" },
+            "matcher": { "id": "byName", "options": "command" },
             "properties": [
               { "id": "displayName", "value": "Command" }
             ]
@@ -1027,14 +985,14 @@
           "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
           "bucketAggs": [
             {
-              "field": "cowrie.input",
+              "field": "command",
               "id": "2",
               "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "30" },
               "type": "terms"
             }
           ],
           "metrics": [{ "id": "1", "type": "count" }],
-          "query": "cowrie.input:*",
+          "query": "command:*",
           "refId": "A",
           "timeField": "@timestamp"
         }
@@ -1064,13 +1022,13 @@
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "cowrie.url" },
+            "matcher": { "id": "byName", "options": "download_url" },
             "properties": [
               { "id": "displayName", "value": "Download URL" }
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "cowrie.shasum" },
+            "matcher": { "id": "byName", "options": "file_hash" },
             "properties": [
               { "id": "displayName", "value": "SHA256" },
               { "id": "links", "value": [{ "title": "VirusTotal", "url": "https://www.virustotal.com/gui/file/${__value.text}" }] }
@@ -1091,20 +1049,20 @@
           "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
           "bucketAggs": [
             {
-              "field": "cowrie.url",
+              "field": "download_url",
               "id": "2",
               "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "20" },
               "type": "terms"
             },
             {
-              "field": "cowrie.shasum",
+              "field": "file_hash",
               "id": "3",
               "settings": { "min_doc_count": "0", "order": "desc", "orderBy": "_count", "size": "1" },
               "type": "terms"
             }
           ],
           "metrics": [{ "id": "1", "type": "count" }],
-          "query": "cowrie.url:*",
+          "query": "download_url:*",
           "refId": "A",
           "timeField": "@timestamp"
         }
@@ -1154,19 +1112,19 @@
           "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
           "bucketAggs": [
             {
-              "field": "tanner.path",
+              "field": "request_path",
               "id": "2",
               "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "25" },
               "type": "terms"
             }
           ],
           "metrics": [{ "id": "1", "type": "count" }],
-          "query": "tanner.path:*",
+          "query": "request_path:*",
           "refId": "A",
           "timeField": "@timestamp"
         }
       ],
-      "title": "Web Paths Attacked (Tanner)",
+      "title": "Web Paths Attacked",
       "type": "table"
     },
     {
@@ -1306,7 +1264,7 @@
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "type" },
+            "matcher": { "id": "byName", "options": "honeypot_type" },
             "properties": [
               { "id": "displayName", "value": "Honeypot" },
               { "id": "custom.width", "value": 100 }
@@ -1342,7 +1300,7 @@
           "metrics": [
             { "id": "1", "type": "raw_data", "settings": { "size": "200" } }
           ],
-          "query": "type:$honeypot_type",
+          "query": "honeypot_type:$honeypot_type",
           "refId": "A",
           "timeField": "@timestamp"
         }
@@ -1380,11 +1338,11 @@
             },
             "indexByName": {
               "@timestamp": 0,
-              "type": 1,
+              "honeypot_type": 1,
               "src_ip": 2,
               "dest_port": 3,
               "geoip.country_name": 4,
-              "message": 5
+              "event_type": 5
             }
           }
         }
@@ -1416,14 +1374,14 @@
         "allValue": "*",
         "current": { "selected": true, "text": "All", "value": "$__all" },
         "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
-        "definition": "{\"find\": \"terms\", \"field\": \"type\"}",
+        "definition": "{\"find\": \"terms\", \"field\": \"honeypot_type\"}",
         "hide": 0,
         "includeAll": true,
         "label": "Honeypot",
         "multi": true,
         "name": "honeypot_type",
         "options": [],
-        "query": "{\"find\": \"terms\", \"field\": \"type\"}",
+        "query": "{\"find\": \"terms\", \"field\": \"honeypot_type\"}",
         "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
