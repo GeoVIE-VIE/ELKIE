@@ -79,7 +79,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "*",
+                    "query": "NOT src_ip:192.168.*",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
@@ -151,7 +151,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "*",
+                    "query": "NOT src_ip:192.168.*",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
@@ -224,7 +224,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "*",
+                    "query": "source.geo.country_name:* AND NOT src_ip:192.168.*",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
@@ -297,7 +297,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "_exists_:username",
+                    "query": "honeypot.username:*",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
@@ -369,7 +369,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "_exists_:download_url",
+                    "query": "honeypot.download_url:*",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
@@ -441,7 +441,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "*",
+                    "query": "container.id:$Container AND src_ip:$Attacker_IP",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -523,14 +523,14 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "_exists_:command",
+                    "query": "honeypot.input:*",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
                         {
                             "id": "1",
                             "type": "cardinality",
-                            "field": "command"
+                            "field": "honeypot.input"
                         }
                     ]
                 }
@@ -596,14 +596,14 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "_exists_:session_id",
+                    "query": "honeypot.session:*",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
                         {
                             "id": "1",
                             "type": "cardinality",
-                            "field": "session_id"
+                            "field": "honeypot.session"
                         }
                     ]
                 }
@@ -664,7 +664,7 @@
                 {
                     "refId": "A",
                     "alias": "Total hits",
-                    "query": "*",
+                    "query": "container.id:$Container AND src_ip:$Attacker_IP",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -687,7 +687,7 @@
                 {
                     "refId": "B",
                     "alias": "By Honeypot Type",
-                    "query": "*",
+                    "query": "container.id:$Container AND src_ip:$Attacker_IP",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -805,7 +805,7 @@
                 {
                     "refId": "A",
                     "alias": "Attacks",
-                    "query": "*",
+                    "query": "NOT src_ip:192.168.40.*",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -914,7 +914,7 @@
                 {
                     "refId": "A",
                     "alias": "Ports",
-                    "query": "*",
+                    "query": "NOT dest_port:9200 AND NOT src_ip:192.168.40.*",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -1023,7 +1023,7 @@
                 {
                     "refId": "A",
                     "alias": "Countries",
-                    "query": "*",
+                    "query": "NOT src_ip:192.168.40.*",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -1057,16 +1057,6 @@
             },
             "fieldConfig": {
                 "defaults": {
-                    "custom": {
-                        "drawStyle": "bars",
-                        "lineInterpolation": "smooth",
-                        "lineWidth": 1,
-                        "fillOpacity": 80,
-                        "showPoints": "never",
-                        "stacking": {
-                            "mode": "normal"
-                        }
-                    },
                     "color": {
                         "mode": "palette-classic"
                     },
@@ -1084,14 +1074,18 @@
             "options": {
                 "legend": {
                     "displayMode": "table",
-                    "placement": "bottom",
+                    "placement": "right",
                     "showLegend": true,
-                    "calcs": [
-                        "sum"
-                    ]
+                    "values": ["value", "percent"]
+                },
+                "pieType": "donut",
+                "reduceOptions": {
+                    "calcs": ["lastNotNull"],
+                    "fields": "",
+                    "values": true
                 },
                 "tooltip": {
-                    "mode": "multi"
+                    "mode": "single"
                 }
             },
             "pluginVersion": "10.0.0",
@@ -1099,7 +1093,7 @@
                 {
                     "refId": "A",
                     "alias": "Protocols",
-                    "query": "*",
+                    "query": "NOT src_ip:192.168.40.*",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -1123,7 +1117,7 @@
                 }
             ],
             "title": "Top Protocols / Services",
-            "type": "bargauge",
+            "type": "piechart",
             "description": "Attack distribution by protocol"
         },
         {
@@ -1133,16 +1127,6 @@
             },
             "fieldConfig": {
                 "defaults": {
-                    "custom": {
-                        "drawStyle": "bars",
-                        "lineInterpolation": "smooth",
-                        "lineWidth": 1,
-                        "fillOpacity": 80,
-                        "showPoints": "never",
-                        "stacking": {
-                            "mode": "normal"
-                        }
-                    },
                     "color": {
                         "mode": "palette-classic"
                     },
@@ -1160,14 +1144,18 @@
             "options": {
                 "legend": {
                     "displayMode": "table",
-                    "placement": "bottom",
+                    "placement": "right",
                     "showLegend": true,
-                    "calcs": [
-                        "sum"
-                    ]
+                    "values": ["value", "percent"]
+                },
+                "pieType": "donut",
+                "reduceOptions": {
+                    "calcs": ["lastNotNull"],
+                    "fields": "",
+                    "values": true
                 },
                 "tooltip": {
-                    "mode": "multi"
+                    "mode": "single"
                 }
             },
             "pluginVersion": "10.0.0",
@@ -1175,7 +1163,7 @@
                 {
                     "refId": "A",
                     "alias": "Honeypots",
-                    "query": "*",
+                    "query": "NOT src_ip:192.168.40.*",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -1199,7 +1187,7 @@
                 }
             ],
             "title": "Attacks by Honeypot Type",
-            "type": "bargauge",
+            "type": "piechart",
             "description": "Distribution across different honeypot services"
         },
         {
@@ -1255,7 +1243,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "_exists_:source.geo.location.lat",
+                    "query": "source.geo.location.lat:* AND NOT src_ip:192.168.*",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
@@ -1352,13 +1340,13 @@
                 {
                     "refId": "A",
                     "alias": "Usernames",
-                    "query": "_exists_:username",
+                    "query": "honeypot.username:*",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
                             "id": "2",
                             "type": "terms",
-                            "field": "username",
+                            "field": "honeypot.username",
                             "settings": {
                                 "size": 15,
                                 "order": "desc",
@@ -1461,13 +1449,13 @@
                 {
                     "refId": "A",
                     "alias": "Passwords",
-                    "query": "_exists_:password",
+                    "query": "honeypot.password:*",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
                             "id": "2",
                             "type": "terms",
-                            "field": "password",
+                            "field": "honeypot.password",
                             "settings": {
                                 "size": 15,
                                 "order": "desc",
@@ -1570,13 +1558,13 @@
                 {
                     "refId": "A",
                     "alias": "Commands",
-                    "query": "_exists_:command",
+                    "query": "honeypot.input:*",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
                             "id": "2",
                             "type": "terms",
-                            "field": "command",
+                            "field": "honeypot.input",
                             "settings": {
                                 "size": 15,
                                 "order": "desc",
@@ -1604,16 +1592,6 @@
             },
             "fieldConfig": {
                 "defaults": {
-                    "custom": {
-                        "drawStyle": "bars",
-                        "lineInterpolation": "smooth",
-                        "lineWidth": 1,
-                        "fillOpacity": 80,
-                        "showPoints": "never",
-                        "stacking": {
-                            "mode": "normal"
-                        }
-                    },
                     "color": {
                         "mode": "palette-classic"
                     },
@@ -1631,14 +1609,18 @@
             "options": {
                 "legend": {
                     "displayMode": "table",
-                    "placement": "bottom",
+                    "placement": "right",
                     "showLegend": true,
-                    "calcs": [
-                        "sum"
-                    ]
+                    "values": ["value", "percent"]
+                },
+                "pieType": "donut",
+                "reduceOptions": {
+                    "calcs": ["lastNotNull"],
+                    "fields": "",
+                    "values": true
                 },
                 "tooltip": {
-                    "mode": "multi"
+                    "mode": "single"
                 }
             },
             "pluginVersion": "10.0.0",
@@ -1646,13 +1628,13 @@
                 {
                     "refId": "A",
                     "alias": "OS",
-                    "query": "_exists_:os_fingerprint",
+                    "query": "honeypot.os:*",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
                             "id": "2",
                             "type": "terms",
-                            "field": "os_fingerprint",
+                            "field": "honeypot.os",
                             "settings": {
                                 "size": 10,
                                 "order": "desc",
@@ -1670,7 +1652,7 @@
                 }
             ],
             "title": "OS Fingerprint Distribution",
-            "type": "bargauge",
+            "type": "piechart",
             "description": "Detected operating systems"
         },
         {
@@ -1717,7 +1699,7 @@
                 {
                     "refId": "A",
                     "alias": "Attacks per Hour",
-                    "query": "*",
+                    "query": "container.id:$Container AND src_ip:$Attacker_IP",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -1845,7 +1827,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "*",
+                    "query": "container.id:$Container AND src_ip:$Attacker_IP",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
@@ -1978,7 +1960,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "_exists_:download_url",
+                    "query": "honeypot.download_url:*",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
