@@ -7,8 +7,10 @@ This repository contains the optimized Filebeat configuration for ingesting Suri
 - **Filebeat.yml** - Main Filebeat configuration (optimized for 28GB RAM, 8 CPUs, 10Gbps network)
 - **Syslog-NG-Config.txt** - Syslog-NG configuration reference
 - **deploy-filebeat-config.sh** - Deployment script
-- **elasticsearch-index-template.json** - Index template for proper field mappings (geo_point, etc.)
-- **grafana-dashboard.json** - Home network monitoring dashboard
+- **elasticsearch-index-template.json** - Index template for Suricata field mappings (geo_point, etc.)
+- **grafana-dashboard.json** - Home network monitoring dashboard (Suricata)
+- **honeypot-elasticsearch-index-template.json** - Index template for honeypot data (filebeat-8.19.8*)
+- **honeypot-grafana-dashboard.json** - Dedicated honeypot monitoring dashboard
 
 ## Quick Fix for Current Issue
 
@@ -155,8 +157,91 @@ sudo systemctl reset-failed filebeat
 sudo systemctl start filebeat
 ```
 
+## Honeypot Monitoring Setup
+
+The honeypot dashboard visualizes data from your honeypot systems using the `filebeat-8.19.8*` index pattern.
+
+### Honeypot Index Template
+
+Apply the index template for proper field mappings:
+
+```bash
+curl -X PUT "localhost:9200/_index_template/honeypot-template" \
+  -H 'Content-Type: application/json' \
+  -d @honeypot-elasticsearch-index-template.json
+```
+
+### Add Honeypot Datasource in Grafana
+
+1. Go to **Configuration → Data Sources → Add data source**
+2. Select **Elasticsearch**
+3. Configure:
+   - **Name**: `Elasticsearch - Honeypot`
+   - **URL**: `http://localhost:9200`
+   - **Index name**: `filebeat-8.19.8*`
+   - **Time field**: `@timestamp`
+   - **Version**: Select your ES version
+4. Click **Save & Test**
+
+### Import Honeypot Dashboard
+
+1. Open Grafana → **Dashboards → Import**
+2. Upload `honeypot-grafana-dashboard.json`
+3. Select your honeypot Elasticsearch datasource
+4. Click **Import**
+
+### Honeypot Dashboard Features
+
+- **Overview Stats**: Total events, unique attackers, countries, targeted ports, login attempts, malware downloads
+- **Attack Timeline**: Time series of honeypot activity
+- **Geographic Map**: Visual map showing attacker origins
+- **Top Attackers**: IPs with most connection attempts, including country and ASN info
+- **Targeted Ports**: Most scanned/attacked ports with service name mappings
+- **Credential Analysis**: Top usernames and passwords attempted (for SSH/Telnet honeypots like Cowrie)
+- **Commands Executed**: Commands run by attackers in honeypot sessions
+- **Malware Downloads**: URLs and SHA256 hashes of downloaded malware (with VirusTotal links)
+- **Raw Events**: Recent events table for detailed analysis
+
+### Supported Honeypot Types
+
+The dashboard supports common honeypot field formats:
+- **Cowrie** (SSH/Telnet): usernames, passwords, commands, sessions
+- **Dionaea**: connection types, download URLs
+- **T-Pot**: Multiple honeypot types combined
+- **Generic ECS fields**: Standard Elastic Common Schema fields
+
+### GeoIP for Honeypot Data
+
+Create a GeoIP pipeline for attacker location enrichment:
+
+```bash
+curl -X PUT "localhost:9200/_ingest/pipeline/honeypot-geoip" -H 'Content-Type: application/json' -d'
+{
+  "description": "Add GeoIP data to honeypot logs",
+  "processors": [
+    {
+      "geoip": {
+        "field": "source.ip",
+        "target_field": "source.geo",
+        "ignore_missing": true
+      }
+    }
+  ]
+}
+'
+```
+
+Then configure your Filebeat to use this pipeline in the output section:
+```yaml
+output.elasticsearch:
+  pipeline: honeypot-geoip
+```
+
 ## Recent Fixes
 
+- **Dec 11, 2025**: Added dedicated honeypot Grafana dashboard with credential analysis, commands, malware tracking
+- **Dec 11, 2025**: Added honeypot Elasticsearch index template for filebeat-8.19.8* pattern
+- **Dec 11, 2025**: Updated main dashboard to use configurable honeypot subnet variable
 - **Dec 8, 2025**: Added Elasticsearch index template for geo_point mapping (map visualizations)
 - **Dec 8, 2025**: Added Grafana dashboard for home network monitoring
 - **Dec 8, 2025**: Added GeoIP enrichment via Elasticsearch ingest pipeline

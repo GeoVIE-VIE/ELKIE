@@ -231,7 +231,7 @@
             }
           ],
           "metrics": [{ "id": "1", "type": "count" }],
-          "query": "dest_ip:192.168.40.* OR src_ip:192.168.40.*",
+          "query": "dest_ip:$honeypot_subnet OR src_ip:$honeypot_subnet",
           "refId": "A",
           "timeField": "@timestamp"
         }
@@ -1132,7 +1132,7 @@
             }
           ],
           "metrics": [{ "id": "1", "type": "count" }],
-          "query": "dest_ip:192.168.40.*",
+          "query": "dest_ip:$honeypot_subnet",
           "refId": "A",
           "timeField": "@timestamp"
         }
@@ -1189,7 +1189,7 @@
             }
           ],
           "metrics": [{ "id": "1", "type": "count" }],
-          "query": "dest_ip:192.168.40.*",
+          "query": "dest_ip:$honeypot_subnet",
           "refId": "A",
           "timeField": "@timestamp"
         }
@@ -1240,7 +1240,7 @@
             }
           ],
           "metrics": [{ "id": "1", "type": "count" }],
-          "query": "dest_ip:192.168.40.*",
+          "query": "dest_ip:$honeypot_subnet",
           "refId": "A",
           "timeField": "@timestamp"
         }
