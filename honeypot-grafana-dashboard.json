@@ -1273,6 +1273,39 @@
                         "name": "Attack Sources",
                         "tooltip": true,
                         "type": "markers"
+                    },
+                    {
+                        "config": {
+                            "showLegend": true,
+                            "style": {
+                                "color": {
+                                    "field": "Count",
+                                    "fixed": "yellow",
+                                    "max": "red",
+                                    "min": "green"
+                                },
+                                "opacity": {
+                                    "field": "Count",
+                                    "fixed": 0.7,
+                                    "max": 1,
+                                    "min": 0.3
+                                },
+                                "width": {
+                                    "field": "Count",
+                                    "fixed": 2,
+                                    "max": 8,
+                                    "min": 1
+                                }
+                            }
+                        },
+                        "location": {
+                            "latitude": "geoip.location.lat",
+                            "longitude": "geoip.location.lon",
+                            "mode": "coords"
+                        },
+                        "name": "Active Streams",
+                        "tooltip": true,
+                        "type": "trails"
                     }
                 ],
                 "tooltip": {
@@ -1339,9 +1372,9 @@
                     }
                 }
             ],
-            "title": "Attack Map by Country",
+            "title": "Attack Map with Active Streams",
             "type": "geomap",
-            "description": "Geographic distribution of attack sources"
+            "description": "Geographic distribution of attack sources with active connection streams"
         },
         {
             "datasource": {
