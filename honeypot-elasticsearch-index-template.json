@@ -1,12 +1,13 @@
 {
-  "index_patterns": ["filebeat-8.19.8*"],
+  "index_patterns": [".ds-filebeat-8.19.8-*", "filebeat-8.19.8*"],
   "priority": 100,
   "template": {
     "settings": {
       "number_of_shards": 1,
       "number_of_replicas": 0,
       "refresh_interval": "5s",
-      "codec": "best_compression"
+      "codec": "best_compression",
+      "default_pipeline": "tpot-honeypot"
     },
     "mappings": {
       "dynamic": "true",
@@ -99,6 +100,73 @@
         "src_port": { "type": "integer" },
         "dest_ip": { "type": "ip" },
         "dest_port": { "type": "integer" },
+
+        "honeypot_type": { "type": "keyword" },
+        "event_type": { "type": "keyword" },
+        "protocol": { "type": "keyword" },
+
+        "username": { "type": "keyword" },
+        "password": { "type": "keyword" },
+        "command": { "type": "keyword" },
+        "session_id": { "type": "keyword" },
+        "file_hash": { "type": "keyword" },
+        "download_url": { "type": "keyword" },
+        "downloaded_file": { "type": "keyword" },
+        "connection_type": { "type": "keyword" },
+        "credentials": { "type": "text" },
+
+        "alert_signature": { "type": "keyword" },
+        "alert_category": { "type": "keyword" },
+        "alert_severity": { "type": "integer" },
+
+        "os_fingerprint": { "type": "keyword" },
+        "os_distance": { "type": "integer" },
+        "os_params": { "type": "keyword" },
+        "os_raw_sig": { "type": "keyword" },
+
+        "called_number": { "type": "keyword" },
+        "sip_message": { "type": "text" },
+        "sip_user_agent": { "type": "keyword" },
+        "transport_type": { "type": "keyword" },
+
+        "ja3_hash": { "type": "keyword" },
+        "ja3s_hash": { "type": "keyword" },
+        "hassh": { "type": "keyword" },
+        "hassh_server": { "type": "keyword" },
+        "server_name": { "type": "keyword" },
+
+        "request_path": { "type": "keyword" },
+        "http_status": { "type": "integer" },
+        "user_agent": { "type": "keyword" },
+        "attack_detection": { "type": "keyword" },
+        "cookies": { "type": "text" },
+
+        "hostname": { "type": "keyword" },
+        "request_body": { "type": "text" },
+
+        "data_type": { "type": "keyword" },
+        "public_ip": { "type": "ip" },
+        "request": { "type": "text" },
+        "response": { "type": "text" },
+
+        "payload": { "type": "text" },
+        "payload_hex": { "type": "keyword" },
+        "service": { "type": "keyword" },
+
+        "output": { "type": "text" },
+        "filename": { "type": "keyword" },
+        "plugin": { "type": "keyword" },
+        "theme": { "type": "keyword" },
+        "print_data": { "type": "text" },
+        "job_name": { "type": "keyword" },
+
+        "cowrie_message": { "type": "text" },
+        "ingest_error": { "type": "text" },
+
+        "honeypot": {
+          "type": "object",
+          "dynamic": true
+        },
 
         "geoip": {
           "dynamic": false,
