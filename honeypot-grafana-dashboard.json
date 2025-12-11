@@ -3,7 +3,10 @@
     "list": [
       {
         "builtIn": 1,
-        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
         "enable": true,
         "hide": true,
         "iconColor": "rgba(0, 211, 255, 1)",
@@ -12,1407 +15,505 @@
       }
     ]
   },
-  "description": "T-Pot Honeypot monitoring dashboard - Attack analysis and threat intelligence",
   "editable": true,
   "fiscalYearStartMonth": 0,
-  "graphTooltip": 1,
+  "graphTooltip": 0,
   "id": null,
   "links": [],
+  "liveNow": false,
   "panels": [
     {
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
-      "id": 100,
-      "title": "T-Pot Overview",
-      "type": "row"
-    },
-    {
-      "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
+      "datasource": {
+        "type": "elasticsearch",
+        "uid": "ef6pmu9oze7eoc"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 1000 },
-              { "color": "orange", "value": 10000 },
-              { "color": "red", "value": 50000 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1000
+              }
             ]
-          },
-          "unit": "short"
-        }
+          }
+        },
+        "overrides": []
       },
-      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 1 },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
       "id": 1,
       "options": {
         "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false },
-        "textMode": "auto"
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": ["sum"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value"
       },
+      "pluginVersion": "10.0.0",
       "targets": [
         {
-          "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
-          "bucketAggs": [
-            {
-              "field": "@timestamp",
-              "id": "2",
-              "settings": { "interval": "auto" },
-              "type": "date_histogram"
-            }
-          ],
-          "metrics": [{ "id": "1", "type": "count" }],
-          "query": "honeypot_type:$honeypot_type",
           "refId": "A",
-          "timeField": "@timestamp"
+          "query": "dest_ip:192.168.40.3 AND source.geo.country_name:* AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country",
+          "timeField": "@timestamp",
+          "bucketAggs": [],
+          "metrics": [
+            {
+              "id": "1",
+              "type": "count"
+            }
+          ]
         }
       ],
-      "title": "Total Events",
+      "title": "Total External Attacks",
       "type": "stat"
     },
     {
-      "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
+      "datasource": {
+        "type": "elasticsearch",
+        "uid": "ef6pmu9oze7eoc"
+      },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 50 },
-              { "color": "orange", "value": 200 },
-              { "color": "red", "value": 500 }
-            ]
+          "color": {
+            "mode": "palette-classic"
           },
-          "unit": "short"
-        }
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "fillOpacity": 20,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
       },
-      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 1 },
+      "gridPos": { "h": 8, "w": 18, "x": 6, "y": 0 },
       "id": 2,
       "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
-        "textMode": "auto"
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single"
+        }
       },
+      "pluginVersion": "10.0.0",
       "targets": [
         {
-          "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
-          "bucketAggs": [
-            {
-              "field": "src_ip",
-              "id": "2",
-              "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "0" },
-              "type": "terms"
-            }
-          ],
-          "metrics": [{ "id": "1", "type": "count" }],
-          "query": "honeypot_type:$honeypot_type",
           "refId": "A",
-          "timeField": "@timestamp"
-        }
-      ],
-      "title": "Unique Attackers",
-      "type": "stat"
-    },
-    {
-      "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "thresholds" },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 10 },
-              { "color": "orange", "value": 30 },
-              { "color": "red", "value": 50 }
-            ]
-          },
-          "unit": "short"
-        }
-      },
-      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 1 },
-      "id": 3,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
+          "alias": "External attacks",
+          "query": "dest_ip:192.168.40.3 AND source.geo.country_name:* AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country",
+          "timeField": "@timestamp",
           "bucketAggs": [
             {
-              "field": "geoip.country_name",
               "id": "2",
-              "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "0" },
-              "type": "terms"
-            }
-          ],
-          "metrics": [{ "id": "1", "type": "count" }],
-          "query": "geoip.country_name:* AND type:$honeypot_type",
-          "refId": "A",
-          "timeField": "@timestamp"
-        }
-      ],
-      "title": "Countries Attacking",
-      "type": "stat"
-    },
-    {
-      "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "thresholds" },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 5 },
-              { "color": "red", "value": 15 }
-            ]
-          },
-          "unit": "short"
-        }
-      },
-      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 1 },
-      "id": 4,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
-          "bucketAggs": [
-            {
-              "field": "dest_port",
-              "id": "2",
-              "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "0" },
-              "type": "terms"
-            }
-          ],
-          "metrics": [{ "id": "1", "type": "count" }],
-          "query": "honeypot_type:$honeypot_type",
-          "refId": "A",
-          "timeField": "@timestamp"
-        }
-      ],
-      "title": "Targeted Ports",
-      "type": "stat"
-    },
-    {
-      "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "thresholds" },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "orange", "value": 100 },
-              { "color": "red", "value": 500 }
-            ]
-          },
-          "unit": "short"
-        }
-      },
-      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 1 },
-      "id": 5,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
-          "bucketAggs": [
-            {
+              "type": "date_histogram",
               "field": "@timestamp",
-              "id": "2",
-              "settings": { "interval": "auto" },
-              "type": "date_histogram"
+              "settings": {
+                "interval": "auto",
+                "min_doc_count": 0
+              }
             }
           ],
-          "metrics": [{ "id": "1", "type": "count" }],
-          "query": "username:* OR password:*",
-          "refId": "A",
-          "timeField": "@timestamp"
-        }
-      ],
-      "title": "Login Attempts",
-      "type": "stat"
-    },
-    {
-      "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "thresholds" },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 1 },
-              { "color": "red", "value": 10 }
-            ]
-          },
-          "unit": "short"
-        }
-      },
-      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 1 },
-      "id": 6,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
-          "bucketAggs": [
+          "metrics": [
             {
-              "field": "@timestamp",
-              "id": "2",
-              "settings": { "interval": "auto" },
-              "type": "date_histogram"
+              "id": "1",
+              "type": "count"
             }
-          ],
-          "metrics": [{ "id": "1", "type": "count" }],
-          "query": "download_url:* OR file_hash:*",
-          "refId": "A",
-          "timeField": "@timestamp"
+          ]
         }
       ],
-      "title": "Malware Downloads",
-      "type": "stat"
-    },
-    {
-      "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "palette-classic" },
-          "custom": {
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "bars",
-            "fillOpacity": 80,
-            "gradientMode": "hue",
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false },
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": { "type": "linear" },
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": { "group": "A", "mode": "normal" },
-            "thresholdsStyle": { "mode": "off" }
-          },
-          "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }] },
-          "unit": "short"
-        }
-      },
-      "gridPos": { "h": 8, "w": 16, "x": 0, "y": 5 },
-      "id": 10,
-      "options": {
-        "legend": { "calcs": ["sum"], "displayMode": "table", "placement": "right", "showLegend": true },
-        "tooltip": { "mode": "multi", "sort": "desc" }
-      },
-      "targets": [
-        {
-          "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
-          "bucketAggs": [
-            {
-              "field": "honeypot_type",
-              "id": "3",
-              "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "15" },
-              "type": "terms"
-            },
-            {
-              "field": "@timestamp",
-              "id": "2",
-              "settings": { "interval": "auto", "min_doc_count": "0" },
-              "type": "date_histogram"
-            }
-          ],
-          "metrics": [{ "id": "1", "type": "count" }],
-          "query": "honeypot_type:$honeypot_type",
-          "refId": "A",
-          "timeField": "@timestamp"
-        }
-      ],
-      "title": "Attack Timeline by Honeypot",
+      "title": "External Attacks Over Time",
       "type": "timeseries"
     },
     {
-      "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "palette-classic" },
-          "custom": {
-            "hideFrom": { "legend": false, "tooltip": false, "viz": false }
-          },
-          "mappings": []
-        }
+      "datasource": {
+        "type": "elasticsearch",
+        "uid": "ef6pmu9oze7eoc"
       },
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 5 },
-      "id": 11,
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 4 },
+      "id": 3,
       "options": {
-        "legend": { "displayMode": "table", "placement": "right", "showLegend": true, "values": ["value", "percent"] },
-        "pieType": "donut",
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": true },
-        "tooltip": { "mode": "single", "sort": "none" }
+        "showHeader": true
       },
+      "pluginVersion": "10.0.0",
       "targets": [
         {
-          "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
-          "bucketAggs": [
-            {
-              "field": "honeypot_type",
-              "id": "2",
-              "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "20" },
-              "type": "terms"
-            }
-          ],
-          "metrics": [{ "id": "1", "type": "count" }],
-          "query": "*",
           "refId": "A",
-          "timeField": "@timestamp"
-        }
-      ],
-      "title": "Events by Honeypot Type",
-      "type": "piechart"
-    },
-    {
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 13 },
-      "id": 101,
-      "title": "Geographic Analysis",
-      "type": "row"
-    },
-    {
-      "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "thresholds" },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 100 },
-              { "color": "orange", "value": 500 },
-              { "color": "red", "value": 1000 }
-            ]
-          }
-        }
-      },
-      "gridPos": { "h": 14, "w": 16, "x": 0, "y": 14 },
-      "id": 20,
-      "options": {
-        "basemap": {
-          "config": {
-            "url": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-            "attribution": "Esri, Maxar, Earthstar Geographics"
-          },
-          "name": "ESRI World Imagery",
-          "type": "xyz"
-        },
-        "controls": { "mouseWheelZoom": true, "showAttribution": true, "showDebug": false, "showMeasure": false, "showScale": false, "showZoom": true },
-        "layers": [
-          {
-            "config": {
-              "showLegend": true,
-              "style": {
-                "color": { "field": "Count", "fixed": "red" },
-                "opacity": 0.8,
-                "rotation": { "fixed": 0, "max": 360, "min": -360, "mode": "mod" },
-                "size": { "field": "Count", "fixed": 5, "max": 25, "min": 5 },
-                "symbol": { "fixed": "img/icons/marker/circle.svg", "mode": "fixed" },
-                "textConfig": { "fontSize": 12, "offsetX": 0, "offsetY": 0, "textAlign": "center", "textBaseline": "middle" }
-              }
-            },
-            "location": { "mode": "geohash", "geohash": "geoip.location" },
-            "name": "Attackers",
-            "tooltip": true,
-            "type": "markers"
-          }
-        ],
-        "tooltip": { "mode": "details" },
-        "view": { "allLayers": true, "id": "zero", "lat": 20, "lon": 0, "zoom": 2 }
-      },
-      "targets": [
-        {
-          "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
+          "query": "dest_ip:192.168.40.3 AND source.geo.country_name:* AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country",
+          "timeField": "@timestamp",
           "bucketAggs": [
             {
-              "field": "geoip.location",
               "id": "2",
-              "settings": { "precision": 3 },
-              "type": "geohash_grid"
-            }
-          ],
-          "metrics": [{ "id": "1", "type": "count" }],
-          "query": "geoip.location:* AND type:$honeypot_type",
-          "refId": "A",
-          "timeField": "@timestamp"
-        }
-      ],
-      "title": "Attacker Origins Map",
-      "type": "geomap"
-    },
-    {
-      "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "thresholds" },
-          "custom": {
-            "align": "auto",
-            "cellOptions": { "type": "auto" },
-            "inspect": false
-          },
-          "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
-        },
-        "overrides": [
-          {
-            "matcher": { "id": "byName", "options": "Count" },
-            "properties": [
-              { "id": "custom.cellOptions", "value": { "mode": "gradient", "type": "gauge" } },
-              { "id": "color", "value": { "mode": "continuous-RdYlGr" } }
-            ]
-          }
-        ]
-      },
-      "gridPos": { "h": 14, "w": 8, "x": 16, "y": 14 },
-      "id": 21,
-      "options": {
-        "cellHeight": "sm",
-        "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": true },
-        "showHeader": true,
-        "sortBy": [{ "desc": true, "displayName": "Count" }]
-      },
-      "targets": [
-        {
-          "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
-          "bucketAggs": [
-            {
-              "field": "geoip.country_name",
-              "id": "2",
-              "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "30" },
-              "type": "terms"
-            }
-          ],
-          "metrics": [{ "id": "1", "type": "count" }],
-          "query": "geoip.country_name:* AND type:$honeypot_type",
-          "refId": "A",
-          "timeField": "@timestamp"
-        }
-      ],
-      "title": "Attacks by Country",
-      "type": "table"
-    },
-    {
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 28 },
-      "id": 102,
-      "title": "Top Attackers & Targets",
-      "type": "row"
-    },
-    {
-      "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "thresholds" },
-          "custom": {
-            "align": "auto",
-            "cellOptions": { "type": "auto" },
-            "filterable": true,
-            "inspect": false
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "yellow", "value": null },
-              { "color": "orange", "value": 50 },
-              { "color": "red", "value": 200 }
-            ]
-          }
-        },
-        "overrides": [
-          {
-            "matcher": { "id": "byName", "options": "Count" },
-            "properties": [
-              { "id": "custom.cellOptions", "value": { "mode": "gradient", "type": "gauge" } },
-              { "id": "color", "value": { "mode": "continuous-RdYlGr" } }
-            ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "src_ip" },
-            "properties": [
-              { "id": "displayName", "value": "Attacker IP" },
-              { "id": "custom.width", "value": 140 }
-            ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "geoip.country_name" },
-            "properties": [
-              { "id": "displayName", "value": "Country" }
-            ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "geoip.as_org" },
-            "properties": [
-              { "id": "displayName", "value": "ASN Org" }
-            ]
-          }
-        ]
-      },
-      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 29 },
-      "id": 30,
-      "options": {
-        "cellHeight": "sm",
-        "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
-        "showHeader": true,
-        "sortBy": [{ "desc": true, "displayName": "Count" }]
-      },
-      "targets": [
-        {
-          "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
-          "bucketAggs": [
-            {
+              "type": "terms",
               "field": "src_ip",
-              "id": "2",
-              "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "25" },
-              "type": "terms"
-            },
-            {
-              "field": "geoip.country_name",
-              "id": "3",
-              "settings": { "min_doc_count": "0", "order": "desc", "orderBy": "_count", "size": "1" },
-              "type": "terms"
-            },
-            {
-              "field": "geoip.as_org",
-              "id": "4",
-              "settings": { "min_doc_count": "0", "order": "desc", "orderBy": "_count", "size": "1" },
-              "type": "terms"
+              "settings": {
+                "size": 10,
+                "order": "desc",
+                "orderBy": "1",
+                "min_doc_count": 1
+              }
             }
           ],
-          "metrics": [{ "id": "1", "type": "count" }],
-          "query": "honeypot_type:$honeypot_type",
-          "refId": "A",
-          "timeField": "@timestamp"
+          "metrics": [
+            {
+              "id": "1",
+              "type": "count"
+            }
+          ]
         }
       ],
-      "title": "Top Attackers",
+      "title": "Top Attacker IPs (public src_ip → honeypot)",
       "type": "table"
     },
     {
-      "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "thresholds" },
-          "custom": {
-            "align": "auto",
-            "cellOptions": { "type": "auto" },
-            "inspect": false
-          },
-          "mappings": [
-            { "options": { "22": { "color": "red", "index": 0, "text": "22 (SSH)" } }, "type": "value" },
-            { "options": { "23": { "color": "orange", "index": 1, "text": "23 (Telnet)" } }, "type": "value" },
-            { "options": { "80": { "color": "blue", "index": 2, "text": "80 (HTTP)" } }, "type": "value" },
-            { "options": { "443": { "color": "green", "index": 3, "text": "443 (HTTPS)" } }, "type": "value" },
-            { "options": { "445": { "color": "purple", "index": 4, "text": "445 (SMB)" } }, "type": "value" },
-            { "options": { "3389": { "color": "yellow", "index": 5, "text": "3389 (RDP)" } }, "type": "value" },
-            { "options": { "21": { "color": "cyan", "index": 6, "text": "21 (FTP)" } }, "type": "value" },
-            { "options": { "25": { "color": "light-blue", "index": 7, "text": "25 (SMTP)" } }, "type": "value" },
-            { "options": { "5060": { "color": "light-green", "index": 8, "text": "5060 (SIP)" } }, "type": "value" },
-            { "options": { "5555": { "color": "dark-orange", "index": 9, "text": "5555 (ADB)" } }, "type": "value" },
-            { "options": { "9200": { "color": "dark-blue", "index": 10, "text": "9200 (ES)" } }, "type": "value" }
-          ],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }] }
-        },
-        "overrides": [
-          {
-            "matcher": { "id": "byName", "options": "Count" },
-            "properties": [
-              { "id": "custom.cellOptions", "value": { "mode": "gradient", "type": "gauge" } },
-              { "id": "color", "value": { "mode": "continuous-RdYlGr" } }
-            ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "dest_port" },
-            "properties": [
-              { "id": "displayName", "value": "Port" }
-            ]
-          }
-        ]
+      "datasource": {
+        "type": "elasticsearch",
+        "uid": "ef6pmu9oze7eoc"
       },
-      "gridPos": { "h": 10, "w": 6, "x": 12, "y": 29 },
-      "id": 31,
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 4 },
+      "id": 4,
       "options": {
-        "cellHeight": "sm",
-        "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
-        "showHeader": true,
-        "sortBy": [{ "desc": true, "displayName": "Count" }]
+        "showHeader": true
       },
+      "pluginVersion": "10.0.0",
       "targets": [
         {
-          "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
+          "refId": "A",
+          "query": "dest_ip:192.168.40.3 AND source.geo.country_name:* AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country",
+          "timeField": "@timestamp",
           "bucketAggs": [
             {
+              "id": "2",
+              "type": "terms",
               "field": "dest_port",
-              "id": "2",
-              "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "25" },
-              "type": "terms"
+              "settings": {
+                "size": 10,
+                "order": "desc",
+                "orderBy": "1",
+                "min_doc_count": 1
+              }
             }
           ],
-          "metrics": [{ "id": "1", "type": "count" }],
-          "query": "honeypot_type:$honeypot_type",
-          "refId": "A",
-          "timeField": "@timestamp"
+          "metrics": [
+            {
+              "id": "1",
+              "type": "count"
+            }
+          ]
         }
       ],
-      "title": "Targeted Ports",
+      "title": "Top Destination Ports (external attacks)",
       "type": "table"
     },
     {
-      "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "thresholds" },
-          "custom": {
-            "align": "auto",
-            "cellOptions": { "type": "auto" },
-            "inspect": false
-          },
-          "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] }
-        },
-        "overrides": [
-          {
-            "matcher": { "id": "byName", "options": "Count" },
-            "properties": [
-              { "id": "custom.cellOptions", "value": { "mode": "gradient", "type": "gauge" } },
-              { "id": "color", "value": { "mode": "continuous-RdYlGr" } }
-            ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "os_fingerprint" },
-            "properties": [
-              { "id": "displayName", "value": "OS" }
-            ]
-          }
-        ]
+      "datasource": {
+        "type": "elasticsearch",
+        "uid": "ef6pmu9oze7eoc"
       },
-      "gridPos": { "h": 10, "w": 6, "x": 18, "y": 29 },
-      "id": 32,
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 4 },
+      "id": 5,
       "options": {
-        "cellHeight": "sm",
-        "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
-        "showHeader": true,
-        "sortBy": [{ "desc": true, "displayName": "Count" }]
+        "showHeader": true
       },
+      "pluginVersion": "10.0.0",
       "targets": [
         {
-          "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
+          "refId": "A",
+          "query": "dest_ip:192.168.40.3 AND source.geo.country_name:* AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country",
+          "timeField": "@timestamp",
           "bucketAggs": [
             {
-              "field": "os_fingerprint",
               "id": "2",
-              "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "15" },
-              "type": "terms"
+              "type": "terms",
+              "field": "source.geo.country_name",
+              "settings": {
+                "size": 10,
+                "order": "desc",
+                "orderBy": "1",
+                "min_doc_count": 1
+              }
             }
           ],
-          "metrics": [{ "id": "1", "type": "count" }],
-          "query": "os_fingerprint:*",
-          "refId": "A",
-          "timeField": "@timestamp"
+          "metrics": [
+            {
+              "id": "1",
+              "type": "count"
+            }
+          ]
         }
       ],
-      "title": "Attacker OS",
+      "title": "Top Source Countries",
       "type": "table"
     },
     {
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 39 },
-      "id": 103,
-      "title": "Credential Analysis (Cowrie/Heralding)",
-      "type": "row"
-    },
-    {
-      "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "thresholds" },
-          "custom": {
-            "align": "auto",
-            "cellOptions": { "type": "auto" },
-            "inspect": false
-          },
-          "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "orange", "value": null }] }
-        },
-        "overrides": [
-          {
-            "matcher": { "id": "byName", "options": "Count" },
-            "properties": [
-              { "id": "custom.cellOptions", "value": { "mode": "gradient", "type": "gauge" } },
-              { "id": "color", "value": { "mode": "continuous-RdYlGr" } }
-            ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "username" },
-            "properties": [
-              { "id": "displayName", "value": "Username" }
-            ]
-          }
-        ]
+      "datasource": {
+        "type": "elasticsearch",
+        "uid": "ef6pmu9oze7eoc"
       },
-      "gridPos": { "h": 10, "w": 8, "x": 0, "y": 40 },
-      "id": 40,
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 12 },
+      "id": 6,
       "options": {
-        "cellHeight": "sm",
-        "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
-        "showHeader": true,
-        "sortBy": [{ "desc": true, "displayName": "Count" }]
+        "showHeader": true
       },
+      "pluginVersion": "10.0.0",
       "targets": [
         {
-          "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
+          "refId": "A",
+          "query": "dest_ip:192.168.40.3 AND source.geo.country_name:* AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country",
+          "timeField": "@timestamp",
           "bucketAggs": [
             {
-              "field": "username",
               "id": "2",
-              "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "25" },
-              "type": "terms"
+              "type": "terms",
+              "field": "honeypot.app_proto",
+              "settings": {
+                "size": 10,
+                "order": "desc",
+                "orderBy": "1",
+                "min_doc_count": 1
+              }
             }
           ],
-          "metrics": [{ "id": "1", "type": "count" }],
-          "query": "username:*",
-          "refId": "A",
-          "timeField": "@timestamp"
+          "metrics": [
+            {
+              "id": "1",
+              "type": "count"
+            }
+          ]
         }
       ],
-      "title": "Top Usernames",
+      "title": "Top Protocols / Services (honeypot.app_proto)",
       "type": "table"
     },
+
     {
-      "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "thresholds" },
-          "custom": {
-            "align": "auto",
-            "cellOptions": { "type": "auto" },
-            "inspect": false
-          },
-          "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "orange", "value": null }] }
-        },
-        "overrides": [
-          {
-            "matcher": { "id": "byName", "options": "Count" },
-            "properties": [
-              { "id": "custom.cellOptions", "value": { "mode": "gradient", "type": "gauge" } },
-              { "id": "color", "value": { "mode": "continuous-RdYlGr" } }
-            ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "password" },
-            "properties": [
-              { "id": "displayName", "value": "Password" }
-            ]
-          }
-        ]
+      "datasource": {
+        "type": "elasticsearch",
+        "uid": "ef6pmu9oze7eoc"
       },
-      "gridPos": { "h": 10, "w": 8, "x": 8, "y": 40 },
-      "id": 41,
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 12 },
+      "id": 7,
       "options": {
-        "cellHeight": "sm",
-        "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
-        "showHeader": true,
-        "sortBy": [{ "desc": true, "displayName": "Count" }]
+        "showHeader": true
       },
+      "pluginVersion": "10.0.0",
       "targets": [
         {
-          "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
+          "refId": "A",
+          "query": "dest_ip:192.168.40.3 AND honeypot.username:* AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country",
+          "timeField": "@timestamp",
           "bucketAggs": [
             {
-              "field": "password",
               "id": "2",
-              "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "25" },
-              "type": "terms"
+              "type": "terms",
+              "field": "honeypot.username",
+              "settings": {
+                "size": 10,
+                "order": "desc",
+                "orderBy": "1",
+                "min_doc_count": 1
+              }
             }
           ],
-          "metrics": [{ "id": "1", "type": "count" }],
-          "query": "password:*",
-          "refId": "A",
-          "timeField": "@timestamp"
-        }
-      ],
-      "title": "Top Passwords",
-      "type": "table"
-    },
-    {
-      "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "thresholds" },
-          "custom": {
-            "align": "auto",
-            "cellOptions": { "type": "auto" },
-            "inspect": false
-          },
-          "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }] }
-        },
-        "overrides": [
-          {
-            "matcher": { "id": "byName", "options": "Count" },
-            "properties": [
-              { "id": "custom.cellOptions", "value": { "mode": "gradient", "type": "gauge" } },
-              { "id": "color", "value": { "mode": "continuous-RdYlGr" } }
-            ]
-          }
-        ]
-      },
-      "gridPos": { "h": 10, "w": 8, "x": 16, "y": 40 },
-      "id": 42,
-      "options": {
-        "cellHeight": "sm",
-        "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
-        "showHeader": true,
-        "sortBy": [{ "desc": true, "displayName": "Count" }]
-      },
-      "targets": [
-        {
-          "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
-          "bucketAggs": [
+          "metrics": [
             {
-              "field": "username",
-              "id": "2",
-              "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "15" },
-              "type": "terms"
-            },
-            {
-              "field": "password",
-              "id": "3",
-              "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "3" },
-              "type": "terms"
+              "id": "1",
+              "type": "count"
             }
-          ],
-          "metrics": [{ "id": "1", "type": "count" }],
-          "query": "username:* AND password:*",
-          "refId": "A",
-          "timeField": "@timestamp"
+          ]
         }
       ],
-      "title": "Username/Password Combinations",
+      "title": "Top Usernames (honeypot.username)",
       "type": "table"
     },
+
     {
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 50 },
-      "id": 104,
-      "title": "Commands & Malware (Cowrie)",
-      "type": "row"
-    },
-    {
-      "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "thresholds" },
-          "custom": {
-            "align": "auto",
-            "cellOptions": { "type": "auto" },
-            "inspect": false
-          },
-          "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "purple", "value": null }] }
-        },
-        "overrides": [
-          {
-            "matcher": { "id": "byName", "options": "Count" },
-            "properties": [
-              { "id": "custom.cellOptions", "value": { "mode": "gradient", "type": "gauge" } },
-              { "id": "color", "value": { "mode": "continuous-BlPu" } }
-            ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "command" },
-            "properties": [
-              { "id": "displayName", "value": "Command" }
-            ]
-          }
-        ]
+      "datasource": {
+        "type": "elasticsearch",
+        "uid": "ef6pmu9oze7eoc"
       },
-      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 51 },
-      "id": 50,
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "gridPos": { "h": 10, "w": 16, "x": 0, "y": 20 },
+      "id": 8,
       "options": {
-        "cellHeight": "sm",
-        "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
-        "showHeader": true,
-        "sortBy": [{ "desc": true, "displayName": "Count" }]
+        "showHeader": true
       },
+      "pluginVersion": "10.0.0",
       "targets": [
         {
-          "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
-          "bucketAggs": [
-            {
-              "field": "command",
-              "id": "2",
-              "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "30" },
-              "type": "terms"
-            }
-          ],
-          "metrics": [{ "id": "1", "type": "count" }],
-          "query": "command:*",
           "refId": "A",
-          "timeField": "@timestamp"
-        }
-      ],
-      "title": "Commands Executed",
-      "type": "table"
-    },
-    {
-      "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "thresholds" },
-          "custom": {
-            "align": "auto",
-            "cellOptions": { "type": "auto" },
-            "inspect": false
-          },
-          "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "dark-red", "value": null }] }
-        },
-        "overrides": [
-          {
-            "matcher": { "id": "byName", "options": "Count" },
-            "properties": [
-              { "id": "custom.cellOptions", "value": { "mode": "gradient", "type": "gauge" } },
-              { "id": "color", "value": { "mode": "continuous-RdYlGr" } }
-            ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "download_url" },
-            "properties": [
-              { "id": "displayName", "value": "Download URL" }
-            ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "file_hash" },
-            "properties": [
-              { "id": "displayName", "value": "SHA256" },
-              { "id": "links", "value": [{ "title": "VirusTotal", "url": "https://www.virustotal.com/gui/file/${__value.text}" }] }
-            ]
-          }
-        ]
-      },
-      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 51 },
-      "id": 51,
-      "options": {
-        "cellHeight": "sm",
-        "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
-        "showHeader": true,
-        "sortBy": [{ "desc": true, "displayName": "Count" }]
-      },
-      "targets": [
-        {
-          "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
-          "bucketAggs": [
-            {
-              "field": "download_url",
-              "id": "2",
-              "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "20" },
-              "type": "terms"
-            },
-            {
-              "field": "file_hash",
-              "id": "3",
-              "settings": { "min_doc_count": "0", "order": "desc", "orderBy": "_count", "size": "1" },
-              "type": "terms"
-            }
-          ],
-          "metrics": [{ "id": "1", "type": "count" }],
-          "query": "download_url:*",
-          "refId": "A",
-          "timeField": "@timestamp"
-        }
-      ],
-      "title": "Malware Downloads",
-      "type": "table"
-    },
-    {
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 61 },
-      "id": 105,
-      "title": "Web/Application Attacks (Tanner/Dionaea/Elasticpot)",
-      "type": "row"
-    },
-    {
-      "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "thresholds" },
-          "custom": {
-            "align": "auto",
-            "cellOptions": { "type": "auto" },
-            "inspect": false
-          },
-          "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] }
-        },
-        "overrides": [
-          {
-            "matcher": { "id": "byName", "options": "Count" },
-            "properties": [
-              { "id": "custom.cellOptions", "value": { "mode": "gradient", "type": "gauge" } },
-              { "id": "color", "value": { "mode": "continuous-RdYlGr" } }
-            ]
-          }
-        ]
-      },
-      "gridPos": { "h": 10, "w": 8, "x": 0, "y": 62 },
-      "id": 60,
-      "options": {
-        "cellHeight": "sm",
-        "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
-        "showHeader": true,
-        "sortBy": [{ "desc": true, "displayName": "Count" }]
-      },
-      "targets": [
-        {
-          "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
-          "bucketAggs": [
-            {
-              "field": "request_path",
-              "id": "2",
-              "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "25" },
-              "type": "terms"
-            }
-          ],
-          "metrics": [{ "id": "1", "type": "count" }],
-          "query": "request_path:*",
-          "refId": "A",
-          "timeField": "@timestamp"
-        }
-      ],
-      "title": "Web Paths Attacked",
-      "type": "table"
-    },
-    {
-      "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "thresholds" },
-          "custom": {
-            "align": "auto",
-            "cellOptions": { "type": "auto" },
-            "inspect": false
-          },
-          "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
-        },
-        "overrides": [
-          {
-            "matcher": { "id": "byName", "options": "Count" },
-            "properties": [
-              { "id": "custom.cellOptions", "value": { "mode": "gradient", "type": "gauge" } },
-              { "id": "color", "value": { "mode": "continuous-RdYlGr" } }
-            ]
-          }
-        ]
-      },
-      "gridPos": { "h": 10, "w": 8, "x": 8, "y": 62 },
-      "id": 61,
-      "options": {
-        "cellHeight": "sm",
-        "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
-        "showHeader": true,
-        "sortBy": [{ "desc": true, "displayName": "Count" }]
-      },
-      "targets": [
-        {
-          "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
-          "bucketAggs": [
-            {
-              "field": "dionaea.connection_protocol",
-              "id": "2",
-              "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "15" },
-              "type": "terms"
-            }
-          ],
-          "metrics": [{ "id": "1", "type": "count" }],
-          "query": "dionaea.connection_protocol:*",
-          "refId": "A",
-          "timeField": "@timestamp"
-        }
-      ],
-      "title": "Dionaea Protocols",
-      "type": "table"
-    },
-    {
-      "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "thresholds" },
-          "custom": {
-            "align": "auto",
-            "cellOptions": { "type": "auto" },
-            "inspect": false
-          },
-          "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "yellow", "value": null }] }
-        },
-        "overrides": [
-          {
-            "matcher": { "id": "byName", "options": "Count" },
-            "properties": [
-              { "id": "custom.cellOptions", "value": { "mode": "gradient", "type": "gauge" } },
-              { "id": "color", "value": { "mode": "continuous-RdYlGr" } }
-            ]
-          }
-        ]
-      },
-      "gridPos": { "h": 10, "w": 8, "x": 16, "y": 62 },
-      "id": 62,
-      "options": {
-        "cellHeight": "sm",
-        "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
-        "showHeader": true,
-        "sortBy": [{ "desc": true, "displayName": "Count" }]
-      },
-      "targets": [
-        {
-          "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
-          "bucketAggs": [
-            {
-              "field": "elasticpot.request_url",
-              "id": "2",
-              "settings": { "min_doc_count": "1", "order": "desc", "orderBy": "_count", "size": "20" },
-              "type": "terms"
-            }
-          ],
-          "metrics": [{ "id": "1", "type": "count" }],
-          "query": "elasticpot.request_url:*",
-          "refId": "A",
-          "timeField": "@timestamp"
-        }
-      ],
-      "title": "Elasticpot Requests",
-      "type": "table"
-    },
-    {
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 72 },
-      "id": 106,
-      "title": "Recent Events",
-      "type": "row"
-    },
-    {
-      "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
-      "fieldConfig": {
-        "defaults": {
-          "color": { "mode": "thresholds" },
-          "custom": {
-            "align": "auto",
-            "cellOptions": { "type": "auto" },
-            "inspect": false
-          },
-          "mappings": [],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "text", "value": null }] }
-        },
-        "overrides": [
-          {
-            "matcher": { "id": "byName", "options": "src_ip" },
-            "properties": [
-              { "id": "displayName", "value": "Attacker IP" },
-              { "id": "custom.width", "value": 130 }
-            ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "dest_port" },
-            "properties": [
-              { "id": "displayName", "value": "Port" },
-              { "id": "custom.width", "value": 70 }
-            ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "honeypot_type" },
-            "properties": [
-              { "id": "displayName", "value": "Honeypot" },
-              { "id": "custom.width", "value": 100 }
-            ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "geoip.country_name" },
-            "properties": [
-              { "id": "displayName", "value": "Country" },
-              { "id": "custom.width", "value": 100 }
-            ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "@timestamp" },
-            "properties": [
-              { "id": "custom.width", "value": 180 }
-            ]
-          }
-        ]
-      },
-      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 73 },
-      "id": 70,
-      "options": {
-        "cellHeight": "sm",
-        "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
-        "showHeader": true,
-        "sortBy": [{ "desc": true, "displayName": "@timestamp" }]
-      },
-      "targets": [
-        {
-          "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
+          "query": "dest_ip:192.168.40.3 AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country",
+          "timeField": "@timestamp",
           "bucketAggs": [],
           "metrics": [
-            { "id": "1", "type": "raw_data", "settings": { "size": "200" } }
-          ],
-          "query": "honeypot_type:$honeypot_type",
-          "refId": "A",
-          "timeField": "@timestamp"
-        }
-      ],
-      "title": "Recent Events",
-      "transformations": [
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "agent.ephemeral_id": true,
-              "agent.id": true,
-              "agent.name": true,
-              "agent.type": true,
-              "agent.version": true,
-              "ecs.version": true,
-              "host.architecture": true,
-              "host.containerized": true,
-              "host.hostname": true,
-              "host.id": true,
-              "host.name": true,
-              "host.os.codename": true,
-              "host.os.family": true,
-              "host.os.kernel": true,
-              "host.os.name": true,
-              "host.os.platform": true,
-              "host.os.type": true,
-              "host.os.version": true,
-              "input.type": true,
-              "log.source.address": true,
-              "log.file.path": true,
-              "_id": true,
-              "_index": true,
-              "_type": true
-            },
-            "indexByName": {
-              "@timestamp": 0,
-              "honeypot_type": 1,
-              "src_ip": 2,
-              "dest_port": 3,
-              "geoip.country_name": 4,
-              "event_type": 5
+            {
+              "id": "1",
+              "type": "raw_document"
             }
-          }
+          ]
         }
       ],
+      "title": "Recent Honeypot Events (filtered)",
       "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "elasticsearch",
+        "uid": "ef6pmu9oze7eoc"
+      },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "gridPos": { "h": 10, "w": 8, "x": 16, "y": 20 },
+      "id": 9,
+      "options": {
+        "basemap": { "type": "carto" },
+        "view": { "id": "world", "zoom": 1 },
+        "layers": [
+          {
+            "type": "heatmap",
+            "name": "External attacks",
+            "visibility": true,
+            "config": {
+              "color": { "scheme": "Spectral" },
+              "opacity": 0.7,
+              "radius": 20
+            },
+            "location": {
+              "mode": "coords",
+              "latField": "source.geo.location.lat",
+              "lonField": "source.geo.location.lon"
+            },
+            "metrics": [
+              { "type": "count" }
+            ]
+          }
+        ]
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        {
+          "refId": "A",
+          "query": "dest_ip:192.168.40.3 AND source.geo.country_name:* AND container.id:$Container AND src_ip:$Attacker_IP AND source.geo.country_name:$Source_Country",
+          "timeField": "@timestamp",
+          "bucketAggs": [],
+          "metrics": [
+            { "id": "1", "type": "raw_document" }
+          ]
+        }
+      ],
+      "title": "Attack Map (public src → honeypot)",
+      "type": "geomap"
     }
   ],
   "refresh": "30s",
-  "schemaVersion": 38,
-  "tags": ["honeypot", "t-pot", "security", "threat-intel"],
+  "schemaVersion": 39,
+  "style": "dark",
+  "tags": ["honeypot", "security", "tpot"],
   "templating": {
     "list": [
       {
-        "current": { "selected": false, "text": "Elasticsearch - Honeypot", "value": "honeypot-elasticsearch" },
-        "hide": 0,
-        "includeAll": false,
-        "label": "Data Source",
-        "multi": false,
-        "name": "datasource",
-        "options": [],
-        "query": "elasticsearch",
-        "queryValue": "",
+        "name": "Container",
+        "type": "query",
+        "datasource": {
+          "type": "elasticsearch",
+          "uid": "ef6pmu9oze7eoc"
+        },
         "refresh": 1,
-        "regex": "",
-        "skipUrlSync": false,
-        "type": "datasource"
+        "hide": 0,
+        "query": "{\"find\":\"terms\",\"field\":\"container.id\"}",
+        "includeAll": true,
+        "allValue": "*",
+        "multi": true,
+        "label": "Container",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "*"
+        }
       },
       {
-        "allValue": "*",
-        "current": { "selected": true, "text": "All", "value": "$__all" },
-        "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
-        "definition": "{\"find\": \"terms\", \"field\": \"honeypot_type\"}",
+        "name": "Attacker_IP",
+        "type": "query",
+        "datasource": {
+          "type": "elasticsearch",
+          "uid": "ef6pmu9oze7eoc"
+        },
+        "refresh": 1,
         "hide": 0,
+        "query": "{\"find\":\"terms\",\"field\":\"src_ip\"}",
         "includeAll": true,
-        "label": "Honeypot",
+        "allValue": "*",
         "multi": true,
-        "name": "honeypot_type",
-        "options": [],
-        "query": "{\"find\": \"terms\", \"field\": \"honeypot_type\"}",
-        "refresh": 2,
-        "regex": "",
-        "skipUrlSync": false,
-        "sort": 1,
-        "type": "query"
+        "label": "Attacker IP",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "*"
+        }
       },
       {
-        "allValue": "*",
-        "current": { "selected": true, "text": "All", "value": "$__all" },
-        "datasource": { "type": "elasticsearch", "uid": "${datasource}" },
-        "definition": "{\"find\": \"terms\", \"field\": \"geoip.country_name\"}",
+        "name": "Source_Country",
+        "type": "query",
+        "datasource": {
+          "type": "elasticsearch",
+          "uid": "ef6pmu9oze7eoc"
+        },
+        "refresh": 1,
         "hide": 0,
+        "query": "{\"find\":\"terms\",\"field\":\"source.geo.country_name\"}",
         "includeAll": true,
-        "label": "Country",
+        "allValue": "*",
         "multi": true,
-        "name": "country",
-        "options": [],
-        "query": "{\"find\": \"terms\", \"field\": \"geoip.country_name\"}",
-        "refresh": 2,
-        "regex": "",
-        "skipUrlSync": false,
-        "sort": 1,
-        "type": "query"
+        "label": "Source Country",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "*"
+        }
       }
     ]
   },
-  "time": { "from": "now-24h", "to": "now" },
-  "timepicker": {},
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": [
+      "10s",
+      "30s",
+      "1m",
+      "5m",
+      "15m",
+      "30m",
+      "1h",
+      "6h",
+      "12h",
+      "24h"
+    ]
+  },
   "timezone": "",
-  "title": "T-Pot Honeypot Monitor",
-  "uid": "tpot-honeypot-monitor",
+  "title": "T-Pot External Attack Overview",
+  "uid": "tpot-attack-overview",
   "version": 1,
   "weekStart": ""
 }
