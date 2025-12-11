@@ -530,7 +530,7 @@
                         {
                             "id": "1",
                             "type": "cardinality",
-                            "field": "honeypot.input"
+                            "field": "command"
                         }
                     ]
                 }
@@ -603,7 +603,7 @@
                         {
                             "id": "1",
                             "type": "cardinality",
-                            "field": "honeypot.session"
+                            "field": "session_id"
                         }
                     ]
                 }
@@ -1006,7 +1006,7 @@
                         {
                             "id": "2",
                             "type": "terms",
-                            "field": "honeypot.app_proto",
+                            "field": "protocol",
                             "settings": {
                                 "size": 10,
                                 "order": "desc",
@@ -1226,7 +1226,7 @@
                         {
                             "id": "2",
                             "type": "terms",
-                            "field": "honeypot.username",
+                            "field": "username",
                             "settings": {
                                 "size": 15,
                                 "order": "desc",
@@ -1302,7 +1302,7 @@
                         {
                             "id": "2",
                             "type": "terms",
-                            "field": "honeypot.password",
+                            "field": "password",
                             "settings": {
                                 "size": 15,
                                 "order": "desc",
@@ -1378,7 +1378,7 @@
                         {
                             "id": "2",
                             "type": "terms",
-                            "field": "honeypot.input",
+                            "field": "command",
                             "settings": {
                                 "size": 15,
                                 "order": "desc",
@@ -1454,7 +1454,7 @@
                         {
                             "id": "2",
                             "type": "terms",
-                            "field": "honeypot.os",
+                            "field": "os_fingerprint",
                             "settings": {
                                 "size": 10,
                                 "order": "desc",
@@ -1922,7 +1922,7 @@
                 },
                 "refresh": 1,
                 "hide": 0,
-                "query": "{\"find\":\"terms\",\"field\":\"honeypot.app_proto\"}",
+                "query": "{\"find\":\"terms\",\"field\":\"protocol\"}",
                 "includeAll": true,
                 "allValue": "*",
                 "multi": true,
