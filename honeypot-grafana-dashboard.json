@@ -297,7 +297,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "(honeypot.username:* OR username:*)",
+                    "query": "container.id:heralding",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
@@ -308,9 +308,9 @@
                     ]
                 }
             ],
-            "title": "Login Attempts",
+            "title": "Heralding Events",
             "type": "stat",
-            "description": "Total credential attempts"
+            "description": "Credential honeypot events"
         },
         {
             "datasource": {
@@ -369,7 +369,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "(honeypot.download_url:* OR download_url:*)",
+                    "query": "container.id:honeytrap",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
@@ -380,9 +380,9 @@
                     ]
                 }
             ],
-            "title": "Malware Downloads",
+            "title": "Honeytrap Events",
             "type": "stat",
-            "description": "Files downloaded by attackers"
+            "description": "Connection trap events"
         },
         {
             "datasource": {
@@ -523,21 +523,20 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "(honeypot.input:* OR command:*)",
+                    "query": "container.id:suricata",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
                         {
                             "id": "1",
-                            "type": "cardinality",
-                            "field": "command"
+                            "type": "count"
                         }
                     ]
                 }
             ],
-            "title": "Unique Commands",
+            "title": "Suricata Events",
             "type": "stat",
-            "description": "Distinct commands executed"
+            "description": "Network monitoring events"
         },
         {
             "datasource": {
@@ -596,21 +595,20 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "(honeypot.session:* OR session_id:*)",
+                    "query": "container.id:p0f",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
                         {
                             "id": "1",
-                            "type": "cardinality",
-                            "field": "session_id"
+                            "type": "count"
                         }
                     ]
                 }
             ],
-            "title": "Active Sessions",
+            "title": "p0f Events",
             "type": "stat",
-            "description": "Unique active sessions"
+            "description": "OS fingerprint detections"
         },
         {
             "datasource": {
@@ -1351,14 +1349,14 @@
             "targets": [
                 {
                     "refId": "A",
-                    "alias": "Usernames",
-                    "query": "container.id:$Container AND src_ip:$Attacker_IP AND (honeypot.username:* OR username:*)",
+                    "alias": "Event Types",
+                    "query": "container.id:$Container AND src_ip:$Attacker_IP",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
                             "id": "2",
                             "type": "terms",
-                            "field": "username",
+                            "field": "event_type",
                             "settings": {
                                 "size": 15,
                                 "order": "desc",
@@ -1375,9 +1373,9 @@
                     ]
                 }
             ],
-            "title": "Top Usernames Attempted",
+            "title": "Top Event Types",
             "type": "table",
-            "description": "Most common usernames used in attacks"
+            "description": "Most common event types captured"
         },
         {
             "datasource": {
@@ -1460,14 +1458,14 @@
             "targets": [
                 {
                     "refId": "A",
-                    "alias": "Passwords",
-                    "query": "container.id:$Container AND src_ip:$Attacker_IP AND (honeypot.password:* OR password:*)",
+                    "alias": "Log Sources",
+                    "query": "container.id:$Container AND src_ip:$Attacker_IP",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
                             "id": "2",
                             "type": "terms",
-                            "field": "password",
+                            "field": "log.file.path",
                             "settings": {
                                 "size": 15,
                                 "order": "desc",
@@ -1484,9 +1482,9 @@
                     ]
                 }
             ],
-            "title": "Top Passwords Attempted",
+            "title": "Top Log Sources",
             "type": "table",
-            "description": "Most common passwords used in attacks"
+            "description": "Most active honeypot log files"
         },
         {
             "datasource": {
@@ -1569,14 +1567,14 @@
             "targets": [
                 {
                     "refId": "A",
-                    "alias": "Commands",
-                    "query": "container.id:$Container AND src_ip:$Attacker_IP AND (honeypot.input:* OR command:*)",
+                    "alias": "Honeypot Modules",
+                    "query": "container.id:$Container AND src_ip:$Attacker_IP AND honeypot.mod:*",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
                             "id": "2",
                             "type": "terms",
-                            "field": "command",
+                            "field": "honeypot.mod",
                             "settings": {
                                 "size": 15,
                                 "order": "desc",
@@ -1593,9 +1591,9 @@
                     ]
                 }
             ],
-            "title": "Top Commands Executed",
+            "title": "Top Honeypot Modules",
             "type": "table",
-            "description": "Most executed commands by attackers"
+            "description": "Most triggered honeypot detection modules"
         },
         {
             "datasource": {
@@ -1645,14 +1643,14 @@
             "targets": [
                 {
                     "refId": "A",
-                    "alias": "OS",
-                    "query": "container.id:$Container AND src_ip:$Attacker_IP AND (honeypot.os:* OR os_fingerprint:*)",
+                    "alias": "Link Types",
+                    "query": "container.id:p0f AND honeypot.link:*",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
                             "id": "2",
                             "type": "terms",
-                            "field": "os_fingerprint",
+                            "field": "honeypot.link",
                             "settings": {
                                 "size": 10,
                                 "order": "desc",
@@ -1669,9 +1667,9 @@
                     ]
                 }
             ],
-            "title": "OS Fingerprint Distribution",
+            "title": "Connection Link Types (p0f)",
             "type": "bargauge",
-            "description": "Detected operating systems (p0f)"
+            "description": "Network link types detected by p0f"
         },
         {
             "datasource": {
@@ -1978,7 +1976,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "(honeypot.download_url:* OR download_url:*)",
+                    "query": "container.id:honeytrap",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
@@ -2007,18 +2005,16 @@
                         "renameByName": {
                             "@timestamp": "Time",
                             "src_ip": "Source IP",
+                            "dest_port": "Port",
                             "source.geo.country_name": "Country",
-                            "honeypot_type": "Honeypot",
-                            "download_url": "Download URL",
-                            "file_hash": "File Hash",
-                            "downloaded_file": "Filename"
+                            "container.id": "Honeypot"
                         }
                     }
                 }
             ],
-            "title": "Malware Downloads",
+            "title": "Honeytrap Events",
             "type": "table",
-            "description": "Files downloaded by attackers with VirusTotal links"
+            "description": "Connection trap events captured by honeytrap"
         }
     ],
     "refresh": "30s",
