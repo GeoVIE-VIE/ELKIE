@@ -9,10 +9,12 @@
       "codec": "best_compression"
     },
     "mappings": {
-      "dynamic": false,
+      "dynamic": "true",
       "properties": {
         "@timestamp": { "type": "date" },
         "timestamp": { "type": "date" },
+        "type": { "type": "keyword" },
+        "t-pot_iso_code": { "type": "keyword" },
 
         "event": {
           "dynamic": false,
@@ -93,25 +95,26 @@
           }
         },
 
-        "client": {
-          "dynamic": false,
-          "properties": {
-            "ip": { "type": "ip" },
-            "port": { "type": "integer" },
-            "address": { "type": "keyword" },
-            "bytes": { "type": "long" },
-            "packets": { "type": "long" }
-          }
-        },
+        "src_ip": { "type": "ip" },
+        "src_port": { "type": "integer" },
+        "dest_ip": { "type": "ip" },
+        "dest_port": { "type": "integer" },
 
-        "server": {
+        "geoip": {
           "dynamic": false,
           "properties": {
-            "ip": { "type": "ip" },
-            "port": { "type": "integer" },
-            "address": { "type": "keyword" },
-            "bytes": { "type": "long" },
-            "packets": { "type": "long" }
+            "location": { "type": "geo_point" },
+            "city_name": { "type": "keyword" },
+            "country_name": { "type": "keyword" },
+            "country_code2": { "type": "keyword" },
+            "country_code3": { "type": "keyword" },
+            "region_name": { "type": "keyword" },
+            "continent_code": { "type": "keyword" },
+            "timezone": { "type": "keyword" },
+            "latitude": { "type": "float" },
+            "longitude": { "type": "float" },
+            "asn": { "type": "long" },
+            "as_org": { "type": "keyword" }
           }
         },
 
@@ -137,29 +140,6 @@
             "domain": { "type": "keyword" },
             "email": { "type": "keyword" },
             "full_name": { "type": "keyword" }
-          }
-        },
-
-        "user_agent": {
-          "dynamic": false,
-          "properties": {
-            "original": { "type": "keyword" },
-            "name": { "type": "keyword" },
-            "version": { "type": "keyword" },
-            "device": {
-              "dynamic": false,
-              "properties": {
-                "name": { "type": "keyword" }
-              }
-            },
-            "os": {
-              "dynamic": false,
-              "properties": {
-                "name": { "type": "keyword" },
-                "version": { "type": "keyword" },
-                "full": { "type": "keyword" }
-              }
-            }
           }
         },
 
@@ -211,66 +191,6 @@
           }
         },
 
-        "tls": {
-          "dynamic": false,
-          "properties": {
-            "version": { "type": "keyword" },
-            "version_protocol": { "type": "keyword" },
-            "cipher": { "type": "keyword" },
-            "client": {
-              "dynamic": false,
-              "properties": {
-                "ja3": { "type": "keyword" },
-                "server_name": { "type": "keyword" }
-              }
-            },
-            "server": {
-              "dynamic": false,
-              "properties": {
-                "ja3s": { "type": "keyword" },
-                "certificate": { "type": "keyword" }
-              }
-            }
-          }
-        },
-
-        "dns": {
-          "dynamic": false,
-          "properties": {
-            "type": { "type": "keyword" },
-            "question": {
-              "dynamic": false,
-              "properties": {
-                "name": { "type": "keyword" },
-                "type": { "type": "keyword" },
-                "class": { "type": "keyword" }
-              }
-            },
-            "answers": {
-              "dynamic": false,
-              "properties": {
-                "name": { "type": "keyword" },
-                "type": { "type": "keyword" },
-                "data": { "type": "keyword" },
-                "ttl": { "type": "long" }
-              }
-            },
-            "response_code": { "type": "keyword" }
-          }
-        },
-
-        "process": {
-          "dynamic": false,
-          "properties": {
-            "name": { "type": "keyword" },
-            "pid": { "type": "long" },
-            "executable": { "type": "keyword" },
-            "command_line": { "type": "keyword" },
-            "working_directory": { "type": "keyword" },
-            "args": { "type": "keyword" }
-          }
-        },
-
         "file": {
           "dynamic": false,
           "properties": {
@@ -285,60 +205,10 @@
               "properties": {
                 "md5": { "type": "keyword" },
                 "sha1": { "type": "keyword" },
-                "sha256": { "type": "keyword" }
+                "sha256": { "type": "keyword" },
+                "sha512": { "type": "keyword" }
               }
             }
-          }
-        },
-
-        "threat": {
-          "dynamic": false,
-          "properties": {
-            "indicator": {
-              "dynamic": false,
-              "properties": {
-                "type": { "type": "keyword" },
-                "ip": { "type": "ip" },
-                "domain": { "type": "keyword" }
-              }
-            },
-            "tactic": {
-              "dynamic": false,
-              "properties": {
-                "name": { "type": "keyword" },
-                "id": { "type": "keyword" }
-              }
-            },
-            "technique": {
-              "dynamic": false,
-              "properties": {
-                "name": { "type": "keyword" },
-                "id": { "type": "keyword" }
-              }
-            }
-          }
-        },
-
-        "rule": {
-          "dynamic": false,
-          "properties": {
-            "name": { "type": "keyword" },
-            "id": { "type": "keyword" },
-            "category": { "type": "keyword" },
-            "description": { "type": "text" }
-          }
-        },
-
-        "observer": {
-          "dynamic": false,
-          "properties": {
-            "hostname": { "type": "keyword" },
-            "ip": { "type": "ip" },
-            "name": { "type": "keyword" },
-            "type": { "type": "keyword" },
-            "vendor": { "type": "keyword" },
-            "product": { "type": "keyword" },
-            "version": { "type": "keyword" }
           }
         },
 
@@ -381,35 +251,16 @@
         },
 
         "tags": { "type": "keyword" },
-        "labels": { "type": "object", "dynamic": true },
         "message": { "type": "text" },
 
-        "honeypot": {
-          "dynamic": false,
-          "properties": {
-            "type": { "type": "keyword" },
-            "session_id": { "type": "keyword" },
-            "username": { "type": "keyword" },
-            "password": { "type": "keyword" },
-            "command": { "type": "keyword" },
-            "input": { "type": "text" },
-            "output": { "type": "text" },
-            "success": { "type": "boolean" },
-            "download_url": { "type": "keyword" },
-            "malware_hash": { "type": "keyword" },
-            "protocol": { "type": "keyword" },
-            "sensor": { "type": "keyword" }
-          }
-        },
-
         "cowrie": {
-          "dynamic": false,
+          "dynamic": true,
           "properties": {
             "session": { "type": "keyword" },
             "username": { "type": "keyword" },
             "password": { "type": "keyword" },
             "input": { "type": "keyword" },
-            "message": { "type": "keyword" },
+            "message": { "type": "text" },
             "eventid": { "type": "keyword" },
             "protocol": { "type": "keyword" },
             "isError": { "type": "boolean" },
@@ -418,21 +269,18 @@
             "src_port": { "type": "integer" },
             "dst_ip": { "type": "ip" },
             "dst_port": { "type": "integer" },
-            "encCS": { "type": "keyword" },
-            "macCS": { "type": "keyword" },
             "version": { "type": "keyword" },
-            "kexAlgs": { "type": "keyword" },
-            "keyAlgs": { "type": "keyword" },
             "duplicate": { "type": "boolean" },
             "duration": { "type": "float" },
             "outfile": { "type": "keyword" },
             "shasum": { "type": "keyword" },
-            "url": { "type": "keyword" }
+            "url": { "type": "keyword" },
+            "sensor": { "type": "keyword" }
           }
         },
 
         "dionaea": {
-          "dynamic": false,
+          "dynamic": true,
           "properties": {
             "connection": { "type": "keyword" },
             "connection_type": { "type": "keyword" },
@@ -443,16 +291,279 @@
             "remote_host": { "type": "ip" },
             "remote_port": { "type": "integer" },
             "download_url": { "type": "keyword" },
-            "download_md5": { "type": "keyword" }
+            "download_md5": { "type": "keyword" },
+            "origin": { "type": "keyword" }
+          }
+        },
+
+        "honeytrap": {
+          "dynamic": true,
+          "properties": {
+            "attack_connection": { "type": "keyword" },
+            "dest_ip": { "type": "ip" },
+            "dest_port": { "type": "integer" },
+            "src_ip": { "type": "ip" },
+            "src_port": { "type": "integer" },
+            "payload": { "type": "text" },
+            "payload_md5": { "type": "keyword" }
+          }
+        },
+
+        "heralding": {
+          "dynamic": true,
+          "properties": {
+            "session_id": { "type": "keyword" },
+            "auth_id": { "type": "keyword" },
+            "protocol": { "type": "keyword" },
+            "username": { "type": "keyword" },
+            "password": { "type": "keyword" },
+            "src_ip": { "type": "ip" },
+            "src_port": { "type": "integer" },
+            "dst_ip": { "type": "ip" },
+            "dst_port": { "type": "integer" }
+          }
+        },
+
+        "conpot": {
+          "dynamic": true,
+          "properties": {
+            "protocol": { "type": "keyword" },
+            "request": { "type": "text" },
+            "response": { "type": "text" },
+            "src_ip": { "type": "ip" },
+            "src_port": { "type": "integer" },
+            "dst_ip": { "type": "ip" },
+            "dst_port": { "type": "integer" },
+            "slave_id": { "type": "integer" },
+            "function_code": { "type": "integer" },
+            "data_type": { "type": "keyword" }
+          }
+        },
+
+        "mailoney": {
+          "dynamic": true,
+          "properties": {
+            "src_ip": { "type": "ip" },
+            "src_port": { "type": "integer" },
+            "helo": { "type": "keyword" },
+            "mail_from": { "type": "keyword" },
+            "rcpt_to": { "type": "keyword" },
+            "data": { "type": "text" }
+          }
+        },
+
+        "adbhoney": {
+          "dynamic": true,
+          "properties": {
+            "src_ip": { "type": "ip" },
+            "src_port": { "type": "integer" },
+            "command": { "type": "keyword" },
+            "input": { "type": "text" }
+          }
+        },
+
+        "ciscoasa": {
+          "dynamic": true,
+          "properties": {
+            "src_ip": { "type": "ip" },
+            "src_port": { "type": "integer" },
+            "username": { "type": "keyword" },
+            "password": { "type": "keyword" }
+          }
+        },
+
+        "citrixhoneypot": {
+          "dynamic": true,
+          "properties": {
+            "src_ip": { "type": "ip" },
+            "src_port": { "type": "integer" },
+            "request": { "type": "text" },
+            "url": { "type": "keyword" }
+          }
+        },
+
+        "ddospot": {
+          "dynamic": true,
+          "properties": {
+            "src_ip": { "type": "ip" },
+            "src_port": { "type": "integer" },
+            "protocol": { "type": "keyword" },
+            "attack_type": { "type": "keyword" }
+          }
+        },
+
+        "dicompot": {
+          "dynamic": true,
+          "properties": {
+            "src_ip": { "type": "ip" },
+            "src_port": { "type": "integer" },
+            "calling_ae_title": { "type": "keyword" },
+            "called_ae_title": { "type": "keyword" }
           }
         },
 
         "elasticpot": {
-          "dynamic": false,
+          "dynamic": true,
           "properties": {
             "action": { "type": "keyword" },
             "query": { "type": "text" },
-            "request_url": { "type": "keyword" }
+            "request_url": { "type": "keyword" },
+            "src_ip": { "type": "ip" },
+            "src_port": { "type": "integer" }
+          }
+        },
+
+        "endlessh": {
+          "dynamic": true,
+          "properties": {
+            "src_ip": { "type": "ip" },
+            "src_port": { "type": "integer" },
+            "duration": { "type": "float" },
+            "bytes_sent": { "type": "long" }
+          }
+        },
+
+        "glutton": {
+          "dynamic": true,
+          "properties": {
+            "src_ip": { "type": "ip" },
+            "src_port": { "type": "integer" },
+            "dst_port": { "type": "integer" },
+            "protocol": { "type": "keyword" },
+            "payload": { "type": "text" },
+            "handler": { "type": "keyword" }
+          }
+        },
+
+        "hellpot": {
+          "dynamic": true,
+          "properties": {
+            "src_ip": { "type": "ip" },
+            "user_agent": { "type": "keyword" },
+            "request_uri": { "type": "keyword" },
+            "bytes_sent": { "type": "long" }
+          }
+        },
+
+        "honeypy": {
+          "dynamic": true,
+          "properties": {
+            "src_ip": { "type": "ip" },
+            "src_port": { "type": "integer" },
+            "dst_port": { "type": "integer" },
+            "service": { "type": "keyword" },
+            "session": { "type": "keyword" },
+            "data": { "type": "text" }
+          }
+        },
+
+        "ipphoney": {
+          "dynamic": true,
+          "properties": {
+            "src_ip": { "type": "ip" },
+            "src_port": { "type": "integer" },
+            "request": { "type": "text" }
+          }
+        },
+
+        "log4pot": {
+          "dynamic": true,
+          "properties": {
+            "src_ip": { "type": "ip" },
+            "src_port": { "type": "integer" },
+            "payload": { "type": "text" },
+            "deobfuscated_payload": { "type": "text" },
+            "uuid": { "type": "keyword" }
+          }
+        },
+
+        "medpot": {
+          "dynamic": true,
+          "properties": {
+            "src_ip": { "type": "ip" },
+            "src_port": { "type": "integer" },
+            "data": { "type": "text" }
+          }
+        },
+
+        "redishoneypot": {
+          "dynamic": true,
+          "properties": {
+            "src_ip": { "type": "ip" },
+            "src_port": { "type": "integer" },
+            "command": { "type": "keyword" },
+            "args": { "type": "keyword" }
+          }
+        },
+
+        "sentrypeer": {
+          "dynamic": true,
+          "properties": {
+            "src_ip": { "type": "ip" },
+            "src_port": { "type": "integer" },
+            "method": { "type": "keyword" },
+            "user_agent": { "type": "keyword" },
+            "called_number": { "type": "keyword" },
+            "collected_method": { "type": "keyword" }
+          }
+        },
+
+        "tanner": {
+          "dynamic": true,
+          "properties": {
+            "src_ip": { "type": "ip" },
+            "src_port": { "type": "integer" },
+            "path": { "type": "keyword" },
+            "cookies": { "type": "text" },
+            "user_agent": { "type": "keyword" },
+            "method": { "type": "keyword" },
+            "attack_type": { "type": "keyword" }
+          }
+        },
+
+        "wordpot": {
+          "dynamic": true,
+          "properties": {
+            "src_ip": { "type": "ip" },
+            "src_port": { "type": "integer" },
+            "request_url": { "type": "keyword" },
+            "request_method": { "type": "keyword" },
+            "user_agent": { "type": "keyword" },
+            "username": { "type": "keyword" },
+            "password": { "type": "keyword" }
+          }
+        },
+
+        "p0f": {
+          "dynamic": true,
+          "properties": {
+            "src_ip": { "type": "ip" },
+            "os": { "type": "keyword" },
+            "os_flavor": { "type": "keyword" },
+            "http_flavor": { "type": "keyword" },
+            "link_type": { "type": "keyword" },
+            "distance": { "type": "integer" },
+            "raw_sig": { "type": "keyword" }
+          }
+        },
+
+        "suricata": {
+          "dynamic": true,
+          "properties": {
+            "event_type": { "type": "keyword" },
+            "src_ip": { "type": "ip" },
+            "dest_ip": { "type": "ip" },
+            "src_port": { "type": "integer" },
+            "dest_port": { "type": "integer" },
+            "proto": { "type": "keyword" },
+            "alert": {
+              "dynamic": false,
+              "properties": {
+                "signature": { "type": "keyword" },
+                "category": { "type": "keyword" },
+                "severity": { "type": "integer" }
+              }
+            }
           }
         },
 
