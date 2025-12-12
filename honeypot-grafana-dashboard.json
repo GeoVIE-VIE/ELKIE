@@ -1655,7 +1655,7 @@
                                 "value": [
                                     {
                                         "title": "View Raw Logs",
-                                        "url": "/explore?left=%7B%22datasource%22:%22ef6pmu9oze7eoc%22,%22queries%22:%5B%7B%22refId%22:%22A%22,%22query%22:%22honeypot.input:%22${__value.raw}%22%20AND%20NOT%20container.id:suricata%22,%22timeField%22:%22@timestamp%22,%22bucketAggs%22:%5B%5D,%22metrics%22:%5B%7B%22id%22:%221%22,%22type%22:%22raw_document%22,%22settings%22:%7B%22size%22:100%7D%7D%5D%7D%5D,%22range%22:%7B%22from%22:%22now-24h%22,%22to%22:%22now%22%7D%7D",
+                                        "url": "/explore?orgId=1&left=%5B%22now-24h%22%2C%22now%22%2C%22ef6pmu9oze7eoc%22%2C%7B%22refId%22%3A%22A%22%2C%22query%22%3A%22honeypot.input%3A%5C%22${__value.raw}%5C%22%20AND%20NOT%20container.id%3Asuricata%22%2C%22timeField%22%3A%22%40timestamp%22%2C%22bucketAggs%22%3A%5B%5D%2C%22metrics%22%3A%5B%7B%22id%22%3A%221%22%2C%22type%22%3A%22raw_document%22%2C%22settings%22%3A%7B%22size%22%3A100%7D%7D%5D%7D%5D",
                                         "targetBlank": true
                                     }
                                 ]
