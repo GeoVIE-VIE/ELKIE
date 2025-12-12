@@ -20,7 +20,7 @@
         "description": "Normalize IP and port fields across all honeypot types",
         "lang": "painless",
         "ignore_failure": true,
-        "source": "def hp = ctx.honeypot; if (hp == null) { return; } def src_ip = null; def dest_ip = null; def src_port = null; def dest_port = null; if (hp.src_ip != null) { src_ip = hp.src_ip; } else if (hp.client_ip != null) { src_ip = hp.client_ip; } else if (hp.sourceIp != null) { src_ip = hp.sourceIp; } else if (hp.source_ip != null) { src_ip = hp.source_ip; } else if (hp.peer != null && hp.peer.ip != null) { src_ip = hp.peer.ip; } else if (hp.remote_host != null) { src_ip = hp.remote_host; } if (hp.dest_ip != null) { dest_ip = hp.dest_ip; } else if (hp.dst_ip != null) { dest_ip = hp.dst_ip; } else if (hp.server_ip != null) { dest_ip = hp.server_ip; } else if (hp.destinationIp != null) { dest_ip = hp.destinationIp; } else if (hp.destination_ip != null) { dest_ip = hp.destination_ip; } else if (hp.local_host != null) { dest_ip = hp.local_host; } if (hp.src_port != null) { src_port = hp.src_port; } else if (hp.client_port != null) { src_port = hp.client_port; } else if (hp.sourcePort != null) { src_port = hp.sourcePort; } else if (hp.source_port != null) { src_port = hp.source_port; } else if (hp.peer != null && hp.peer.port != null) { src_port = hp.peer.port; } else if (hp.remote_port != null) { src_port = hp.remote_port; } if (hp.dest_port != null) { dest_port = hp.dest_port; } else if (hp.dst_port != null) { dest_port = hp.dst_port; } else if (hp.server_port != null) { dest_port = hp.server_port; } else if (hp.destinationPort != null) { dest_port = hp.destinationPort; } else if (hp.destination_port != null) { dest_port = hp.destination_port; } else if (hp.local_port != null) { dest_port = hp.local_port; } if (src_ip != null) { ctx.src_ip = src_ip; } if (dest_ip != null) { ctx.dest_ip = dest_ip; } if (src_port != null) { ctx.src_port = src_port; } if (dest_port != null) { ctx.dest_port = dest_port; }"
+        "source": "def hp = ctx.honeypot; if (hp == null) { return; } def src_ip = null; def dest_ip = null; def src_port = null; def dest_port = null; if (hp.src_ip != null) { src_ip = hp.src_ip; } else if (hp.client_ip != null) { src_ip = hp.client_ip; } else if (hp.sourceIp != null) { src_ip = hp.sourceIp; } else if (hp.source_ip != null) { src_ip = hp.source_ip; } else if (hp.peer != null && hp.peer.ip != null) { src_ip = hp.peer.ip; } else if (hp.remote_host != null) { src_ip = hp.remote_host; } else if (hp.attack_connection != null && hp.attack_connection.remote_ip != null) { src_ip = hp.attack_connection.remote_ip; } else if (hp.proxy_connection != null && hp.proxy_connection.remote_ip != null) { src_ip = hp.proxy_connection.remote_ip; } if (hp.dest_ip != null) { dest_ip = hp.dest_ip; } else if (hp.dst_ip != null) { dest_ip = hp.dst_ip; } else if (hp.server_ip != null) { dest_ip = hp.server_ip; } else if (hp.destinationIp != null) { dest_ip = hp.destinationIp; } else if (hp.destination_ip != null) { dest_ip = hp.destination_ip; } else if (hp.local_host != null) { dest_ip = hp.local_host; } else if (hp.attack_connection != null && hp.attack_connection.local_ip != null) { dest_ip = hp.attack_connection.local_ip; } else if (hp.proxy_connection != null && hp.proxy_connection.local_ip != null) { dest_ip = hp.proxy_connection.local_ip; } if (hp.src_port != null) { src_port = hp.src_port; } else if (hp.client_port != null) { src_port = hp.client_port; } else if (hp.sourcePort != null) { src_port = hp.sourcePort; } else if (hp.source_port != null) { src_port = hp.source_port; } else if (hp.peer != null && hp.peer.port != null) { src_port = hp.peer.port; } else if (hp.remote_port != null) { src_port = hp.remote_port; } else if (hp.attack_connection != null && hp.attack_connection.remote_port != null) { src_port = hp.attack_connection.remote_port; } else if (hp.proxy_connection != null && hp.proxy_connection.remote_port != null) { src_port = hp.proxy_connection.remote_port; } if (hp.dest_port != null) { dest_port = hp.dest_port; } else if (hp.dst_port != null) { dest_port = hp.dst_port; } else if (hp.server_port != null) { dest_port = hp.server_port; } else if (hp.destinationPort != null) { dest_port = hp.destinationPort; } else if (hp.destination_port != null) { dest_port = hp.destination_port; } else if (hp.local_port != null) { dest_port = hp.local_port; } else if (hp.attack_connection != null && hp.attack_connection.local_port != null) { dest_port = hp.attack_connection.local_port; } else if (hp.proxy_connection != null && hp.proxy_connection.local_port != null) { dest_port = hp.proxy_connection.local_port; } if (src_ip != null) { ctx.src_ip = src_ip; } if (dest_ip != null) { ctx.dest_ip = dest_ip; } if (src_port != null) { ctx.src_port = src_port; } if (dest_port != null) { ctx.dest_port = dest_port; }"
       }
     },
     {
@@ -52,7 +52,7 @@
         "description": "Extract Suricata-specific fields (IDS)",
         "lang": "painless",
         "ignore_failure": true,
-        "source": "def hp = ctx.honeypot; if (hp == null) { return; } if (ctx.honeypot_type == 'suricata') { if (hp.alert != null) { ctx.alert = hp.alert; if (hp.alert.signature != null) { ctx.alert_signature = hp.alert.signature; } if (hp.alert.category != null) { ctx.alert_category = hp.alert.category; } if (hp.alert.severity != null) { ctx.alert_severity = hp.alert.severity; } } if (hp.http != null) { ctx.http = hp.http; } if (hp.dns != null) { ctx.dns = hp.dns; } if (hp.tls != null) { ctx.tls = hp.tls; } if (hp.flow != null) { ctx.flow = hp.flow; } }"
+        "source": "def hp = ctx.honeypot; if (hp == null) { return; } if (ctx.honeypot_type == 'suricata') { if (hp.alert != null) { ctx.alert = hp.alert; if (hp.alert.signature != null) { ctx.alert_signature = hp.alert.signature; } if (hp.alert.category != null) { ctx.alert_category = hp.alert.category; } if (hp.alert.severity != null) { ctx.alert_severity = hp.alert.severity; } if (hp.alert.signature_id != null) { ctx.alert_signature_id = hp.alert.signature_id; } if (hp.alert.action != null) { ctx.alert_action = hp.alert.action; } } if (hp.http != null) { ctx.http = hp.http; } if (hp.dns != null) { ctx.dns = hp.dns; } if (hp.tls != null) { ctx.tls = hp.tls; } if (hp.flow != null) { ctx.flow = hp.flow; } if (hp.rfb != null) { ctx.rfb = hp.rfb; } if (hp.fileinfo != null) { ctx.fileinfo = hp.fileinfo; } if (hp.app_proto != null) { ctx.app_proto = hp.app_proto; } }"
       }
     },
     {
@@ -92,7 +92,7 @@
         "description": "Extract Heralding-specific fields (credential honeypot)",
         "lang": "painless",
         "ignore_failure": true,
-        "source": "def hp = ctx.honeypot; if (hp == null) { return; } if (ctx.honeypot_type == 'heralding') { if (hp.username != null) { ctx.username = hp.username; } if (hp.password != null) { ctx.password = hp.password; } if (hp.protocol != null) { ctx.protocol = hp.protocol; } if (hp.session_id != null) { ctx.session_id = hp.session_id; } }"
+        "source": "def hp = ctx.honeypot; if (hp == null) { return; } if (ctx.honeypot_type == 'heralding') { if (hp.username != null) { ctx.username = hp.username; } if (hp.password != null) { ctx.password = hp.password; } if (hp.protocol != null) { ctx.protocol = hp.protocol; } if (hp.session_id != null) { ctx.session_id = hp.session_id; } if (hp.num_auth_attempts != null) { ctx.num_auth_attempts = hp.num_auth_attempts; } if (hp.auth_attempts != null) { ctx.auth_attempts = hp.auth_attempts; } if (hp.start_time != null) { ctx.start_time = hp.start_time; } if (hp.end_time != null) { ctx.end_time = hp.end_time; } if (hp.duration != null) { ctx.duration = hp.duration; } if (hp.session_ended != null) { ctx.session_ended = hp.session_ended; } if (hp.auxiliary_data != null) { ctx.auxiliary_data = hp.auxiliary_data; } }"
       }
     },
     {
@@ -116,7 +116,7 @@
         "description": "Extract Honeytrap-specific fields",
         "lang": "painless",
         "ignore_failure": true,
-        "source": "def hp = ctx.honeypot; if (hp == null) { return; } if (ctx.honeypot_type == 'honeytrap') { if (hp.payload != null) { ctx.payload = hp.payload; } if (hp.payload_hex != null) { ctx.payload_hex = hp.payload_hex; } if (hp.service != null) { ctx.service = hp.service; } }"
+        "source": "def hp = ctx.honeypot; if (hp == null) { return; } if (ctx.honeypot_type == 'honeytrap') { if (hp.attack_connection != null) { def ac = hp.attack_connection; if (ac.protocol != null) { ctx.protocol = ac.protocol; } if (ac.payload != null) { if (ac.payload.data_hex != null) { ctx.payload_hex = ac.payload.data_hex; } if (ac.payload.md5_hash != null) { ctx.payload_md5 = ac.payload.md5_hash; } if (ac.payload.sha512_hash != null) { ctx.payload_sha512 = ac.payload.sha512_hash; } if (ac.payload.length != null) { ctx.payload_length = ac.payload.length; } } } if (hp.proxy_connection != null) { def pc = hp.proxy_connection; if (pc.protocol != null && ctx.protocol == null) { ctx.protocol = pc.protocol; } if (pc.payload != null) { if (pc.payload.data_hex != null && ctx.payload_hex == null) { ctx.payload_hex = pc.payload.data_hex; } if (pc.payload.md5_hash != null && ctx.payload_md5 == null) { ctx.payload_md5 = pc.payload.md5_hash; } if (pc.payload.sha512_hash != null && ctx.payload_sha512 == null) { ctx.payload_sha512 = pc.payload.sha512_hash; } } } if (hp.payload != null) { ctx.payload = hp.payload; } if (hp.payload_hex != null && ctx.payload_hex == null) { ctx.payload_hex = hp.payload_hex; } if (hp.service != null) { ctx.service = hp.service; } }"
       }
     },
     {
@@ -156,7 +156,8 @@
         "field": "src_ip",
         "target_field": "geoip",
         "ignore_missing": true,
-        "ignore_failure": true
+        "ignore_failure": true,
+        "properties": ["ip", "country_iso_code", "country_name", "continent_name", "region_iso_code", "region_name", "city_name", "timezone", "location"]
       }
     },
     {
@@ -164,7 +165,8 @@
         "field": "src_ip",
         "target_field": "source.geo",
         "ignore_missing": true,
-        "ignore_failure": true
+        "ignore_failure": true,
+        "properties": ["ip", "country_iso_code", "country_name", "continent_name", "region_iso_code", "region_name", "city_name", "timezone", "location"]
       }
     },
     {
@@ -172,7 +174,8 @@
         "field": "dest_ip",
         "target_field": "destination.geo",
         "ignore_missing": true,
-        "ignore_failure": true
+        "ignore_failure": true,
+        "properties": ["ip", "country_iso_code", "country_name", "continent_name", "region_iso_code", "region_name", "city_name", "timezone", "location"]
       }
     },
     {
