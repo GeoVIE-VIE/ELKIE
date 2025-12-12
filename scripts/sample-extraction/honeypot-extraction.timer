@@ -1,0 +1,12 @@
+[Unit]
+Description=Run Honeypot Sample Extraction every 15 minutes
+Documentation=https://github.com/GeoVIE-VIE/ELKIE
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=15min
+RandomizedDelaySec=60
+Persistent=true
+
+[Install]
+WantedBy=timers.target

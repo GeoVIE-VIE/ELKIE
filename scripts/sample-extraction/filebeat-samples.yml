@@ -1,0 +1,44 @@
+# Filebeat configuration for ingesting honeypot sample metadata
+# Add this to your existing filebeat.yml or as a separate module
+
+filebeat.inputs:
+
+  # Ingest sample catalog entries (JSONL format)
+  - type: log
+    enabled: true
+    paths:
+      - /var/log/honeypot-extraction/samples.jsonl
+    json.keys_under_root: true
+    json.add_error_key: true
+    fields:
+      log_type: honeypot_sample
+      pipeline: honeypot-samples
+    fields_under_root: true
+
+  # Ingest extraction logs
+  - type: log
+    enabled: true
+    paths:
+      - /var/log/honeypot-extraction/extraction.log
+    fields:
+      log_type: honeypot_extraction
+    fields_under_root: true
+
+# Optional: Add processors for enrichment
+processors:
+  - add_host_metadata:
+      when.not.contains.tags: forwarded
+  - add_cloud_metadata: ~
+
+# Output to your Elasticsearch
+output.elasticsearch:
+  hosts: ["localhost:9200"]
+  index: "honeypot-samples-%{+yyyy.MM}"
+  pipeline: honeypot-samples
+
+# Index template
+setup.template.name: "honeypot-samples"
+setup.template.pattern: "honeypot-samples-*"
+setup.template.settings:
+  index.number_of_shards: 1
+  index.number_of_replicas: 0
