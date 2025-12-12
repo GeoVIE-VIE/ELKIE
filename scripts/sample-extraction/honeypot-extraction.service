@@ -1,0 +1,48 @@
+[Unit]
+Description=Honeypot Sample Extraction Service
+Documentation=https://github.com/GeoVIE-VIE/ELKIE
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=honeypot-analyst
+Group=honeypot-analyst
+SupplementaryGroups=docker
+
+# Environment
+Environment=QUARANTINE_BASE=/opt/honeypot-quarantine
+Environment=LOG_DIR=/var/log/honeypot-extraction
+Environment=EXTRACTION_WINDOW=60
+Environment=MAX_FILE_SIZE=104857600
+Environment=CLEANUP_OLD=false
+Environment=RETENTION_DAYS=30
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+MemoryDenyWriteExecute=true
+
+# Allow write to quarantine and log directories
+ReadWritePaths=/opt/honeypot-quarantine /var/log/honeypot-extraction
+
+# Allow docker socket access
+ReadWritePaths=/var/run/docker.sock
+
+# Execution
+ExecStart=/opt/honeypot-quarantine/scripts/extract-samples.sh
+
+# Restart on failure
+Restart=on-failure
+RestartSec=60
+
+[Install]
+WantedBy=multi-user.target

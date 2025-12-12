@@ -1,0 +1,110 @@
+{
+  "description": "Process honeypot malware sample metadata",
+  "processors": [
+    {
+      "date": {
+        "field": "timestamp",
+        "target_field": "@timestamp",
+        "formats": ["ISO8601"],
+        "ignore_failure": true
+      }
+    },
+    {
+      "set": {
+        "field": "event.kind",
+        "value": "event"
+      }
+    },
+    {
+      "set": {
+        "field": "event.category",
+        "value": ["malware"]
+      }
+    },
+    {
+      "set": {
+        "field": "event.type",
+        "value": ["info"]
+      }
+    },
+    {
+      "rename": {
+        "field": "sha256",
+        "target_field": "file.hash.sha256",
+        "ignore_missing": true
+      }
+    },
+    {
+      "rename": {
+        "field": "sha1",
+        "target_field": "file.hash.sha1",
+        "ignore_missing": true
+      }
+    },
+    {
+      "rename": {
+        "field": "md5",
+        "target_field": "file.hash.md5",
+        "ignore_missing": true
+      }
+    },
+    {
+      "rename": {
+        "field": "ssdeep",
+        "target_field": "file.hash.ssdeep",
+        "ignore_missing": true
+      }
+    },
+    {
+      "rename": {
+        "field": "file_type",
+        "target_field": "file.type",
+        "ignore_missing": true
+      }
+    },
+    {
+      "rename": {
+        "field": "file_size",
+        "target_field": "file.size",
+        "ignore_missing": true
+      }
+    },
+    {
+      "rename": {
+        "field": "quarantine_path",
+        "target_field": "file.path",
+        "ignore_missing": true
+      }
+    },
+    {
+      "rename": {
+        "field": "container",
+        "target_field": "honeypot.type",
+        "ignore_missing": true
+      }
+    },
+    {
+      "rename": {
+        "field": "original_path",
+        "target_field": "honeypot.original_path",
+        "ignore_missing": true
+      }
+    },
+    {
+      "script": {
+        "description": "Classify file type for easier filtering",
+        "lang": "painless",
+        "ignore_failure": true,
+        "source": "def fileType = ctx.file?.type; if (fileType == null) return; fileType = fileType.toLowerCase(); if (fileType.contains('elf') || fileType.contains('executable')) { ctx.file.classification = 'executable'; } else if (fileType.contains('script') || fileType.contains('python') || fileType.contains('perl') || fileType.contains('shell') || fileType.contains('bash')) { ctx.file.classification = 'script'; } else if (fileType.contains('zip') || fileType.contains('tar') || fileType.contains('gzip') || fileType.contains('archive')) { ctx.file.classification = 'archive'; } else if (fileType.contains('pe32') || fileType.contains('windows') || fileType.contains('dll')) { ctx.file.classification = 'windows_executable'; } else if (fileType.contains('text') || fileType.contains('ascii')) { ctx.file.classification = 'text'; } else { ctx.file.classification = 'other'; }"
+      }
+    }
+  ],
+  "on_failure": [
+    {
+      "set": {
+        "field": "ingest_error",
+        "value": "{{ _ingest.on_failure_message }}"
+      }
+    }
+  ]
+}
