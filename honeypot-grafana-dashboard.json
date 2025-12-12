@@ -1643,6 +1643,24 @@
                                 }
                             }
                         ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "honeypot.input"
+                        },
+                        "properties": [
+                            {
+                                "id": "links",
+                                "value": [
+                                    {
+                                        "title": "View Raw Logs",
+                                        "url": "/explore?left=%7B%22datasource%22:%22ef6pmu9oze7eoc%22,%22queries%22:%5B%7B%22refId%22:%22A%22,%22query%22:%22honeypot.input:%22${__value.raw}%22%20AND%20NOT%20container.id:suricata%22,%22timeField%22:%22@timestamp%22,%22bucketAggs%22:%5B%5D,%22metrics%22:%5B%7B%22id%22:%221%22,%22type%22:%22raw_document%22,%22settings%22:%7B%22size%22:100%7D%7D%5D%7D%5D,%22range%22:%7B%22from%22:%22now-24h%22,%22to%22:%22now%22%7D%7D",
+                                        "targetBlank": true
+                                    }
+                                ]
+                            }
+                        ]
                     }
                 ]
             },
