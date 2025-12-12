@@ -925,7 +925,7 @@
                 {
                     "refId": "A",
                     "alias": "Ports",
-                    "query": "NOT dest_port:9200 AND NOT src_ip:192.168.* AND NOT (dest_ip:192.168.50.3 AND dest_port:9200) AND NOT container.id:suricata",
+                    "query": "NOT (dest_ip:192.168.50.3 AND dest_port:9200) AND NOT src_ip:192.168.* AND NOT container.id:suricata",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -1655,7 +1655,7 @@
                                 "value": [
                                     {
                                         "title": "View Raw Logs",
-                                        "url": "/explore?orgId=1&left=%5B%22now-24h%22%2C%22now%22%2C%22ef6pmu9oze7eoc%22%2C%7B%22refId%22%3A%22A%22%2C%22query%22%3A%22honeypot.input%3A%5C%22${__value.raw}%5C%22%20AND%20NOT%20container.id%3Asuricata%22%2C%22timeField%22%3A%22%40timestamp%22%2C%22bucketAggs%22%3A%5B%5D%2C%22metrics%22%3A%5B%7B%22id%22%3A%221%22%2C%22type%22%3A%22raw_document%22%2C%22settings%22%3A%7B%22size%22%3A100%7D%7D%5D%7D%5D",
+                                        "url": "/explore?orgId=1&left=%5B%22now-24h%22%2C%22now%22%2C%22ef6pmu9oze7eoc%22%2C%7B%22refId%22%3A%22A%22%2C%22query%22%3A%22honeypot.input%3A%22${__value.raw}%22%20AND%20NOT%20container.id%3Asuricata%22%2C%22timeField%22%3A%22%40timestamp%22%2C%22bucketAggs%22%3A%5B%5D%2C%22metrics%22%3A%5B%7B%22id%22%3A%221%22%2C%22type%22%3A%22logs%22%2C%22settings%22%3A%7B%22limit%22%3A100%7D%7D%5D%7D%5D",
                                         "targetBlank": true
                                     }
                                 ]
@@ -1969,9 +1969,9 @@
                     "metrics": [
                         {
                             "id": "1",
-                            "type": "raw_document",
+                            "type": "logs",
                             "settings": {
-                                "size": 100
+                                "limit": 100
                             }
                         }
                     ]
@@ -2102,9 +2102,9 @@
                     "metrics": [
                         {
                             "id": "1",
-                            "type": "raw_document",
+                            "type": "logs",
                             "settings": {
-                                "size": 50
+                                "limit": 50
                             }
                         }
                     ]
