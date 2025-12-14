@@ -2136,6 +2136,359 @@
             "title": "Malware Downloads",
             "type": "table",
             "description": "Files downloaded by attackers with VirusTotal links"
+        },
+        {
+            "datasource": {
+                "type": "elasticsearch",
+                "uid": "ef6pmu9oze7eoc"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "yellow",
+                                "value": 1
+                            },
+                            {
+                                "color": "red",
+                                "value": 5
+                            }
+                        ]
+                    },
+                    "unit": "short"
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 6,
+                "x": 0,
+                "y": 80
+            },
+            "id": 23,
+            "options": {
+                "colorMode": "background",
+                "graphMode": "area",
+                "justifyMode": "center",
+                "orientation": "horizontal",
+                "reduceOptions": {
+                    "calcs": [
+                        "sum"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "textMode": "value_and_name"
+            },
+            "pluginVersion": "10.0.0",
+            "targets": [
+                {
+                    "refId": "A",
+                    "query": "event_type:yara_match OR type:yara_match",
+                    "timeField": "@timestamp",
+                    "bucketAggs": [],
+                    "metrics": [
+                        {
+                            "id": "1",
+                            "type": "count"
+                        }
+                    ]
+                }
+            ],
+            "title": "YARA Matches",
+            "type": "stat",
+            "description": "Samples matching YARA malware signatures"
+        },
+        {
+            "datasource": {
+                "type": "elasticsearch",
+                "uid": "ef6pmu9oze7eoc"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "yellow",
+                                "value": 1
+                            },
+                            {
+                                "color": "red",
+                                "value": 3
+                            }
+                        ]
+                    },
+                    "unit": "short"
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 4,
+                "w": 6,
+                "x": 6,
+                "y": 80
+            },
+            "id": 24,
+            "options": {
+                "colorMode": "background",
+                "graphMode": "area",
+                "justifyMode": "center",
+                "orientation": "horizontal",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "textMode": "value_and_name"
+            },
+            "pluginVersion": "10.0.0",
+            "targets": [
+                {
+                    "refId": "A",
+                    "query": "event_type:yara_match OR type:yara_match",
+                    "timeField": "@timestamp",
+                    "bucketAggs": [],
+                    "metrics": [
+                        {
+                            "id": "1",
+                            "type": "cardinality",
+                            "field": "yara_rule"
+                        }
+                    ]
+                }
+            ],
+            "title": "Unique YARA Rules Triggered",
+            "type": "stat",
+            "description": "Different malware signatures detected"
+        },
+        {
+            "datasource": {
+                "type": "elasticsearch",
+                "uid": "ef6pmu9oze7eoc"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "custom": {
+                        "align": "auto",
+                        "cellOptions": {
+                            "type": "auto"
+                        },
+                        "inspect": false
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "red",
+                                "value": null
+                            }
+                        ]
+                    }
+                },
+                "overrides": [
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "sha256"
+                        },
+                        "properties": [
+                            {
+                                "id": "links",
+                                "value": [
+                                    {
+                                        "title": "VirusTotal",
+                                        "url": "https://www.virustotal.com/gui/file/${__value.raw}"
+                                    }
+                                ]
+                            },
+                            {
+                                "id": "custom.width",
+                                "value": 150
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "yara_rule"
+                        },
+                        "properties": [
+                            {
+                                "id": "custom.cellOptions",
+                                "value": {
+                                    "type": "color-background",
+                                    "mode": "basic"
+                                }
+                            }
+                        ]
+                    }
+                ]
+            },
+            "gridPos": {
+                "h": 10,
+                "w": 24,
+                "x": 0,
+                "y": 84
+            },
+            "id": 25,
+            "options": {
+                "cellHeight": "sm",
+                "footer": {
+                    "countRows": false,
+                    "fields": "",
+                    "reducer": [
+                        "sum"
+                    ],
+                    "show": false
+                },
+                "showHeader": true,
+                "sortBy": [
+                    {
+                        "desc": true,
+                        "displayName": "@timestamp"
+                    }
+                ]
+            },
+            "pluginVersion": "10.0.0",
+            "targets": [
+                {
+                    "refId": "A",
+                    "query": "event_type:yara_match OR type:yara_match",
+                    "timeField": "@timestamp",
+                    "bucketAggs": [],
+                    "metrics": [
+                        {
+                            "id": "1",
+                            "type": "logs",
+                            "settings": {
+                                "limit": 100
+                            }
+                        }
+                    ]
+                }
+            ],
+            "transformations": [
+                {
+                    "id": "organize",
+                    "options": {
+                        "excludeByName": {
+                            "_id": true,
+                            "_index": true,
+                            "_score": true,
+                            "_source": true,
+                            "_type": true,
+                            "event_type": true,
+                            "type": true
+                        },
+                        "indexByName": {},
+                        "renameByName": {
+                            "@timestamp": "Time",
+                            "yara_rule": "YARA Rule",
+                            "sha256": "SHA256 Hash",
+                            "container": "Honeypot",
+                            "file_path": "Sample Path"
+                        }
+                    }
+                }
+            ],
+            "title": "YARA Malware Alerts",
+            "type": "table",
+            "description": "Samples matching YARA malware signatures with VirusTotal links"
+        },
+        {
+            "datasource": {
+                "type": "elasticsearch",
+                "uid": "ef6pmu9oze7eoc"
+            },
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "palette-classic"
+                    },
+                    "mappings": []
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 80
+            },
+            "id": 26,
+            "options": {
+                "legend": {
+                    "displayMode": "table",
+                    "placement": "right",
+                    "showLegend": true,
+                    "values": ["value", "percent"]
+                },
+                "pieType": "donut",
+                "reduceOptions": {
+                    "calcs": ["lastNotNull"],
+                    "fields": "",
+                    "values": true
+                },
+                "tooltip": {
+                    "mode": "single"
+                }
+            },
+            "pluginVersion": "10.0.0",
+            "targets": [
+                {
+                    "refId": "A",
+                    "alias": "YARA Rules",
+                    "query": "event_type:yara_match OR type:yara_match",
+                    "timeField": "@timestamp",
+                    "bucketAggs": [
+                        {
+                            "id": "2",
+                            "type": "terms",
+                            "field": "yara_rule",
+                            "settings": {
+                                "size": 10,
+                                "order": "desc",
+                                "orderBy": "1",
+                                "min_doc_count": 1
+                            }
+                        }
+                    ],
+                    "metrics": [
+                        {
+                            "id": "1",
+                            "type": "count"
+                        }
+                    ]
+                }
+            ],
+            "title": "YARA Rule Distribution",
+            "type": "piechart",
+            "description": "Distribution of triggered YARA signatures"
         }
     ],
     "refresh": "30s",
