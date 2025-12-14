@@ -1,0 +1,65 @@
+{
+  "description": "Process YARA match events from honeypot sample extraction",
+  "processors": [
+    {
+      "date": {
+        "field": "timestamp",
+        "target_field": "@timestamp",
+        "formats": ["ISO8601"],
+        "ignore_failure": true
+      }
+    },
+    {
+      "set": {
+        "field": "event.kind",
+        "value": "alert"
+      }
+    },
+    {
+      "set": {
+        "field": "event.category",
+        "value": "malware"
+      }
+    },
+    {
+      "set": {
+        "field": "threat.indicator.type",
+        "value": "file"
+      }
+    },
+    {
+      "rename": {
+        "field": "sha256",
+        "target_field": "file.hash.sha256",
+        "ignore_missing": true
+      }
+    },
+    {
+      "rename": {
+        "field": "yara_rule",
+        "target_field": "rule.name",
+        "ignore_missing": true
+      }
+    },
+    {
+      "rename": {
+        "field": "container",
+        "target_field": "honeypot.type",
+        "ignore_missing": true
+      }
+    },
+    {
+      "rename": {
+        "field": "file_path",
+        "target_field": "file.path",
+        "ignore_missing": true
+      }
+    },
+    {
+      "set": {
+        "field": "message",
+        "value": "YARA rule {{rule.name}} matched on sample from {{honeypot.type}}"
+      }
+    }
+  ]
+}
