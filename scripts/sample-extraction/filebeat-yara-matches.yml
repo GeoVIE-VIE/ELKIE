@@ -1,0 +1,29 @@
+# Filebeat input for YARA match alerts
+# Add this to /etc/filebeat/inputs.d/yara-matches.yml on T-Pot
+
+filebeat.inputs:
+  - type: log
+    enabled: true
+    paths:
+      - /var/log/honeypot-extraction/yara-matches.jsonl
+    json.keys_under_root: true
+    json.add_error_key: true
+    fields:
+      type: yara_match
+    fields_under_root: true
+
+    # Add index routing
+    processors:
+      - add_fields:
+          target: ''
+          fields:
+            event.kind: alert
+            event.category: malware
+            event.type: indicator
+
+output.elasticsearch:
+  hosts: ["localhost:64298"]
+  index: "honeypot-yara-%{+yyyy.MM.dd}"
+
+setup.template.name: "honeypot-yara"
+setup.template.pattern: "honeypot-yara-*"

@@ -19,6 +19,8 @@ LOG_DIR="${LOG_DIR:-/var/log/honeypot-extraction}"
 CATALOG_FILE="$QUARANTINE_BASE/catalog.json"
 MAX_FILE_SIZE="${MAX_FILE_SIZE:-104857600}"  # 100MB max file size
 RETENTION_DAYS="${RETENTION_DAYS:-30}"
+YARA_RULES_DIR="${YARA_RULES_DIR:-$HOME/rules}"
+YARA_ENABLED="${YARA_ENABLED:-true}"
 
 # T-Pot container paths (standard T-Pot installation)
 declare -A CONTAINER_PATHS=(
@@ -111,6 +113,70 @@ compute_hashes() {
 get_file_type() {
     local filepath="$1"
     file -b "$filepath" 2>/dev/null || echo "unknown"
+}
+
+#===============================================================================
+# YARA Scanning Functions
+#===============================================================================
+
+yara_scan() {
+    local filepath="$1"
+    local matches=""
+
+    # Skip if YARA not enabled or not installed
+    if [[ "$YARA_ENABLED" != "true" ]] || ! command -v yara &>/dev/null; then
+        echo ""
+        return
+    fi
+
+    # Skip if rules directory doesn't exist
+    if [[ ! -d "$YARA_RULES_DIR" ]]; then
+        echo ""
+        return
+    fi
+
+    # Scan with all rule files
+    while IFS= read -r -d '' rulefile; do
+        local result
+        result=$(yara -w "$rulefile" "$filepath" 2>/dev/null || true)
+        if [[ -n "$result" ]]; then
+            # Extract just the rule name (first word of each line)
+            while IFS= read -r line; do
+                local rule_name
+                rule_name=$(echo "$line" | awk '{print $1}')
+                if [[ -n "$rule_name" ]]; then
+                    if [[ -n "$matches" ]]; then
+                        matches="$matches,$rule_name"
+                    else
+                        matches="$rule_name"
+                    fi
+                fi
+            done <<< "$result"
+        fi
+    done < <(find "$YARA_RULES_DIR" -type f \( -name "*.yar" -o -name "*.yara" \) -print0 2>/dev/null)
+
+    echo "$matches"
+}
+
+log_yara_match() {
+    local sha256="$1"
+    local container="$2"
+    local filepath="$3"
+    local matches="$4"
+    local timestamp
+    timestamp=$(date -Iseconds)
+
+    # Log each match as separate JSON entry for Elasticsearch
+    IFS=',' read -ra MATCH_ARRAY <<< "$matches"
+    for match in "${MATCH_ARRAY[@]}"; do
+        local entry
+        entry=$(cat <<EOF
+{"timestamp":"$timestamp","event_type":"yara_match","sha256":"$sha256","container":"$container","yara_rule":"$match","file_path":"$filepath"}
+EOF
+)
+        echo "$entry" >> "$LOG_DIR/yara-matches.jsonl"
+        log_warn "YARA MATCH: $match on $sha256 ($container)"
+    done
 }
 
 #===============================================================================
@@ -266,6 +332,13 @@ extract_from_container() {
 
         # Add to catalog
         add_to_catalog "$container" "$file" "$final_path" "$hashes" "$file_type" "$file_size"
+
+        # YARA scan the new sample
+        local yara_matches
+        yara_matches=$(yara_scan "$final_path")
+        if [[ -n "$yara_matches" ]]; then
+            log_yara_match "$sha256" "$container" "$final_path" "$yara_matches"
+        fi
 
         ((extracted_count++))
 
