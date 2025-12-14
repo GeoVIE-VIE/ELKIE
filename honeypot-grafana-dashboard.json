@@ -2321,6 +2321,10 @@
                                 "id": "links",
                                 "value": [
                                     {
+                                        "title": "Search in Kibana",
+                                        "url": "http://192.168.50.3:64297/app/discover#/?_g=(time:(from:now-7d,to:now))&_a=(index:'filebeat-*',query:(language:lucene,query:'sha256:${__value.raw}'))"
+                                    },
+                                    {
                                         "title": "VirusTotal",
                                         "url": "https://www.virustotal.com/gui/file/${__value.raw}"
                                     }
@@ -2344,6 +2348,32 @@
                                     "type": "color-background",
                                     "mode": "basic"
                                 }
+                            },
+                            {
+                                "id": "links",
+                                "value": [
+                                    {
+                                        "title": "All matches for ${__value.raw}",
+                                        "url": "http://192.168.50.3:64297/app/discover#/?_g=(time:(from:now-7d,to:now))&_a=(index:'filebeat-*',query:(language:lucene,query:'yara_rule:${__value.raw}'))"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "container"
+                        },
+                        "properties": [
+                            {
+                                "id": "links",
+                                "value": [
+                                    {
+                                        "title": "YARA matches from ${__value.raw}",
+                                        "url": "http://192.168.50.3:64297/app/discover#/?_g=(time:(from:now-7d,to:now))&_a=(index:'filebeat-*',query:(language:lucene,query:'container:${__value.raw} AND (event_type:yara_match OR type:yara_match)'))"
+                                    }
+                                ]
                             }
                         ]
                     }
@@ -2849,6 +2879,10 @@
                                 "id": "links",
                                 "value": [
                                     {
+                                        "title": "Search in Kibana",
+                                        "url": "http://192.168.50.3:64297/app/discover#/?_g=(time:(from:now-7d,to:now))&_a=(index:'filebeat-*',query:(language:lucene,query:'sha256:${__value.raw}'))"
+                                    },
+                                    {
                                         "title": "VirusTotal",
                                         "url": "https://www.virustotal.com/gui/file/${__value.raw}"
                                     }
@@ -2870,6 +2904,10 @@
                                 "id": "links",
                                 "value": [
                                     {
+                                        "title": "Search in Kibana",
+                                        "url": "http://192.168.50.3:64297/app/discover#/?_g=(time:(from:now-7d,to:now))&_a=(index:'filebeat-*',query:(language:lucene,query:'md5:${__value.raw}'))"
+                                    },
+                                    {
                                         "title": "VirusTotal (MD5)",
                                         "url": "https://www.virustotal.com/gui/file/${__value.raw}"
                                     }
@@ -2890,6 +2928,23 @@
                             {
                                 "id": "unit",
                                 "value": "bytes"
+                            }
+                        ]
+                    },
+                    {
+                        "matcher": {
+                            "id": "byName",
+                            "options": "container"
+                        },
+                        "properties": [
+                            {
+                                "id": "links",
+                                "value": [
+                                    {
+                                        "title": "View all samples from ${__value.raw}",
+                                        "url": "http://192.168.50.3:64297/app/discover#/?_g=(time:(from:now-7d,to:now))&_a=(index:'filebeat-*',query:(language:lucene,query:'container:${__value.raw} AND (fields.type:honeypot_sample OR type:honeypot_sample)'))"
+                                    }
+                                ]
                             }
                         ]
                     }
