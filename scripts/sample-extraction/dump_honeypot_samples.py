@@ -25,6 +25,34 @@ OUT_MANIFEST = os.path.expanduser("~/honeypot_samples_manifest.txt")
 # Prefer quarantine_path, fall back to original_path
 PATH_KEYS = ("quarantine_path", "original_path")
 
+def xxd_dump(data: bytes, bytes_per_line: int = 16) -> str:
+    """Generate xxd-style hex dump of binary data."""
+    lines = []
+    for offset in range(0, len(data), bytes_per_line):
+        chunk = data[offset:offset + bytes_per_line]
+
+        # Hex portion
+        hex_parts = []
+        for i, b in enumerate(chunk):
+            hex_parts.append(f"{b:02x}")
+            if i == 7:  # Add extra space in middle
+                hex_parts.append("")
+        hex_str = " ".join(hex_parts)
+
+        # ASCII portion (printable chars only)
+        ascii_str = ""
+        for b in chunk:
+            if 32 <= b <= 126:
+                ascii_str += chr(b)
+            else:
+                ascii_str += "."
+
+        # Format: offset: hex  ascii
+        lines.append(f"{offset:08x}: {hex_str:<49} {ascii_str}")
+
+    return "\n".join(lines) + "\n"
+
+
 def pick_path(obj: dict) -> str | None:
     for k in PATH_KEYS:
         v = obj.get(k)
@@ -93,12 +121,11 @@ def main() -> int:
             out.write(f"FILE: {p}\n")
             out.write("=" * 100 + "\n")
 
-            # Decode binary safely (lossy, but keeps byte values stable-ish)
-            text = data.decode("latin-1", errors="replace")
-            out.write(text)
+            # Output xxd-style hex dump (much more readable for binary)
+            out.write(xxd_dump(data))
 
             written_files += 1
-            bytes_written += len(text.encode("utf-8", errors="replace"))
+            bytes_written += len(data)
 
     with open(OUT_MANIFEST, "w", encoding="utf-8") as mf:
         mf.write(run_header)
