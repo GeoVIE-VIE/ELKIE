@@ -1,0 +1,223 @@
+{
+  "description": "ELKIE LLM Honeypot Log Processing Pipeline",
+  "processors": [
+    {
+      "set": {
+        "field": "event.module",
+        "value": "honeypot-llm"
+      }
+    },
+    {
+      "set": {
+        "field": "event.dataset",
+        "value": "honeypot.llm",
+        "if": "ctx.event_type != null"
+      }
+    },
+    {
+      "set": {
+        "field": "event.category",
+        "value": ["intrusion_detection"],
+        "if": "ctx.event_type != null"
+      }
+    },
+    {
+      "set": {
+        "field": "event.kind",
+        "value": "event"
+      }
+    },
+    {
+      "set": {
+        "field": "event.outcome",
+        "value": "success",
+        "if": "ctx.success == true"
+      }
+    },
+    {
+      "set": {
+        "field": "event.outcome",
+        "value": "failure",
+        "if": "ctx.success == false"
+      }
+    },
+    {
+      "rename": {
+        "field": "src_ip",
+        "target_field": "source.ip",
+        "ignore_missing": true
+      }
+    },
+    {
+      "rename": {
+        "field": "username",
+        "target_field": "user.name",
+        "ignore_missing": true
+      }
+    },
+    {
+      "rename": {
+        "field": "password",
+        "target_field": "user.credential",
+        "ignore_missing": true
+      }
+    },
+    {
+      "rename": {
+        "field": "command",
+        "target_field": "process.command_line",
+        "ignore_missing": true
+      }
+    },
+    {
+      "rename": {
+        "field": "session_id",
+        "target_field": "event.id",
+        "ignore_missing": true
+      }
+    },
+    {
+      "geoip": {
+        "field": "source.ip",
+        "target_field": "source.geo",
+        "ignore_missing": true,
+        "ignore_failure": true
+      }
+    },
+    {
+      "geoip": {
+        "field": "source.ip",
+        "target_field": "source.as",
+        "database_file": "GeoLite2-ASN.mmdb",
+        "properties": ["asn", "organization_name"],
+        "ignore_missing": true,
+        "ignore_failure": true
+      }
+    },
+    {
+      "set": {
+        "field": "threat.indicator.type",
+        "value": "ipv4-addr",
+        "if": "ctx.source?.ip != null"
+      }
+    },
+    {
+      "set": {
+        "field": "observer.type",
+        "value": "honeypot"
+      }
+    },
+    {
+      "set": {
+        "field": "observer.product",
+        "value": "ELKIE LLM Honeypot"
+      }
+    },
+    {
+      "set": {
+        "field": "observer.vendor",
+        "value": "ELKIE"
+      }
+    },
+    {
+      "script": {
+        "lang": "painless",
+        "description": "Classify attack severity based on command",
+        "if": "ctx.process?.command_line != null",
+        "source": """
+          String cmd = ctx.process.command_line.toLowerCase();
+
+          // Critical - credential access
+          if (cmd.contains('/etc/shadow') || cmd.contains('id_rsa') ||
+              cmd.contains('.aws/credentials') || cmd.contains('wallet')) {
+            ctx.event.severity = 9;
+            ctx.threat = ctx.threat ?: [:];
+            ctx.threat.tactic = [:];
+            ctx.threat.tactic.name = 'Credential Access';
+          }
+          // High - malware download
+          else if ((cmd.contains('wget ') || cmd.contains('curl ')) &&
+                   (cmd.contains('|') || cmd.contains('.sh') || cmd.contains('.py'))) {
+            ctx.event.severity = 8;
+            ctx.threat = ctx.threat ?: [:];
+            ctx.threat.tactic = [:];
+            ctx.threat.tactic.name = 'Execution';
+          }
+          // Medium - reconnaissance
+          else if (cmd.contains('find /') || cmd.contains('locate ') ||
+                   cmd.contains('nmap') || cmd.contains('nikto')) {
+            ctx.event.severity = 5;
+            ctx.threat = ctx.threat ?: [:];
+            ctx.threat.tactic = [:];
+            ctx.threat.tactic.name = 'Discovery';
+          }
+          // Low - basic enumeration
+          else if (cmd.contains('uname') || cmd.contains('whoami') ||
+                   cmd.contains('id') || cmd.contains('hostname')) {
+            ctx.event.severity = 2;
+            ctx.threat = ctx.threat ?: [:];
+            ctx.threat.tactic = [:];
+            ctx.threat.tactic.name = 'Discovery';
+          }
+          else {
+            ctx.event.severity = 3;
+          }
+        """
+      }
+    },
+    {
+      "script": {
+        "lang": "painless",
+        "description": "Extract indicators from commands",
+        "if": "ctx.process?.command_line != null",
+        "source": """
+          String cmd = ctx.process.command_line;
+
+          // Extract URLs
+          def urlPattern = /https?:\\/\\/[^\\s]+/;
+          def matcher = urlPattern.matcher(cmd);
+          if (matcher.find()) {
+            ctx.url = ctx.url ?: [:];
+            ctx.url.original = matcher.group();
+          }
+
+          // Extract IP addresses
+          def ipPattern = /\\b(?:\\d{1,3}\\.){3}\\d{1,3}\\b/;
+          def ipMatcher = ipPattern.matcher(cmd);
+          if (ipMatcher.find()) {
+            ctx.destination = ctx.destination ?: [:];
+            ctx.destination.ip = ipMatcher.group();
+          }
+        """
+      }
+    },
+    {
+      "set": {
+        "field": "labels.response_source",
+        "value": "{{response_source}}",
+        "if": "ctx.response_source != null"
+      }
+    },
+    {
+      "set": {
+        "field": "labels.response_latency_ms",
+        "value": "{{response_latency_ms}}",
+        "if": "ctx.response_latency_ms != null"
+      }
+    },
+    {
+      "remove": {
+        "field": ["success", "response_source", "response_latency_ms", "response_length"],
+        "ignore_missing": true
+      }
+    }
+  ],
+  "on_failure": [
+    {
+      "set": {
+        "field": "error.message",
+        "value": "{{ _ingest.on_failure_message }}"
+      }
+    }
+  ]
+}
