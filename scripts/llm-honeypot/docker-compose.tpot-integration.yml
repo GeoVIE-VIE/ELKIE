@@ -1,0 +1,99 @@
+version: '3.8'
+
+# LLM Integration for T-Pot Cowrie
+# This runs ALONGSIDE your existing T-Pot - doesn't replace anything
+
+services:
+  # Local LLM Server (Ollama)
+  ollama:
+    image: ollama/ollama:latest
+    container_name: honeypot-ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+    environment:
+      # Optimized for Dual Xeon Platinum 8168
+      - OLLAMA_NUM_THREAD=48
+      - OLLAMA_NUM_PARALLEL=4
+      - OLLAMA_MAX_LOADED_MODELS=1
+    deploy:
+      resources:
+        limits:
+          memory: 16G
+        reservations:
+          memory: 12G
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - honeypot-llm
+
+  # LLM Proxy Service (sits between Cowrie and Ollama)
+  llm-proxy:
+    build:
+      context: ./cowrie-plugin
+      dockerfile: Dockerfile.proxy
+    container_name: cowrie-llm-proxy
+    restart: unless-stopped
+    depends_on:
+      ollama:
+        condition: service_healthy
+    ports:
+      - "11435:11435"
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+      - LLM_MODEL=mistral:7b-instruct-v0.2-q4_K_M
+      - LOG_LEVEL=INFO
+    volumes:
+      - llm_cache:/app/cache
+    networks:
+      - honeypot-llm
+      # Connect to T-Pot network so Cowrie can reach us
+      - tpot_default
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11435/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis for response caching (optional but recommended)
+  redis:
+    image: redis:7-alpine
+    container_name: honeypot-llm-redis
+    restart: unless-stopped
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory 2gb
+      --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    networks:
+      - honeypot-llm
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  ollama_models:
+    name: honeypot-ollama-models
+  redis_data:
+    name: honeypot-llm-redis
+  llm_cache:
+    name: honeypot-llm-cache
+
+networks:
+  honeypot-llm:
+    name: honeypot-llm
+    driver: bridge
+  # External network - connects to existing T-Pot
+  tpot_default:
+    external: true
+    name: tpot_default  # Adjust this to match your T-Pot network name
