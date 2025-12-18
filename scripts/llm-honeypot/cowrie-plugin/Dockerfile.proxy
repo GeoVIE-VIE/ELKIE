@@ -1,0 +1,17 @@
+# LLM Proxy for Cowrie Integration
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install dependencies
+RUN pip install --no-cache-dir aiohttp redis
+
+# Copy proxy code
+COPY cowrie_llm_proxy.py .
+
+# Create cache directory
+RUN mkdir -p /app/cache
+
+EXPOSE 11435
+
+CMD ["python", "cowrie_llm_proxy.py"]

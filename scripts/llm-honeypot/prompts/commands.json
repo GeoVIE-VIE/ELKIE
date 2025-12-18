@@ -1,0 +1,53 @@
+{
+  "file_listing": {
+    "patterns": ["ls", "dir", "ll"],
+    "system_context": "Generate a realistic directory listing. Include typical Linux files like .bashrc, .ssh, logs, configs. Use realistic file sizes and dates. Format as 'ls -la' output with permissions, owner, size, date, name columns.",
+    "examples": {
+      "ls -la /root": "total 32\ndrwx------  5 root root 4096 Dec 15 14:22 .\ndrwxr-xr-x 23 root root 4096 Nov  8 09:14 ..\n-rw-------  1 root root 1247 Dec 15 14:22 .bash_history\n-rw-r--r--  1 root root 3106 Oct 15 17:46 .bashrc\ndrwx------  2 root root 4096 Nov  8 09:30 .ssh\n-rw-r--r--  1 root root  161 Jul  9  2019 .profile"
+    }
+  },
+  "file_read": {
+    "patterns": ["cat", "head", "tail", "less", "more"],
+    "system_context": "Generate realistic file contents. For config files, use proper syntax. For logs, use proper timestamp format. For system files like /etc/passwd, use standard Linux format.",
+    "sensitive_files": {
+      "/etc/shadow": "Return: permission denied or fake shadow entries",
+      "/root/.ssh/id_rsa": "Generate a fake RSA private key header only",
+      ".bash_history": "Generate realistic command history an admin might run"
+    }
+  },
+  "process_listing": {
+    "patterns": ["ps", "top", "htop"],
+    "system_context": "Generate realistic process listing. Include common daemons: sshd, nginx/apache, mysql/postgres, cron, systemd. Use realistic PIDs (not sequential), memory/CPU values.",
+    "examples": {
+      "ps aux": "USER       PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND\nroot         1  0.0  0.1 169436 11892 ?        Ss   Nov08   1:23 /sbin/init\nroot       456  0.0  0.0  72304  6412 ?        Ss   Nov08   0:12 /usr/sbin/sshd -D\nwww-data  1234  0.0  0.2 214532 18764 ?        S    Nov08   2:45 nginx: worker process\nmysql     2345  0.1  2.5 1845632 208456 ?      Sl   Nov08  45:23 /usr/sbin/mysqld"
+    }
+  },
+  "network": {
+    "patterns": ["netstat", "ss", "ifconfig", "ip", "curl", "wget", "ping"],
+    "system_context": "Generate realistic network information. Show expected ports for web server (80, 443), database (3306), SSH (22). Use realistic IPs. For curl/wget, simulate downloading.",
+    "security_note": "For wget/curl to suspicious URLs, simulate the download starting then show realistic error or success"
+  },
+  "system_info": {
+    "patterns": ["uname", "hostname", "uptime", "free", "df", "lscpu"],
+    "system_context": "Return realistic system information for an Ubuntu 22.04 server. Use consistent hostname across commands. Show realistic memory/disk values.",
+    "static_responses": {
+      "uname -a": "Linux {hostname} 5.15.0-91-generic #101-Ubuntu SMP Tue Nov 14 13:30:08 UTC 2023 x86_64 x86_64 x86_64 GNU/Linux",
+      "free -h": "              total        used        free      shared  buff/cache   available\nMem:           15Gi       4.2Gi       2.1Gi       256Mi       9.1Gi        10Gi\nSwap:         2.0Gi       128Mi       1.9Gi"
+    }
+  },
+  "dangerous_commands": {
+    "patterns": ["rm -rf", "mkfs", "dd if=", "chmod 777", "wget.*\\|.*sh", "curl.*\\|.*bash"],
+    "behavior": "Simulate execution but don't actually report success for destructive commands. For download-and-execute patterns, show the download then execution.",
+    "log_priority": "HIGH - These indicate active exploitation attempts"
+  },
+  "reconnaissance": {
+    "patterns": ["find", "locate", "which", "whereis", "grep -r"],
+    "system_context": "Generate realistic search results. For 'find / -perm', show some SUID binaries. For config searches, show paths to nginx/apache/mysql configs.",
+    "security_note": "Attackers use these to find privilege escalation vectors"
+  },
+  "credential_access": {
+    "patterns": ["cat /etc/shadow", "cat /etc/passwd", ".ssh", "id_rsa", "aws", "credentials"],
+    "system_context": "For /etc/passwd, return realistic entries. For /etc/shadow, return permission denied unless root. For SSH keys and cloud credentials, generate plausible fake data.",
+    "log_priority": "CRITICAL - Credential theft attempt"
+  }
+}
