@@ -1,0 +1,85 @@
+version: '3.8'
+
+# Local LLM Honeypot Integration for T-Pot
+# Runs Ollama for CPU-based inference on Xeon Platinum 8168
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: honeypot-ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+      - ./prompts:/prompts:ro
+    environment:
+      # Optimize for dual Xeon Platinum 8168 (48 cores/96 threads)
+      - OLLAMA_NUM_PARALLEL=4
+      - OLLAMA_MAX_LOADED_MODELS=2
+      # Use all available threads for inference
+      - OLLAMA_NUM_THREAD=48
+    deploy:
+      resources:
+        limits:
+          memory: 24G
+        reservations:
+          memory: 16G
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - honeypot-llm
+
+  cowrie-llm-responder:
+    build:
+      context: .
+      dockerfile: Dockerfile.responder
+    container_name: cowrie-llm-responder
+    restart: unless-stopped
+    depends_on:
+      ollama:
+        condition: service_healthy
+    ports:
+      - "8022:8022"  # SSH honeypot with LLM responses
+      - "8023:8023"  # Telnet honeypot with LLM responses
+    volumes:
+      - ./logs:/var/log/cowrie-llm
+      - ./prompts:/app/prompts:ro
+      - ./config.yml:/app/config.yml:ro
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+      - LLM_MODEL=mistral:7b-instruct-v0.2-q4_K_M
+      - LOG_LEVEL=INFO
+      - ELASTICSEARCH_HOST=${ELASTICSEARCH_HOST:-localhost:9200}
+    networks:
+      - honeypot-llm
+
+  # Redis for session state and response caching
+  redis:
+    image: redis:7-alpine
+    container_name: honeypot-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 2gb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    networks:
+      - honeypot-llm
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  ollama_models:
+    name: honeypot-ollama-models
+  redis_data:
+    name: honeypot-redis-data
+
+networks:
+  honeypot-llm:
+    name: honeypot-llm-network
+    driver: bridge
