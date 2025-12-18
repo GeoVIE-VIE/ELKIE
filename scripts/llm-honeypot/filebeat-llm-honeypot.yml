@@ -1,0 +1,80 @@
+# Filebeat configuration for LLM Honeypot log ingestion
+# Ingests session and command logs into Elasticsearch
+
+filebeat.inputs:
+  # Session events (login attempts, session start/end)
+  - type: filestream
+    id: honeypot-llm-sessions
+    enabled: true
+    paths:
+      - /var/log/cowrie-llm/sessions.jsonl
+    parsers:
+      - ndjson:
+          keys_under_root: true
+          add_error_key: true
+    fields:
+      log_type: honeypot_session
+      honeypot_variant: llm
+    fields_under_root: false
+
+  # Command execution logs
+  - type: filestream
+    id: honeypot-llm-commands
+    enabled: true
+    paths:
+      - /var/log/cowrie-llm/commands.jsonl
+    parsers:
+      - ndjson:
+          keys_under_root: true
+          add_error_key: true
+    fields:
+      log_type: honeypot_command
+      honeypot_variant: llm
+    fields_under_root: false
+
+# Processors for enrichment
+processors:
+  # Add host metadata
+  - add_host_metadata:
+      when.not.contains.tags: forwarded
+
+  # Parse timestamp
+  - timestamp:
+      field: "@timestamp"
+      layouts:
+        - '2006-01-02T15:04:05.999999999Z07:00'
+        - '2006-01-02T15:04:05Z'
+      test:
+        - '2024-12-18T14:30:45.123456789Z'
+
+  # GeoIP enrichment for attacker IPs
+  - add_fields:
+      target: ''
+      fields:
+        ecs.version: "8.0"
+
+# Output to Elasticsearch
+output.elasticsearch:
+  hosts: ["${ELASTICSEARCH_HOST:localhost:9200}"]
+  index: "honeypot-llm-%{+yyyy.MM.dd}"
+  pipeline: "honeypot-llm-pipeline"
+
+# Index template
+setup.template.enabled: true
+setup.template.name: "honeypot-llm"
+setup.template.pattern: "honeypot-llm-*"
+setup.template.settings:
+  index.number_of_shards: 1
+  index.number_of_replicas: 0
+
+# ILM disabled for manual index management
+setup.ilm.enabled: false
+
+# Logging
+logging.level: info
+logging.to_files: true
+logging.files:
+  path: /var/log/filebeat
+  name: filebeat-llm-honeypot
+  keepfiles: 7
+  permissions: 0640
