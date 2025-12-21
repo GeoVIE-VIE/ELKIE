@@ -1,0 +1,24 @@
+filebeat.inputs:
+  - type: filestream
+    id: auditd
+    enabled: true
+    paths:
+      - /var/log/audit/audit.log
+    fields:
+      log_type: auditd
+      honeypot_type: sacrificial-vm
+
+  - type: filestream
+    id: auth
+    enabled: true
+    paths:
+      - /var/log/auth.log
+    fields:
+      log_type: auth
+      honeypot_type: sacrificial-vm
+
+output.elasticsearch:
+  hosts: ["192.168.50.3:9200"]
+  index: "honeypot-sacrificial-%{+yyyy.MM.dd}"
+
+setup.ilm.enabled: false
