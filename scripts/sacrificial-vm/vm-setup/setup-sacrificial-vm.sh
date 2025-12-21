@@ -70,7 +70,8 @@ sed -i 's/#PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_c
 sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config
 sed -i 's/#PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
 
-systemctl restart sshd
+# Ubuntu uses 'ssh' not 'sshd'
+systemctl restart ssh
 
 echo -e "${GREEN}  ✓ Users created with weak passwords${NC}"
 
@@ -445,7 +446,7 @@ echo "[*] Clearing bash histories..."
 > /home/admin/.bash_history
 
 echo "[*] Restarting services..."
-systemctl restart sshd
+systemctl restart ssh
 systemctl restart nginx
 
 echo "[*] Honeypot reset complete"
