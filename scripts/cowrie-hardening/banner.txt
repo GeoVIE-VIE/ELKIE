@@ -1,0 +1,28 @@
+
+Welcome to Ubuntu 22.04.3 LTS (GNU/Linux 5.15.0-91-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+ System information as of Wed Dec 18 14:32:47 UTC 2024
+
+  System load:  0.12              Processes:             187
+  Usage of /:   18.2% of 233.8GB   Users logged in:       0
+  Memory usage: 27%               IPv4 address for eth0: 10.0.2.15
+  Swap usage:   7%
+
+ * Strictly confined Kubernetes makes edge and IoT secure. Learn how MicroK8s
+   just raised the bar for easy, entity://secure and production-ready K8s cluster
+   deployment.
+
+   https://ubuntu.com/engage/secure-kubernetes-at-the-edge
+
+Expanded Security Maintenance for Applications is not enabled.
+
+0 updates can be applied immediately.
+
+Enable ESM Apps to receive additional future security updates.
+See https://ubuntu.com/esm or run: sudo pro status
+
+Last login: Wed Dec 18 09:15:23 2024 from 192.168.1.100
