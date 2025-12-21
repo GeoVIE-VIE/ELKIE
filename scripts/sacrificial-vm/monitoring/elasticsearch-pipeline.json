@@ -1,0 +1,162 @@
+{
+  "description": "Process logs from sacrificial honeypot VM",
+  "processors": [
+    {
+      "set": {
+        "field": "event.module",
+        "value": "honeypot-sacrificial"
+      }
+    },
+    {
+      "set": {
+        "field": "observer.type",
+        "value": "honeypot"
+      }
+    },
+    {
+      "set": {
+        "field": "observer.product",
+        "value": "sacrificial-vm"
+      }
+    },
+
+    {
+      "grok": {
+        "if": "ctx.log_type == 'auditd'",
+        "field": "message",
+        "patterns": [
+          "type=%{WORD:audit.type}.*?pid=%{NUMBER:process.pid:int}.*?uid=%{NUMBER:user.id:int}.*?comm=\"%{DATA:process.name}\".*?exe=\"%{DATA:process.executable}\"",
+          "type=%{WORD:audit.type}.*?pid=%{NUMBER:process.pid:int}.*?uid=%{NUMBER:user.id:int}",
+          "type=%{WORD:audit.type}"
+        ],
+        "ignore_failure": true
+      }
+    },
+
+    {
+      "grok": {
+        "if": "ctx.log_type == 'auditd' && ctx.message.contains('EXECVE')",
+        "field": "message",
+        "patterns": [
+          ".*?a0=\"%{DATA:process.args.0}\".*?a1=\"%{DATA:process.args.1}\".*?a2=\"%{DATA:process.args.2}\"",
+          ".*?a0=\"%{DATA:process.args.0}\".*?a1=\"%{DATA:process.args.1}\"",
+          ".*?a0=\"%{DATA:process.args.0}\""
+        ],
+        "ignore_failure": true
+      }
+    },
+
+    {
+      "script": {
+        "if": "ctx.log_type == 'auditd' && ctx.process?.args != null",
+        "lang": "painless",
+        "source": """
+          def args = [];
+          if (ctx.process.args?.0 != null) args.add(ctx.process.args.0);
+          if (ctx.process.args?.1 != null) args.add(ctx.process.args.1);
+          if (ctx.process.args?.2 != null) args.add(ctx.process.args.2);
+          ctx.process.command_line = String.join(' ', args);
+        """
+      }
+    },
+
+    {
+      "set": {
+        "if": "ctx.event_type == 'alert'",
+        "field": "event.kind",
+        "value": "alert"
+      }
+    },
+
+    {
+      "set": {
+        "if": "ctx.event_type == 'flow'",
+        "field": "event.kind",
+        "value": "event"
+      }
+    },
+
+    {
+      "rename": {
+        "field": "src_ip",
+        "target_field": "source.ip",
+        "ignore_missing": true
+      }
+    },
+    {
+      "rename": {
+        "field": "dest_ip",
+        "target_field": "destination.ip",
+        "ignore_missing": true
+      }
+    },
+    {
+      "rename": {
+        "field": "src_port",
+        "target_field": "source.port",
+        "ignore_missing": true
+      }
+    },
+    {
+      "rename": {
+        "field": "dest_port",
+        "target_field": "destination.port",
+        "ignore_missing": true
+      }
+    },
+
+    {
+      "geoip": {
+        "field": "destination.ip",
+        "target_field": "destination.geo",
+        "ignore_missing": true,
+        "ignore_failure": true
+      }
+    },
+
+    {
+      "script": {
+        "if": "ctx.process?.command_line != null",
+        "lang": "painless",
+        "source": """
+          def cmd = ctx.process.command_line.toLowerCase();
+
+          // Classify threat severity
+          if (cmd.contains('wget') || cmd.contains('curl')) {
+            if (cmd.contains('|') || cmd.contains('bash') || cmd.contains('sh')) {
+              ctx.event.severity = 9;
+              ctx.threat.tactic = 'Execution';
+            } else {
+              ctx.event.severity = 6;
+              ctx.threat.tactic = 'Command and Control';
+            }
+          } else if (cmd.contains('chmod +x') || cmd.contains('chmod 777')) {
+            ctx.event.severity = 7;
+            ctx.threat.tactic = 'Execution';
+          } else if (cmd.contains('/etc/shadow') || cmd.contains('/etc/passwd')) {
+            ctx.event.severity = 8;
+            ctx.threat.tactic = 'Credential Access';
+          } else if (cmd.contains('nc ') || cmd.contains('ncat') || cmd.contains('/dev/tcp')) {
+            ctx.event.severity = 9;
+            ctx.threat.tactic = 'Command and Control';
+          } else if (cmd.contains('crontab') || cmd.contains('/etc/cron')) {
+            ctx.event.severity = 8;
+            ctx.threat.tactic = 'Persistence';
+          } else {
+            ctx.event.severity = 3;
+            ctx.threat.tactic = 'Discovery';
+          }
+        """,
+        "ignore_failure": true
+      }
+    }
+  ],
+  "on_failure": [
+    {
+      "set": {
+        "field": "error.message",
+        "value": "{{ _ingest.on_failure_message }}"
+      }
+    }
+  ]
+}

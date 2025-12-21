@@ -1,0 +1,12 @@
+Active Internet connections (only servers)
+Proto Recv-Q Send-Q Local Address           Foreign Address         State       PID/Program name
+tcp        0      0 0.0.0.0:22              0.0.0.0:*               LISTEN      456/sshd: /usr/sbin
+tcp        0      0 127.0.0.1:3306          0.0.0.0:*               LISTEN      912/mysqld
+tcp        0      0 0.0.0.0:80              0.0.0.0:*               LISTEN      1023/nginx: master
+tcp        0      0 0.0.0.0:443             0.0.0.0:*               LISTEN      1023/nginx: master
+tcp        0      0 127.0.0.53:53           0.0.0.0:*               LISTEN      623/systemd-resolve
+tcp6       0      0 :::22                   :::*                    LISTEN      456/sshd: /usr/sbin
+tcp6       0      0 :::80                   :::*                    LISTEN      1023/nginx: master
+tcp6       0      0 :::443                  :::*                    LISTEN      1023/nginx: master
+udp        0      0 127.0.0.53:53           0.0.0.0:*                           623/systemd-resolve
+udp        0      0 0.0.0.0:68              0.0.0.0:*                           478/systemd-network
