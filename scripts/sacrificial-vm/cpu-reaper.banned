@@ -1,0 +1,114 @@
+# =============================================================================
+# CPU Reaper Banned Process Patterns
+# =============================================================================
+# Processes matching these patterns are killed INSTANTLY regardless of CPU usage.
+# Patterns are matched case-insensitively against:
+#   - Process name (comm)
+#   - Full command line (cmdline)
+#   - Executable path (exe)
+#
+# Lines starting with # are comments.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# XMRig and variants (Monero)
+# -----------------------------------------------------------------------------
+xmrig
+xmr-stak
+xmr-stak-cpu
+xmr-stak-amd
+xmr-stak-nvidia
+xmrig-notls
+xmrig-cuda
+xmrig-amd
+
+# -----------------------------------------------------------------------------
+# Other cryptocurrency miners
+# -----------------------------------------------------------------------------
+minerd
+cgminer
+bfgminer
+cpuminer
+ethminer
+claymore
+phoenixminer
+gminer
+nbminer
+lolminer
+t-rex
+teamredminer
+nanominer
+srbminer
+bminer
+ewbf
+dstm
+ccminer
+nheqminer
+excavator
+nicehash
+kryptex
+
+# -----------------------------------------------------------------------------
+# Generic miner patterns
+# -----------------------------------------------------------------------------
+cryptonight
+-o stratum
+stratum+tcp
+stratum+ssl
+--coin=
+--algo=rx
+--algo=cn
+--randomx
+pool.minexmr
+pool.supportxmr
+nanopool.org
+2miners.com
+f2pool.com
+antpool.com
+poolin.com
+viabtc.com
+luxor.tech
+emcd.io
+hashvault.pro
+moneroocean
+herominers
+c3pool
+hashrate
+-a cryptonight
+--donate-level
+randomx_vm
+
+# -----------------------------------------------------------------------------
+# Known malicious miner filenames
+# -----------------------------------------------------------------------------
+kinsing
+kdevtmpfsi
+dbused
+solrd
+networkmanager
+.rsync
+.sshd
+.ash
+.javae
+ld-linux
+.ntp
+kerberods
+khugepageds
+pamdicks
+systemd-
+[kworker
+[watchdog
+config.json.xmrig
+
+# -----------------------------------------------------------------------------
+# Botnet/RAT commonly bundled with miners
+# -----------------------------------------------------------------------------
+tsunami
+mirai
+gafgyt
+bashlite
+xorddos
+billgates
+dofloo
+nitol
+ddostf
