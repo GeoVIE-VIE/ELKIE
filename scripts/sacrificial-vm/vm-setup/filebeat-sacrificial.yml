@@ -17,6 +17,20 @@ filebeat.inputs:
       log_type: auth
       honeypot_type: sacrificial-vm
 
+  - type: filestream
+    id: cpu-reaper
+    enabled: true
+    paths:
+      - /var/log/cpu-reaper.json
+    parsers:
+      - ndjson:
+          keys_under_root: true
+          overwrite_keys: true
+    fields:
+      log_type: cpu-reaper
+      honeypot_type: sacrificial-vm
+    fields_under_root: false
+
 output.elasticsearch:
   hosts: ["192.168.50.3:9200"]
   index: "honeypot-sacrificial-%{+yyyy.MM.dd}"
