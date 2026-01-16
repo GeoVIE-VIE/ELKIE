@@ -1,0 +1,30 @@
+[Unit]
+Description=CPU Reaper - Kill cryptocurrency miners and high-CPU processes
+Documentation=https://github.com/GeoVIE-VIE/ELKIE
+After=network.target auditd.service
+Wants=auditd.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/cpu-reaper
+Restart=always
+RestartSec=5
+
+# Environment configuration (can override in /etc/default/cpu-reaper)
+EnvironmentFile=-/etc/default/cpu-reaper
+
+# Run as root (needed to kill any process)
+User=root
+
+# Hardening
+NoNewPrivileges=false
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/var/log
+
+# Resource limits for the reaper itself
+CPUQuota=5%
+MemoryMax=64M
+
+[Install]
+WantedBy=multi-user.target
