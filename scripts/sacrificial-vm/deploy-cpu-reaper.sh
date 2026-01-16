@@ -166,13 +166,17 @@ dbused
 solrd
 kerberods
 khugepageds
-.rsync
-.sshd
+pamdicks
+config.json.xmrig
+# NOTE: Do NOT add generic patterns like "systemd-", "[kworker", ".sshd" (no slash), etc.
+# Those will match legitimate system processes and break things.
 
 # Botnets
 tsunami
 mirai
 gafgyt
+bashlite
+xorddos
 BANNED_LIST
 
 # -----------------------------------------------------------------------------

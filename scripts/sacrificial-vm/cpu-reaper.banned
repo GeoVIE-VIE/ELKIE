@@ -85,19 +85,17 @@ kinsing
 kdevtmpfsi
 dbused
 solrd
-networkmanager
-.rsync
-.sshd
-.ash
-.javae
-ld-linux
-.ntp
+# NOTE: Do NOT add generic patterns like "systemd-" or "[kworker" here!
+# Those match legitimate system processes and will break the system.
+.rsync/
+.sshd/
+.ash/
+.javae/
+ld-linux-fake
+.ntp/
 kerberods
 khugepageds
 pamdicks
-systemd-
-[kworker
-[watchdog
 config.json.xmrig
 
 # -----------------------------------------------------------------------------
