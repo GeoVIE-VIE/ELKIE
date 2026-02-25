@@ -24,6 +24,7 @@ BANNED_FILE="${CPU_REAPER_BANNED:-/etc/cpu-reaper.banned}"
 LOG_FILE="${CPU_REAPER_LOG:-/var/log/cpu-reaper.json}"
 ONLY_SSH_FOR_CPU="${CPU_REAPER_ONLY_SSH:-1}"
 PROTECTED_PROCS="sshd auditd systemd filebeat suricata journald rsyslogd"
+GUARDED_SERVICES="auditd"
 
 declare -A seen
 
@@ -107,11 +108,31 @@ scan_high_cpu_processes() {
     done < <(ps -eo pid,pcpu --no-headers | awk -v t="$THRESHOLD" '$2+0 > t+0 {print $1, $2}')
 }
 
-echo "CPU Reaper starting... (threshold=${THRESHOLD}%, duration=${DURATION}s)"
+guard_critical_services() {
+    for svc in $GUARDED_SERVICES; do
+        if ! pgrep -x "$svc" >/dev/null 2>&1; then
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] ALERT: $svc not running - restarting"
+            log_json "guard_restart" "0" "${svc}_not_running" "$svc" "" "0" "" ""
+            systemctl unmask "$svc" 2>/dev/null || true
+            systemctl restart "$svc" 2>/dev/null || true
+            sleep 2
+            if pgrep -x "$svc" >/dev/null 2>&1; then
+                echo "[$(date '+%Y-%m-%d %H:%M:%S')] OK: $svc restarted successfully"
+                log_json "guard_restored" "0" "${svc}_restored" "$svc" "" "0" "" ""
+            else
+                echo "[$(date '+%Y-%m-%d %H:%M:%S')] CRITICAL: Failed to restart $svc"
+                log_json "guard_failed" "0" "${svc}_restart_failed" "$svc" "" "0" "" ""
+            fi
+        fi
+    done
+}
+
+echo "CPU Reaper starting... (threshold=${THRESHOLD}%, duration=${DURATION}s, guarded=${GUARDED_SERVICES})"
 mkdir -p "$(dirname "$LOG_FILE")"; touch "$LOG_FILE"
 [[ ! -f "$BANNED_FILE" ]] && echo "Warning: $BANNED_FILE not found"
 
 while true; do
+    guard_critical_services
     scan_banned_processes
     scan_high_cpu_processes
     for p in "${!seen[@]}"; do [[ ! -d "/proc/$p" ]] && unset "seen[$p]" || true; done
@@ -177,6 +198,11 @@ mirai
 gafgyt
 bashlite
 xorddos
+
+# Anti-forensics / audit tampering
+auditctl -e 0
+auditctl -D
+auditctl -R /dev/null
 BANNED_LIST
 
 # -----------------------------------------------------------------------------
@@ -185,7 +211,8 @@ BANNED_LIST
 cat > /etc/systemd/system/cpu-reaper.service << 'SERVICE_FILE'
 [Unit]
 Description=CPU Reaper - Kill cryptocurrency miners
-After=network.target
+After=network.target auditd.service
+Wants=auditd.service
 
 [Service]
 Type=simple
@@ -196,6 +223,18 @@ RestartSec=5
 [Install]
 WantedBy=multi-user.target
 SERVICE_FILE
+
+# Harden auditd - prevent attackers from stopping it via systemctl
+if systemctl list-unit-files auditd.service &>/dev/null; then
+    echo "Hardening auditd service..."
+    mkdir -p /etc/systemd/system/auditd.service.d
+    cat > /etc/systemd/system/auditd.service.d/honeypot-protect.conf << 'AUDITD_OVERRIDE'
+[Service]
+Restart=always
+RestartSec=3
+RefuseManualStop=yes
+AUDITD_OVERRIDE
+fi
 
 # -----------------------------------------------------------------------------
 # Enable and start

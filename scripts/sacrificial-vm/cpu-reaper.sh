@@ -30,6 +30,9 @@ ONLY_SSH_FOR_CPU="${CPU_REAPER_ONLY_SSH:-1}"   # SSH check only for CPU threshol
 # Protected processes - never kill these
 PROTECTED_PROCS="sshd auditd systemd filebeat suricata journald rsyslogd"
 
+# Critical services that must always be running - restart if killed
+GUARDED_SERVICES="auditd"
+
 declare -A seen
 
 # =============================================================================
@@ -225,6 +228,35 @@ scan_high_cpu_processes() {
 }
 
 # =============================================================================
+# Guard critical services - restart if killed by attacker
+# =============================================================================
+
+guard_critical_services() {
+    for svc in $GUARDED_SERVICES; do
+        # Check if the process is running
+        if ! pgrep -x "$svc" >/dev/null 2>&1; then
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] ALERT: $svc not running - restarting"
+
+            log_json "guard_restart" "0" "${svc}_not_running" "$svc" "" "0" "" ""
+
+            # Unmask in case attacker masked it, then restart
+            systemctl unmask "$svc" 2>/dev/null || true
+            systemctl restart "$svc" 2>/dev/null || true
+
+            # Verify it came back
+            sleep 2
+            if pgrep -x "$svc" >/dev/null 2>&1; then
+                echo "[$(date '+%Y-%m-%d %H:%M:%S')] OK: $svc restarted successfully"
+                log_json "guard_restored" "0" "${svc}_restored" "$svc" "" "0" "" ""
+            else
+                echo "[$(date '+%Y-%m-%d %H:%M:%S')] CRITICAL: Failed to restart $svc"
+                log_json "guard_failed" "0" "${svc}_restart_failed" "$svc" "" "0" "" ""
+            fi
+        fi
+    done
+}
+
+# =============================================================================
 # Main
 # =============================================================================
 
@@ -233,6 +265,7 @@ echo "  Threshold: ${THRESHOLD}% CPU for ${DURATION}s"
 echo "  Banned file: $BANNED_FILE"
 echo "  Log file: $LOG_FILE"
 echo "  SSH-only for CPU kills: $ONLY_SSH_FOR_CPU"
+echo "  Guarded services: $GUARDED_SERVICES"
 
 # Ensure log directory exists
 mkdir -p "$(dirname "$LOG_FILE")"
@@ -244,6 +277,9 @@ if [[ ! -f "$BANNED_FILE" ]]; then
 fi
 
 while true; do
+    # Guard critical services (restart auditd etc. if killed by attacker)
+    guard_critical_services
+
     # Scan ALL processes for banned patterns (miners often daemonize)
     scan_banned_processes
 
