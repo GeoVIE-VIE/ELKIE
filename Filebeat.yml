@@ -67,7 +67,11 @@ output.elasticsearch:
   max_idle_time: 3m
 
 # ============================== ILM ===================================
-setup.ilm.enabled: false
+# Index Lifecycle Management - automatically deletes indices after 30 days
+setup.ilm.enabled: true
+setup.ilm.policy_name: "suricata-30d-delete"
+setup.ilm.rollover_alias: "suricata"
+setup.ilm.pattern: "{now/d}-000001"
 
 # ============================== Template ==================================
 setup.template.name: "suricata"
