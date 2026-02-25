@@ -132,11 +132,25 @@ EOF
 # Enable audit logging in JSON format (easier to parse)
 sed -i 's/log_format = .*/log_format = ENRICHED/' /etc/audit/auditd.conf
 
+# Harden auditd service - prevent attackers from stopping it
+mkdir -p /etc/systemd/system/auditd.service.d
+cat > /etc/systemd/system/auditd.service.d/honeypot-protect.conf << 'EOF'
+[Service]
+# Auto-restart if killed by attacker
+Restart=always
+RestartSec=3
+
+# Prevent 'systemctl stop auditd' from working
+RefuseManualStop=yes
+EOF
+
+systemctl daemon-reload
+
 # Restart auditd
 systemctl enable auditd
 systemctl restart auditd
 
-echo -e "${GREEN}  ✓ Auditd configured - all commands will be logged${NC}"
+echo -e "${GREEN}  ✓ Auditd configured and hardened - all commands will be logged${NC}"
 
 # ============================================================================
 # STEP 3: Install Suricata for network monitoring

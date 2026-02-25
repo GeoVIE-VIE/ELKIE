@@ -110,3 +110,14 @@ billgates
 dofloo
 nitol
 ddostf
+
+# -----------------------------------------------------------------------------
+# Anti-forensics / audit tampering
+# -----------------------------------------------------------------------------
+# Kill processes attempting to disable audit logging or tamper with monitoring.
+# NOTE: Quick one-shot commands (e.g. systemctl stop) may complete before
+# detection - the auditd watchdog in cpu-reaper handles that case by restarting
+# auditd if it goes down. These patterns catch longer-lived tampering processes.
+auditctl -e 0
+auditctl -D
+auditctl -R /dev/null
