@@ -13,13 +13,16 @@
 # 5. Filebeat - ships logs to your Elasticsearch
 # 6. Fake services to look realistic
 #
-# Usage: sudo ./setup-sacrificial-vm.sh <ELASTICSEARCH_HOST> <HONEYPOT_VLAN_GW>
+# Usage: sudo ./setup-sacrificial-vm.sh [HONEYPOT_VLAN_GW]
+#
+# Elasticsearch is hardcoded to 192.168.40.99
 #
 
 set -e
 
-ELASTICSEARCH_HOST="${1:-192.168.40.1:9200}"
-HONEYPOT_GW="${2:-192.168.40.1}"
+ELASTICSEARCH_HOST="192.168.40.99:9200"
+HONEYPOT_GW="${1:-192.168.40.1}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VM_IP=$(hostname -I | awk '{print $1}')
 
 RED='\033[0;31m'
@@ -134,34 +137,10 @@ cat > /etc/audit/rules.d/honeypot.rules << 'EOF'
 -e 2
 EOF
 
-# Configure auditd.conf for sustained high-volume logging
-# ENRICHED format resolves UIDs->usernames on every event which creates
-# backpressure under load, causing the backlog to fill and events to drop.
-# Use RAW format - Filebeat/Elasticsearch can enrich later.
-sed -i 's/log_format = .*/log_format = RAW/' /etc/audit/auditd.conf
-
-# Increase max log file size (default 8MB is way too small)
-# When the log hits this size, the max_log_file_action triggers
-sed -i 's/^max_log_file .*/max_log_file = 100/' /etc/audit/auditd.conf
-
-# Keep 10 rotated log files (100MB x 10 = 1GB max disk usage)
-sed -i 's/^num_logs .*/num_logs = 10/' /etc/audit/auditd.conf
-
-# ROTATE instead of SUSPEND/STOP - this is the #1 reason auditd goes silent!
-# Default on many distros is ROTATE but some set SUSPEND which kills logging
-sed -i 's/^max_log_file_action .*/max_log_file_action = ROTATE/' /etc/audit/auditd.conf
-
-# When disk is low, switch to syslog instead of suspending
-sed -i 's/^space_left_action .*/space_left_action = SYSLOG/' /etc/audit/auditd.conf
-sed -i 's/^admin_space_left_action .*/admin_space_left_action = SYSLOG/' /etc/audit/auditd.conf
-
-# Don't halt on disk full - just stop logging (better than crashing the honeypot)
-sed -i 's/^disk_full_action .*/disk_full_action = SUSPEND/' /etc/audit/auditd.conf
-sed -i 's/^disk_error_action .*/disk_error_action = SYSLOG/' /etc/audit/auditd.conf
-
-# Flush to disk frequently so we don't lose events
-sed -i 's/^flush .*/flush = INCREMENTAL_ASYNC/' /etc/audit/auditd.conf
-sed -i 's/^freq .*/freq = 50/' /etc/audit/auditd.conf
+# Deploy the separate auditd.conf (replaces all the sed hacks)
+# This config is optimized to survive snapshot reverts without stalling
+cp "$SCRIPT_DIR/auditd.conf" /etc/audit/auditd.conf
+echo -e "${GREEN}  ✓ Deployed auditd.conf from repo${NC}"
 
 # Harden auditd service - prevent attackers from stopping it
 mkdir -p /etc/systemd/system/auditd.service.d
@@ -190,6 +169,17 @@ auditctl -s | grep -E "backlog_limit|lost|backlog " || true
 
 echo -e "${GREEN}  ✓ Auditd configured and hardened - all commands will be logged${NC}"
 echo -e "${YELLOW}  NOTE: Rules are immutable (-e 2). To change rules, you must REBOOT.${NC}"
+
+# Install auditd watchdog - recovers auditd after snapshot reverts
+# This is the fix for auditd going silent ~10 minutes after a snapshot revert
+cp "$SCRIPT_DIR/auditd-watchdog.sh" /usr/local/bin/auditd-watchdog.sh
+chmod +x /usr/local/bin/auditd-watchdog.sh
+cp "$SCRIPT_DIR/auditd-watchdog.service" /etc/systemd/system/auditd-watchdog.service
+systemctl daemon-reload
+systemctl enable auditd-watchdog
+systemctl start auditd-watchdog
+
+echo -e "${GREEN}  ✓ Auditd watchdog installed - will auto-recover after snapshot reverts${NC}"
 
 # ============================================================================
 # STEP 3: Install Suricata for network monitoring
