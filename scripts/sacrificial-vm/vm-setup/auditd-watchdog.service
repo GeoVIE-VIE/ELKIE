@@ -1,0 +1,24 @@
+[Unit]
+Description=Auditd Watchdog - Recovers auditd after snapshot reverts
+After=auditd.service
+Requires=auditd.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/auditd-watchdog.sh
+Restart=always
+RestartSec=10
+
+# Run as root (needs to restart auditd)
+User=root
+
+# Prevent attackers from stopping the watchdog
+RefuseManualStop=yes
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=auditd-watchdog
+
+[Install]
+WantedBy=multi-user.target
