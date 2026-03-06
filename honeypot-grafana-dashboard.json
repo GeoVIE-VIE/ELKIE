@@ -3064,7 +3064,7 @@
         {
             "datasource": {
                 "type": "elasticsearch",
-                "uid": "${sac_ds}"
+                "uid": "af68payzal7nkd"
             },
             "fieldConfig": {
                 "defaults": {
@@ -3094,7 +3094,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "event_type:http",
+                    "query": "src_ip:$honeypot_subnet AND event_type:http",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [{ "id": "1", "type": "count" }]
@@ -3106,7 +3106,7 @@
         {
             "datasource": {
                 "type": "elasticsearch",
-                "uid": "${sac_ds}"
+                "uid": "af68payzal7nkd"
             },
             "fieldConfig": {
                 "defaults": {
@@ -3136,7 +3136,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "event_type:tls",
+                    "query": "src_ip:$honeypot_subnet AND event_type:tls",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [{ "id": "1", "type": "count" }]
@@ -3148,7 +3148,7 @@
         {
             "datasource": {
                 "type": "elasticsearch",
-                "uid": "${sac_ds}"
+                "uid": "af68payzal7nkd"
             },
             "fieldConfig": {
                 "defaults": {
@@ -3178,7 +3178,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "event_type:dns",
+                    "query": "src_ip:$honeypot_subnet AND event_type:dns",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [{ "id": "1", "type": "count" }]
@@ -3190,7 +3190,7 @@
         {
             "datasource": {
                 "type": "elasticsearch",
-                "uid": "${sac_ds}"
+                "uid": "af68payzal7nkd"
             },
             "fieldConfig": {
                 "defaults": {
@@ -3220,17 +3220,10 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "event_type:http AND url.domain:*",
+                    "query": "src_ip:$honeypot_subnet AND event_type:http AND http.hostname:*",
                     "timeField": "@timestamp",
-                    "bucketAggs": [
-                        {
-                            "id": "2",
-                            "type": "terms",
-                            "field": "url.domain",
-                            "settings": { "size": 0, "order": "desc", "orderBy": "1", "min_doc_count": 1 }
-                        }
-                    ],
-                    "metrics": [{ "id": "1", "type": "cardinality", "field": "url.domain" }]
+                    "bucketAggs": [],
+                    "metrics": [{ "id": "1", "type": "cardinality", "field": "http.hostname" }]
                 }
             ],
             "title": "Unique Domains (HTTP)",
@@ -3239,7 +3232,7 @@
         {
             "datasource": {
                 "type": "elasticsearch",
-                "uid": "${sac_ds}"
+                "uid": "af68payzal7nkd"
             },
             "fieldConfig": {
                 "defaults": {
@@ -3272,13 +3265,13 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "event_type:http AND url.domain:*",
+                    "query": "src_ip:$honeypot_subnet AND event_type:http AND http.hostname:*",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
                             "id": "2",
                             "type": "terms",
-                            "field": "url.domain",
+                            "field": "http.hostname",
                             "settings": { "size": 50, "order": "desc", "orderBy": "_count", "min_doc_count": 1 }
                         }
                     ],
@@ -3292,7 +3285,7 @@
         {
             "datasource": {
                 "type": "elasticsearch",
-                "uid": "${sac_ds}"
+                "uid": "af68payzal7nkd"
             },
             "fieldConfig": {
                 "defaults": {
@@ -3325,13 +3318,13 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "event_type:tls AND tls.client.server_name:*",
+                    "query": "src_ip:$honeypot_subnet AND event_type:tls AND tls.sni:*",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
                             "id": "2",
                             "type": "terms",
-                            "field": "tls.client.server_name",
+                            "field": "tls.sni",
                             "settings": { "size": 50, "order": "desc", "orderBy": "_count", "min_doc_count": 1 }
                         }
                     ],
@@ -3345,7 +3338,7 @@
         {
             "datasource": {
                 "type": "elasticsearch",
-                "uid": "${sac_ds}"
+                "uid": "af68payzal7nkd"
             },
             "fieldConfig": {
                 "defaults": {
@@ -3378,13 +3371,13 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "event_type:dns AND dns.question.name:*",
+                    "query": "src_ip:$honeypot_subnet AND event_type:dns AND dns.rrname:*",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
                             "id": "2",
                             "type": "terms",
-                            "field": "dns.question.name",
+                            "field": "dns.rrname",
                             "settings": { "size": 50, "order": "desc", "orderBy": "_count", "min_doc_count": 1 }
                         }
                     ],
@@ -3398,7 +3391,7 @@
         {
             "datasource": {
                 "type": "elasticsearch",
-                "uid": "${sac_ds}"
+                "uid": "af68payzal7nkd"
             },
             "fieldConfig": {
                 "defaults": {
@@ -3431,13 +3424,13 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "event_type:http AND user_agent.original:*",
+                    "query": "src_ip:$honeypot_subnet AND event_type:http AND http.http_user_agent:*",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
                             "id": "2",
                             "type": "terms",
-                            "field": "user_agent.original",
+                            "field": "http.http_user_agent",
                             "settings": { "size": 30, "order": "desc", "orderBy": "_count", "min_doc_count": 1 }
                         }
                     ],
@@ -3451,7 +3444,7 @@
         {
             "datasource": {
                 "type": "elasticsearch",
-                "uid": "${sac_ds}"
+                "uid": "af68payzal7nkd"
             },
             "fieldConfig": {
                 "defaults": {
@@ -3484,25 +3477,25 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "event_type:http",
+                    "query": "src_ip:$honeypot_subnet AND event_type:http",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
                             "id": "2",
                             "type": "terms",
-                            "field": "url.domain",
+                            "field": "http.hostname",
                             "settings": { "size": 50, "order": "desc", "orderBy": "_count", "min_doc_count": 1 }
                         },
                         {
                             "id": "3",
                             "type": "terms",
-                            "field": "url.path",
+                            "field": "http.url",
                             "settings": { "size": 20, "order": "desc", "orderBy": "_count", "min_doc_count": 1 }
                         },
                         {
                             "id": "4",
                             "type": "terms",
-                            "field": "http.request.method",
+                            "field": "http.http_method",
                             "settings": { "size": 10, "order": "desc", "orderBy": "_count", "min_doc_count": 1 }
                         }
                     ],
@@ -3516,7 +3509,7 @@
         {
             "datasource": {
                 "type": "elasticsearch",
-                "uid": "${sac_ds}"
+                "uid": "af68payzal7nkd"
             },
             "fieldConfig": {
                 "defaults": {
@@ -3545,7 +3538,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "event_type:http OR event_type:tls",
+                    "query": "src_ip:$honeypot_subnet AND (event_type:http OR event_type:tls)",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -3580,15 +3573,23 @@
     "templating": {
         "list": [
             {
-                "name": "sac_ds",
-                "type": "datasource",
-                "query": "elasticsearch",
-                "refresh": 1,
+                "name": "honeypot_subnet",
+                "type": "textbox",
                 "hide": 0,
-                "includeAll": false,
-                "multi": false,
-                "label": "Sacrificial VM Datasource",
-                "current": {}
+                "label": "Honeypot Subnet",
+                "query": "192.168.40.*",
+                "current": {
+                    "selected": false,
+                    "text": "192.168.40.*",
+                    "value": "192.168.40.*"
+                },
+                "options": [
+                    {
+                        "selected": true,
+                        "text": "192.168.40.*",
+                        "value": "192.168.40.*"
+                    }
+                ]
             },
             {
                 "name": "Container",
