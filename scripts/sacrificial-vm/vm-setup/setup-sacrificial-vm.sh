@@ -88,8 +88,13 @@ cat > /etc/audit/rules.d/honeypot.rules << 'EOF'
 # Delete all existing rules
 -D
 
-# Buffer size
--b 8192
+# Buffer size - must be large enough for heavy monitoring rules
+# 8192 is too small and causes auditd to silently drop events
+-b 65536
+
+# Set the backlog wait time (ms) - how long kernel waits when backlog is full
+# 60000ms = 60s, gives auditd time to drain instead of dropping events
+--backlog_wait_time 60000
 
 # Failure mode - silent (don't alert attacker)
 -f 1
@@ -129,8 +134,34 @@ cat > /etc/audit/rules.d/honeypot.rules << 'EOF'
 -e 2
 EOF
 
-# Enable audit logging in JSON format (easier to parse)
-sed -i 's/log_format = .*/log_format = ENRICHED/' /etc/audit/auditd.conf
+# Configure auditd.conf for sustained high-volume logging
+# ENRICHED format resolves UIDs->usernames on every event which creates
+# backpressure under load, causing the backlog to fill and events to drop.
+# Use RAW format - Filebeat/Elasticsearch can enrich later.
+sed -i 's/log_format = .*/log_format = RAW/' /etc/audit/auditd.conf
+
+# Increase max log file size (default 8MB is way too small)
+# When the log hits this size, the max_log_file_action triggers
+sed -i 's/^max_log_file .*/max_log_file = 100/' /etc/audit/auditd.conf
+
+# Keep 10 rotated log files (100MB x 10 = 1GB max disk usage)
+sed -i 's/^num_logs .*/num_logs = 10/' /etc/audit/auditd.conf
+
+# ROTATE instead of SUSPEND/STOP - this is the #1 reason auditd goes silent!
+# Default on many distros is ROTATE but some set SUSPEND which kills logging
+sed -i 's/^max_log_file_action .*/max_log_file_action = ROTATE/' /etc/audit/auditd.conf
+
+# When disk is low, switch to syslog instead of suspending
+sed -i 's/^space_left_action .*/space_left_action = SYSLOG/' /etc/audit/auditd.conf
+sed -i 's/^admin_space_left_action .*/admin_space_left_action = SYSLOG/' /etc/audit/auditd.conf
+
+# Don't halt on disk full - just stop logging (better than crashing the honeypot)
+sed -i 's/^disk_full_action .*/disk_full_action = SUSPEND/' /etc/audit/auditd.conf
+sed -i 's/^disk_error_action .*/disk_error_action = SYSLOG/' /etc/audit/auditd.conf
+
+# Flush to disk frequently so we don't lose events
+sed -i 's/^flush .*/flush = INCREMENTAL_ASYNC/' /etc/audit/auditd.conf
+sed -i 's/^freq .*/freq = 50/' /etc/audit/auditd.conf
 
 # Harden auditd service - prevent attackers from stopping it
 mkdir -p /etc/systemd/system/auditd.service.d
@@ -146,11 +177,19 @@ EOF
 
 systemctl daemon-reload
 
-# Restart auditd
+# Restart auditd and load rules
 systemctl enable auditd
 systemctl restart auditd
 
+# Load the rules explicitly (augenrules compiles rules.d/ into audit.rules)
+augenrules --load 2>/dev/null || true
+
+# Verify backlog is set correctly
+echo -e "${YELLOW}  Audit status:${NC}"
+auditctl -s | grep -E "backlog_limit|lost|backlog " || true
+
 echo -e "${GREEN}  ✓ Auditd configured and hardened - all commands will be logged${NC}"
+echo -e "${YELLOW}  NOTE: Rules are immutable (-e 2). To change rules, you must REBOOT.${NC}"
 
 # ============================================================================
 # STEP 3: Install Suricata for network monitoring
