@@ -18,20 +18,6 @@ filebeat.inputs:
       honeypot_type: sacrificial-vm
 
   - type: filestream
-    id: suricata
-    enabled: true
-    paths:
-      - /var/log/suricata/eve.json
-    parsers:
-      - ndjson:
-          keys_under_root: true
-          add_error_key: true
-    fields:
-      log_type: suricata
-      honeypot_type: sacrificial-vm
-    fields_under_root: false
-
-  - type: filestream
     id: cpu-reaper
     enabled: true
     paths:
@@ -48,6 +34,5 @@ filebeat.inputs:
 output.elasticsearch:
   hosts: ["192.168.50.3:9200"]
   index: "honeypot-sacrificial-%{+yyyy.MM.dd}"
-  pipeline: "honeypot-sacrificial-pipeline"
 
 setup.ilm.enabled: false
