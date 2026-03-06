@@ -1,7 +1,8 @@
 [Unit]
 Description=Auditd Watchdog - Recovers auditd after snapshot reverts
 After=auditd.service
-Requires=auditd.service
+Wants=auditd.service
+StartLimitIntervalSec=0
 
 [Service]
 Type=simple
