@@ -15,12 +15,12 @@
 #
 # Usage: sudo ./setup-sacrificial-vm.sh [HONEYPOT_VLAN_GW]
 #
-# Elasticsearch is hardcoded to 192.168.40.99
+# Elasticsearch is hardcoded to 192.168.50.3
 #
 
 set -e
 
-ELASTICSEARCH_HOST="192.168.40.99:9200"
+ELASTICSEARCH_HOST="192.168.50.3:9200"
 HONEYPOT_GW="${1:-192.168.40.1}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VM_IP=$(hostname -I | awk '{print $1}')
