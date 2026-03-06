@@ -32,7 +32,7 @@ filebeat.inputs:
     fields_under_root: false
 
 output.elasticsearch:
-  hosts: ["192.168.40.99:9200"]
+  hosts: ["192.168.50.3:9200"]
   index: "honeypot-sacrificial-%{+yyyy.MM.dd}"
 
 setup.ilm.enabled: false

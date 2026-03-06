@@ -17,7 +17,7 @@
 AUDIT_LOG="/var/log/audit/audit.log"
 CHECK_INTERVAL=60        # Check every 60 seconds
 STALL_THRESHOLD=180      # 3 minutes without events = stalled
-ELASTICSEARCH_HOST="192.168.40.99"
+HONEYPOT_IP="192.168.40.99"
 
 log() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') [auditd-watchdog] $1"
@@ -102,7 +102,7 @@ recover_auditd() {
 
 log "Starting auditd watchdog (check=${CHECK_INTERVAL}s, stall_threshold=${STALL_THRESHOLD}s)"
 log "Monitoring: $AUDIT_LOG"
-log "Elasticsearch target: $ELASTICSEARCH_HOST"
+log "Honeypot VM: $HONEYPOT_IP"
 
 LAST_ACTIVE_MTIME=$(get_audit_log_mtime)
 
