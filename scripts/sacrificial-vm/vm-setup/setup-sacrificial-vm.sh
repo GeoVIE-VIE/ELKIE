@@ -100,8 +100,12 @@ fi
 # ============================================================================
 echo -e "${BLUE}[2/8] Installing auditd for command logging...${NC}"
 
-apt-get update -qq $APT_OPTS
-apt-get install -y -qq $APT_OPTS auditd audispd-plugins
+if ! command -v auditd &>/dev/null; then
+    apt-get update -qq $APT_OPTS
+    apt-get install -y -qq $APT_OPTS auditd audispd-plugins
+else
+    echo -e "${GREEN}  ✓ auditd already installed - skipping apt${NC}"
+fi
 
 # Configure audit rules - log EVERYTHING
 cat > /etc/audit/rules.d/honeypot.rules << 'EOF'
@@ -162,6 +166,10 @@ echo -e "${GREEN}  ✓ Deployed auditd.conf from repo${NC}"
 # Harden auditd service - prevent attackers from stopping it
 mkdir -p /etc/systemd/system/auditd.service.d
 cat > /etc/systemd/system/auditd.service.d/honeypot-protect.conf << 'EOF'
+[Unit]
+# Never stop trying to restart auditd no matter how many times it fails
+StartLimitIntervalSec=0
+
 [Service]
 # Auto-restart if killed by attacker
 Restart=always

@@ -36,10 +36,14 @@ recover_auditd() {
     log "STALL DETECTED - auditd has not written events for ${STALL_THRESHOLD}s"
     log "Attempting recovery..."
 
-    # Step 1: Check if auditd process is alive
+    # Step 1: Check if auditd process is alive or service is inactive
     if ! pgrep -x auditd > /dev/null; then
         log "auditd process is DEAD - restarting service"
         systemctl restart auditd
+        sleep 2
+    elif ! systemctl is-active --quiet auditd; then
+        log "auditd service is INACTIVE - starting service"
+        systemctl start auditd
         sleep 2
     fi
 
