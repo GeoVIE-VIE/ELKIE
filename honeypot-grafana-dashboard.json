@@ -3064,7 +3064,7 @@
         {
             "datasource": {
                 "type": "elasticsearch",
-                "uid": "af68payzal7nkd"
+                "uid": "${suricata_ds}"
             },
             "fieldConfig": {
                 "defaults": {
@@ -3106,7 +3106,7 @@
         {
             "datasource": {
                 "type": "elasticsearch",
-                "uid": "af68payzal7nkd"
+                "uid": "${suricata_ds}"
             },
             "fieldConfig": {
                 "defaults": {
@@ -3148,7 +3148,7 @@
         {
             "datasource": {
                 "type": "elasticsearch",
-                "uid": "af68payzal7nkd"
+                "uid": "${suricata_ds}"
             },
             "fieldConfig": {
                 "defaults": {
@@ -3190,7 +3190,7 @@
         {
             "datasource": {
                 "type": "elasticsearch",
-                "uid": "af68payzal7nkd"
+                "uid": "${suricata_ds}"
             },
             "fieldConfig": {
                 "defaults": {
@@ -3232,7 +3232,7 @@
         {
             "datasource": {
                 "type": "elasticsearch",
-                "uid": "af68payzal7nkd"
+                "uid": "${suricata_ds}"
             },
             "fieldConfig": {
                 "defaults": {
@@ -3285,7 +3285,7 @@
         {
             "datasource": {
                 "type": "elasticsearch",
-                "uid": "af68payzal7nkd"
+                "uid": "${suricata_ds}"
             },
             "fieldConfig": {
                 "defaults": {
@@ -3338,7 +3338,7 @@
         {
             "datasource": {
                 "type": "elasticsearch",
-                "uid": "af68payzal7nkd"
+                "uid": "${suricata_ds}"
             },
             "fieldConfig": {
                 "defaults": {
@@ -3391,7 +3391,7 @@
         {
             "datasource": {
                 "type": "elasticsearch",
-                "uid": "af68payzal7nkd"
+                "uid": "${suricata_ds}"
             },
             "fieldConfig": {
                 "defaults": {
@@ -3444,7 +3444,7 @@
         {
             "datasource": {
                 "type": "elasticsearch",
-                "uid": "af68payzal7nkd"
+                "uid": "${suricata_ds}"
             },
             "fieldConfig": {
                 "defaults": {
@@ -3509,7 +3509,7 @@
         {
             "datasource": {
                 "type": "elasticsearch",
-                "uid": "af68payzal7nkd"
+                "uid": "${suricata_ds}"
             },
             "fieldConfig": {
                 "defaults": {
@@ -3590,6 +3590,17 @@
                         "value": "192.168.40.*"
                     }
                 ]
+            },
+            {
+                "name": "suricata_ds",
+                "type": "datasource",
+                "query": "elasticsearch",
+                "refresh": 1,
+                "hide": 0,
+                "includeAll": false,
+                "multi": false,
+                "label": "Suricata Datasource",
+                "current": {}
             },
             {
                 "name": "Container",
