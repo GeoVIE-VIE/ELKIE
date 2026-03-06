@@ -79,12 +79,29 @@ systemctl restart ssh
 echo -e "${GREEN}  ✓ Users created with weak passwords${NC}"
 
 # ============================================================================
+# STEP 1.5: Fix system clock (snapshots often have stale clocks)
+# ============================================================================
+echo -e "${BLUE}[*] Syncing system clock...${NC}"
+
+APT_OPTS=""
+if timedatectl set-ntp true 2>/dev/null && systemctl restart systemd-timesyncd 2>/dev/null; then
+    # Give NTP a few seconds to sync
+    sleep 3
+    echo -e "${GREEN}  ✓ Clock synced via NTP${NC}"
+else
+    # NTP unavailable (no internet, isolated VLAN, etc.)
+    # Tell apt to ignore date validation so installs still work
+    APT_OPTS="-o Acquire::Check-Valid-Until=false -o Acquire::Check-Date=false"
+    echo -e "${YELLOW}  ⚠ NTP unavailable - apt will skip date validation${NC}"
+fi
+
+# ============================================================================
 # STEP 2: Install auditd for invisible command logging
 # ============================================================================
 echo -e "${BLUE}[2/8] Installing auditd for command logging...${NC}"
 
-apt-get update -qq
-apt-get install -y -qq auditd audispd-plugins
+apt-get update -qq $APT_OPTS
+apt-get install -y -qq $APT_OPTS auditd audispd-plugins
 
 # Configure audit rules - log EVERYTHING
 cat > /etc/audit/rules.d/honeypot.rules << 'EOF'
@@ -187,8 +204,8 @@ echo -e "${GREEN}  ✓ Auditd watchdog installed - will auto-recover after snaps
 echo -e "${BLUE}[3/8] Installing Suricata for network capture...${NC}"
 
 add-apt-repository -y ppa:oisf/suricata-stable
-apt-get update -qq
-apt-get install -y -qq suricata
+apt-get update -qq $APT_OPTS
+apt-get install -y -qq $APT_OPTS suricata
 
 # Configure Suricata
 INTERFACE=$(ip route get 1.1.1.1 | awk '{print $5; exit}')
@@ -300,8 +317,8 @@ echo -e "${BLUE}[5/8] Installing Filebeat...${NC}"
 wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | gpg --dearmor -o /usr/share/keyrings/elastic.gpg
 echo "deb [signed-by=/usr/share/keyrings/elastic.gpg] https://artifacts.elastic.co/packages/8.x/apt stable main" > /etc/apt/sources.list.d/elastic.list
 
-apt-get update -qq
-apt-get install -y -qq filebeat
+apt-get update -qq $APT_OPTS
+apt-get install -y -qq $APT_OPTS filebeat
 
 # Configure Filebeat
 cat > /etc/filebeat/filebeat.yml << EOF
@@ -392,7 +409,7 @@ echo -e "${GREEN}  ✓ Filebeat installed - logs shipping to $ELASTICSEARCH_HOST
 echo -e "${BLUE}[6/8] Making VM look realistic...${NC}"
 
 # Install common packages attackers expect
-apt-get install -y -qq \
+apt-get install -y -qq $APT_OPTS \
     nginx \
     mysql-server \
     python3 python3-pip \
