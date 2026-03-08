@@ -22,7 +22,7 @@
 
     {
       "grok": {
-        "if": "ctx.log_type == 'auditd'",
+        "if": "ctx.service?.type == 'auditd'",
         "field": "message",
         "patterns": [
           "type=%{WORD:audit.type}.*?pid=%{NUMBER:process.pid:int}.*?uid=%{NUMBER:user.id:int}.*?comm=\"%{DATA:process.name}\".*?exe=\"%{DATA:process.executable}\"",
@@ -35,7 +35,7 @@
 
     {
       "grok": {
-        "if": "ctx.log_type == 'auditd' && ctx.message.contains('EXECVE')",
+        "if": "ctx.service?.type == 'auditd' && ctx.auditd?.log?.SYSCALL == 'execve'",
         "field": "message",
         "patterns": [
           ".*?a0=\"%{DATA:process.args.0}\".*?a1=\"%{DATA:process.args.1}\".*?a2=\"%{DATA:process.args.2}\"",
@@ -48,13 +48,16 @@
 
     {
       "script": {
-        "if": "ctx.log_type == 'auditd' && ctx.process?.args != null",
+        "if": "ctx.service?.type == 'auditd' && ctx.auditd?.log?.a0 != null",
         "lang": "painless",
         "source": """
+          def log = ctx.auditd.log;
           def args = [];
-          if (ctx.process.args?.0 != null) args.add(ctx.process.args.0);
-          if (ctx.process.args?.1 != null) args.add(ctx.process.args.1);
-          if (ctx.process.args?.2 != null) args.add(ctx.process.args.2);
+          if (log.a0 != null) args.add(log.a0);
+          if (log.a1 != null) args.add(log.a1);
+          if (log.a2 != null) args.add(log.a2);
+          if (log.a3 != null) args.add(log.a3);
+          if (ctx.process == null) ctx.process = new HashMap();
           ctx.process.command_line = String.join(' ', args);
         """
       }
