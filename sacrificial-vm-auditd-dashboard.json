@@ -1,0 +1,942 @@
+{
+    "annotations": {
+        "list": [
+            {
+                "builtIn": 1,
+                "datasource": {
+                    "type": "grafana",
+                    "uid": "-- Grafana --"
+                },
+                "enable": true,
+                "hide": true,
+                "iconColor": "rgba(0, 211, 255, 1)",
+                "name": "Annotations & Alerts",
+                "type": "dashboard"
+            }
+        ]
+    },
+    "editable": true,
+    "fiscalYearStartMonth": 0,
+    "graphTooltip": 1,
+    "id": null,
+    "links": [],
+    "liveNow": false,
+    "panels": [
+        {
+            "collapsed": false,
+            "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0},
+            "id": 100,
+            "title": "Overview",
+            "type": "row"
+        },
+        {
+            "datasource": {"type": "elasticsearch", "uid": "ef6pmu9oze7eoc"},
+            "fieldConfig": {
+                "defaults": {
+                    "color": {"mode": "thresholds"},
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {"color": "green", "value": null},
+                            {"color": "orange", "value": 10000},
+                            {"color": "red", "value": 100000}
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": {"h": 4, "w": 4, "x": 0, "y": 1},
+            "id": 1,
+            "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "center",
+                "orientation": "horizontal",
+                "reduceOptions": {"calcs": ["sum"], "fields": "", "values": false},
+                "textMode": "value_and_name"
+            },
+            "title": "Total Auditd Events",
+            "type": "stat",
+            "targets": [
+                {
+                    "refId": "A",
+                    "query": "*",
+                    "timeField": "@timestamp",
+                    "bucketAggs": [
+                        {
+                            "id": "2",
+                            "type": "date_histogram",
+                            "field": "@timestamp",
+                            "settings": {"interval": "auto", "min_doc_count": 0}
+                        }
+                    ],
+                    "metrics": [{"id": "1", "type": "count"}]
+                }
+            ]
+        },
+        {
+            "datasource": {"type": "elasticsearch", "uid": "ef6pmu9oze7eoc"},
+            "fieldConfig": {
+                "defaults": {
+                    "color": {"mode": "thresholds"},
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {"color": "green", "value": null},
+                            {"color": "yellow", "value": 5000},
+                            {"color": "red", "value": 50000}
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": {"h": 4, "w": 4, "x": 4, "y": 1},
+            "id": 2,
+            "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "center",
+                "orientation": "horizontal",
+                "reduceOptions": {"calcs": ["sum"], "fields": "", "values": false},
+                "textMode": "value_and_name"
+            },
+            "title": "Command Executions",
+            "type": "stat",
+            "targets": [
+                {
+                    "refId": "A",
+                    "query": "event.action:execve",
+                    "timeField": "@timestamp",
+                    "bucketAggs": [
+                        {
+                            "id": "2",
+                            "type": "date_histogram",
+                            "field": "@timestamp",
+                            "settings": {"interval": "auto", "min_doc_count": 0}
+                        }
+                    ],
+                    "metrics": [{"id": "1", "type": "count"}]
+                }
+            ]
+        },
+        {
+            "datasource": {"type": "elasticsearch", "uid": "ef6pmu9oze7eoc"},
+            "fieldConfig": {
+                "defaults": {
+                    "color": {"mode": "thresholds"},
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {"color": "green", "value": null},
+                            {"color": "orange", "value": 50},
+                            {"color": "red", "value": 200}
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": {"h": 4, "w": 4, "x": 8, "y": 1},
+            "id": 3,
+            "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "center",
+                "orientation": "horizontal",
+                "reduceOptions": {"calcs": ["sum"], "fields": "", "values": false},
+                "textMode": "value_and_name"
+            },
+            "title": "Unique Executables",
+            "type": "stat",
+            "targets": [
+                {
+                    "refId": "A",
+                    "query": "event.action:execve",
+                    "timeField": "@timestamp",
+                    "bucketAggs": [
+                        {
+                            "id": "2",
+                            "type": "date_histogram",
+                            "field": "@timestamp",
+                            "settings": {"interval": "auto", "min_doc_count": 0}
+                        }
+                    ],
+                    "metrics": [{"id": "1", "type": "cardinality", "field": "process.executable.keyword"}]
+                }
+            ]
+        },
+        {
+            "datasource": {"type": "elasticsearch", "uid": "ef6pmu9oze7eoc"},
+            "fieldConfig": {
+                "defaults": {
+                    "color": {"mode": "thresholds"},
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {"color": "green", "value": null},
+                            {"color": "orange", "value": 100},
+                            {"color": "red", "value": 1000}
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": {"h": 4, "w": 4, "x": 12, "y": 1},
+            "id": 4,
+            "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "center",
+                "orientation": "horizontal",
+                "reduceOptions": {"calcs": ["sum"], "fields": "", "values": false},
+                "textMode": "value_and_name"
+            },
+            "title": "Network Events",
+            "type": "stat",
+            "targets": [
+                {
+                    "refId": "A",
+                    "query": "network.direction:*",
+                    "timeField": "@timestamp",
+                    "bucketAggs": [
+                        {
+                            "id": "2",
+                            "type": "date_histogram",
+                            "field": "@timestamp",
+                            "settings": {"interval": "auto", "min_doc_count": 0}
+                        }
+                    ],
+                    "metrics": [{"id": "1", "type": "count"}]
+                }
+            ]
+        },
+        {
+            "datasource": {"type": "elasticsearch", "uid": "ef6pmu9oze7eoc"},
+            "fieldConfig": {
+                "defaults": {
+                    "color": {"mode": "thresholds"},
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {"color": "green", "value": null},
+                            {"color": "yellow", "value": 10},
+                            {"color": "red", "value": 50}
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": {"h": 4, "w": 4, "x": 16, "y": 1},
+            "id": 5,
+            "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "center",
+                "orientation": "horizontal",
+                "reduceOptions": {"calcs": ["sum"], "fields": "", "values": false},
+                "textMode": "value_and_name"
+            },
+            "title": "SSH Logins",
+            "type": "stat",
+            "targets": [
+                {
+                    "refId": "A",
+                    "query": "event.action:logged-in OR event.action:authenticated",
+                    "timeField": "@timestamp",
+                    "bucketAggs": [
+                        {
+                            "id": "2",
+                            "type": "date_histogram",
+                            "field": "@timestamp",
+                            "settings": {"interval": "auto", "min_doc_count": 0}
+                        }
+                    ],
+                    "metrics": [{"id": "1", "type": "count"}]
+                }
+            ]
+        },
+        {
+            "datasource": {"type": "elasticsearch", "uid": "ef6pmu9oze7eoc"},
+            "fieldConfig": {
+                "defaults": {
+                    "color": {"mode": "thresholds"},
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {"color": "green", "value": null},
+                            {"color": "red", "value": 1}
+                        ]
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": {"h": 4, "w": 4, "x": 20, "y": 1},
+            "id": 6,
+            "options": {
+                "colorMode": "value",
+                "graphMode": "area",
+                "justifyMode": "center",
+                "orientation": "horizontal",
+                "reduceOptions": {"calcs": ["sum"], "fields": "", "values": false},
+                "textMode": "value_and_name"
+            },
+            "title": "Suspicious /tmp Writes",
+            "type": "stat",
+            "targets": [
+                {
+                    "refId": "A",
+                    "query": "process.executable:\\/tmp\\/*",
+                    "timeField": "@timestamp",
+                    "bucketAggs": [
+                        {
+                            "id": "2",
+                            "type": "date_histogram",
+                            "field": "@timestamp",
+                            "settings": {"interval": "auto", "min_doc_count": 0}
+                        }
+                    ],
+                    "metrics": [{"id": "1", "type": "count"}]
+                }
+            ]
+        },
+        {
+            "collapsed": false,
+            "gridPos": {"h": 1, "w": 24, "x": 0, "y": 5},
+            "id": 101,
+            "title": "Activity Timeline",
+            "type": "row"
+        },
+        {
+            "datasource": {"type": "elasticsearch", "uid": "ef6pmu9oze7eoc"},
+            "fieldConfig": {
+                "defaults": {
+                    "color": {"mode": "palette-classic"},
+                    "custom": {
+                        "axisCenteredZero": false,
+                        "axisLabel": "Events",
+                        "drawStyle": "line",
+                        "fillOpacity": 20,
+                        "lineWidth": 1,
+                        "pointSize": 5,
+                        "stacking": {"mode": "normal"}
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": {"h": 8, "w": 24, "x": 0, "y": 6},
+            "id": 10,
+            "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+            "title": "Events Over Time by Action",
+            "type": "timeseries",
+            "targets": [
+                {
+                    "refId": "A",
+                    "query": "event.action:execve",
+                    "alias": "execve",
+                    "timeField": "@timestamp",
+                    "bucketAggs": [
+                        {
+                            "id": "2",
+                            "type": "date_histogram",
+                            "field": "@timestamp",
+                            "settings": {"interval": "auto", "min_doc_count": 0}
+                        }
+                    ],
+                    "metrics": [{"id": "1", "type": "count"}]
+                },
+                {
+                    "refId": "B",
+                    "query": "event.action:syscall",
+                    "alias": "syscall",
+                    "timeField": "@timestamp",
+                    "bucketAggs": [
+                        {
+                            "id": "2",
+                            "type": "date_histogram",
+                            "field": "@timestamp",
+                            "settings": {"interval": "auto", "min_doc_count": 0}
+                        }
+                    ],
+                    "metrics": [{"id": "1", "type": "count"}],
+                    "hide": false
+                },
+                {
+                    "refId": "C",
+                    "query": "event.action:sockaddr OR event.action:logged-in OR event.action:authenticated",
+                    "alias": "network/auth",
+                    "timeField": "@timestamp",
+                    "bucketAggs": [
+                        {
+                            "id": "2",
+                            "type": "date_histogram",
+                            "field": "@timestamp",
+                            "settings": {"interval": "auto", "min_doc_count": 0}
+                        }
+                    ],
+                    "metrics": [{"id": "1", "type": "count"}],
+                    "hide": false
+                }
+            ]
+        },
+        {
+            "datasource": {"type": "elasticsearch", "uid": "ef6pmu9oze7eoc"},
+            "fieldConfig": {
+                "defaults": {
+                    "color": {"mode": "palette-classic"},
+                    "custom": {
+                        "axisCenteredZero": false,
+                        "axisLabel": "Executions",
+                        "drawStyle": "bars",
+                        "fillOpacity": 80,
+                        "lineWidth": 1,
+                        "stacking": {"mode": "normal"}
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": {"h": 8, "w": 24, "x": 0, "y": 14},
+            "id": 11,
+            "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+            "title": "Executions Over Time by Audit Rule",
+            "type": "timeseries",
+            "targets": [
+                {
+                    "refId": "A",
+                    "query": "event.action:syscall",
+                    "timeField": "@timestamp",
+                    "bucketAggs": [
+                        {
+                            "id": "3",
+                            "type": "terms",
+                            "field": "auditd.log.key.keyword",
+                            "settings": {"size": "10", "order": "desc", "orderBy": "_count"}
+                        },
+                        {
+                            "id": "2",
+                            "type": "date_histogram",
+                            "field": "@timestamp",
+                            "settings": {"interval": "auto", "min_doc_count": 0}
+                        }
+                    ],
+                    "metrics": [{"id": "1", "type": "count"}]
+                }
+            ]
+        },
+        {
+            "collapsed": false,
+            "gridPos": {"h": 1, "w": 24, "x": 0, "y": 22},
+            "id": 102,
+            "title": "Process Analysis",
+            "type": "row"
+        },
+        {
+            "datasource": {"type": "elasticsearch", "uid": "ef6pmu9oze7eoc"},
+            "fieldConfig": {
+                "defaults": {
+                    "color": {"mode": "palette-classic"},
+                    "custom": {"align": "auto"}
+                },
+                "overrides": []
+            },
+            "gridPos": {"h": 10, "w": 12, "x": 0, "y": 23},
+            "id": 20,
+            "options": {
+                "showHeader": true,
+                "sortBy": [{"displayName": "Count", "desc": true}]
+            },
+            "title": "Top Executables (Full Path)",
+            "type": "table",
+            "targets": [
+                {
+                    "refId": "A",
+                    "query": "event.action:execve AND process.executable:\\/\\/*",
+                    "timeField": "@timestamp",
+                    "bucketAggs": [
+                        {
+                            "id": "2",
+                            "type": "terms",
+                            "field": "process.executable.keyword",
+                            "settings": {"size": "30", "order": "desc", "orderBy": "_count", "min_doc_count": "1"}
+                        }
+                    ],
+                    "metrics": [{"id": "1", "type": "count"}]
+                }
+            ],
+            "transformations": [
+                {
+                    "id": "organize",
+                    "options": {
+                        "renameByName": {
+                            "process.executable.keyword": "Executable",
+                            "Count": "Count"
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "datasource": {"type": "elasticsearch", "uid": "ef6pmu9oze7eoc"},
+            "fieldConfig": {
+                "defaults": {
+                    "color": {"mode": "palette-classic"}
+                },
+                "overrides": []
+            },
+            "gridPos": {"h": 10, "w": 12, "x": 12, "y": 23},
+            "id": 21,
+            "options": {
+                "legend": {"displayMode": "table", "placement": "right", "values": ["value", "percent"]},
+                "pieType": "donut",
+                "reduceOptions": {"calcs": ["sum"], "fields": "", "values": false},
+                "tooltip": {"mode": "single"}
+            },
+            "title": "Event Action Distribution",
+            "type": "piechart",
+            "targets": [
+                {
+                    "refId": "A",
+                    "query": "*",
+                    "timeField": "@timestamp",
+                    "bucketAggs": [
+                        {
+                            "id": "2",
+                            "type": "terms",
+                            "field": "event.action.keyword",
+                            "settings": {"size": "10", "order": "desc", "orderBy": "_count"}
+                        }
+                    ],
+                    "metrics": [{"id": "1", "type": "count"}]
+                }
+            ]
+        },
+        {
+            "datasource": {"type": "elasticsearch", "uid": "ef6pmu9oze7eoc"},
+            "fieldConfig": {
+                "defaults": {
+                    "color": {"mode": "palette-classic"},
+                    "custom": {"align": "auto"}
+                },
+                "overrides": []
+            },
+            "gridPos": {"h": 10, "w": 12, "x": 0, "y": 33},
+            "id": 22,
+            "options": {
+                "showHeader": true,
+                "sortBy": [{"displayName": "Count", "desc": true}]
+            },
+            "title": "Suspicious Executables (from /tmp, /dev/shm, /var/tmp)",
+            "type": "table",
+            "targets": [
+                {
+                    "refId": "A",
+                    "query": "event.action:execve AND (process.executable:\\/tmp\\/* OR process.executable:\\/dev\\/shm\\/* OR process.executable:\\/var\\/tmp\\/*)",
+                    "timeField": "@timestamp",
+                    "bucketAggs": [
+                        {
+                            "id": "2",
+                            "type": "terms",
+                            "field": "process.executable.keyword",
+                            "settings": {"size": "20", "order": "desc", "orderBy": "_count"}
+                        }
+                    ],
+                    "metrics": [{"id": "1", "type": "count"}]
+                }
+            ]
+        },
+        {
+            "datasource": {"type": "elasticsearch", "uid": "ef6pmu9oze7eoc"},
+            "fieldConfig": {
+                "defaults": {
+                    "color": {"mode": "palette-classic"},
+                    "custom": {"align": "auto"}
+                },
+                "overrides": []
+            },
+            "gridPos": {"h": 10, "w": 12, "x": 12, "y": 33},
+            "id": 23,
+            "options": {
+                "showHeader": true,
+                "sortBy": [{"displayName": "Count", "desc": true}]
+            },
+            "title": "Top Process Arguments (execve)",
+            "type": "table",
+            "targets": [
+                {
+                    "refId": "A",
+                    "query": "event.action:execve AND process.args:*",
+                    "timeField": "@timestamp",
+                    "bucketAggs": [
+                        {
+                            "id": "2",
+                            "type": "terms",
+                            "field": "process.args.keyword",
+                            "settings": {"size": "30", "order": "desc", "orderBy": "_count"}
+                        }
+                    ],
+                    "metrics": [{"id": "1", "type": "count"}]
+                }
+            ]
+        },
+        {
+            "collapsed": false,
+            "gridPos": {"h": 1, "w": 24, "x": 0, "y": 43},
+            "id": 103,
+            "title": "Authentication & Sessions",
+            "type": "row"
+        },
+        {
+            "datasource": {"type": "elasticsearch", "uid": "ef6pmu9oze7eoc"},
+            "fieldConfig": {
+                "defaults": {
+                    "color": {"mode": "palette-classic"},
+                    "custom": {"align": "auto"}
+                },
+                "overrides": []
+            },
+            "gridPos": {"h": 8, "w": 12, "x": 0, "y": 44},
+            "id": 30,
+            "options": {
+                "showHeader": true,
+                "sortBy": [{"displayName": "Count", "desc": true}]
+            },
+            "title": "Authentication Events",
+            "type": "table",
+            "targets": [
+                {
+                    "refId": "A",
+                    "query": "event.category:authentication OR event.action:logged-in OR event.action:authenticated",
+                    "timeField": "@timestamp",
+                    "bucketAggs": [
+                        {
+                            "id": "3",
+                            "type": "terms",
+                            "field": "event.action.keyword",
+                            "settings": {"size": "10", "order": "desc", "orderBy": "_count"}
+                        },
+                        {
+                            "id": "4",
+                            "type": "terms",
+                            "field": "auditd.log.UID.keyword",
+                            "settings": {"size": "10", "order": "desc", "orderBy": "_count"}
+                        }
+                    ],
+                    "metrics": [{"id": "1", "type": "count"}]
+                }
+            ]
+        },
+        {
+            "datasource": {"type": "elasticsearch", "uid": "ef6pmu9oze7eoc"},
+            "fieldConfig": {
+                "defaults": {
+                    "color": {"mode": "palette-classic"},
+                    "custom": {"align": "auto"}
+                },
+                "overrides": []
+            },
+            "gridPos": {"h": 8, "w": 12, "x": 12, "y": 44},
+            "id": 31,
+            "options": {
+                "showHeader": true,
+                "sortBy": [{"displayName": "Count", "desc": true}]
+            },
+            "title": "SSH Login Source IPs",
+            "type": "table",
+            "targets": [
+                {
+                    "refId": "A",
+                    "query": "source.ip:* AND (event.action:logged-in OR event.action:authenticated)",
+                    "timeField": "@timestamp",
+                    "bucketAggs": [
+                        {
+                            "id": "2",
+                            "type": "terms",
+                            "field": "source.ip.keyword",
+                            "settings": {"size": "20", "order": "desc", "orderBy": "_count"}
+                        }
+                    ],
+                    "metrics": [{"id": "1", "type": "count"}]
+                }
+            ]
+        },
+        {
+            "datasource": {"type": "elasticsearch", "uid": "ef6pmu9oze7eoc"},
+            "fieldConfig": {
+                "defaults": {
+                    "color": {"mode": "palette-classic"},
+                    "custom": {
+                        "axisCenteredZero": false,
+                        "drawStyle": "bars",
+                        "fillOpacity": 80,
+                        "lineWidth": 1,
+                        "stacking": {"mode": "normal"}
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": {"h": 8, "w": 24, "x": 0, "y": 52},
+            "id": 32,
+            "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+            "title": "Sessions Over Time",
+            "type": "timeseries",
+            "targets": [
+                {
+                    "refId": "A",
+                    "query": "event.action:started-session OR event.action:ended-session OR event.action:logged-in",
+                    "timeField": "@timestamp",
+                    "bucketAggs": [
+                        {
+                            "id": "3",
+                            "type": "terms",
+                            "field": "event.action.keyword",
+                            "settings": {"size": "5", "order": "desc", "orderBy": "_count"}
+                        },
+                        {
+                            "id": "2",
+                            "type": "date_histogram",
+                            "field": "@timestamp",
+                            "settings": {"interval": "auto", "min_doc_count": 0}
+                        }
+                    ],
+                    "metrics": [{"id": "1", "type": "count"}]
+                }
+            ]
+        },
+        {
+            "collapsed": false,
+            "gridPos": {"h": 1, "w": 24, "x": 0, "y": 60},
+            "id": 104,
+            "title": "Threat Detection",
+            "type": "row"
+        },
+        {
+            "datasource": {"type": "elasticsearch", "uid": "ef6pmu9oze7eoc"},
+            "fieldConfig": {
+                "defaults": {
+                    "color": {"mode": "palette-classic"},
+                    "custom": {
+                        "axisCenteredZero": false,
+                        "drawStyle": "bars",
+                        "fillOpacity": 80,
+                        "lineWidth": 1
+                    }
+                },
+                "overrides": []
+            },
+            "gridPos": {"h": 8, "w": 24, "x": 0, "y": 61},
+            "id": 40,
+            "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+            "title": "Suspicious /tmp Executions Over Time",
+            "type": "timeseries",
+            "targets": [
+                {
+                    "refId": "A",
+                    "query": "event.action:execve AND (process.executable:\\/tmp\\/* OR process.executable:\\/dev\\/shm\\/* OR process.executable:\\/var\\/tmp\\/*)",
+                    "timeField": "@timestamp",
+                    "bucketAggs": [
+                        {
+                            "id": "3",
+                            "type": "terms",
+                            "field": "process.executable.keyword",
+                            "settings": {"size": "10", "order": "desc", "orderBy": "_count"}
+                        },
+                        {
+                            "id": "2",
+                            "type": "date_histogram",
+                            "field": "@timestamp",
+                            "settings": {"interval": "auto", "min_doc_count": 0}
+                        }
+                    ],
+                    "metrics": [{"id": "1", "type": "count"}]
+                }
+            ]
+        },
+        {
+            "datasource": {"type": "elasticsearch", "uid": "ef6pmu9oze7eoc"},
+            "fieldConfig": {
+                "defaults": {
+                    "color": {"mode": "palette-classic"},
+                    "custom": {"align": "auto"}
+                },
+                "overrides": []
+            },
+            "gridPos": {"h": 10, "w": 12, "x": 0, "y": 69},
+            "id": 41,
+            "options": {
+                "showHeader": true,
+                "sortBy": [{"displayName": "Count", "desc": true}]
+            },
+            "title": "Services Started/Stopped",
+            "type": "table",
+            "targets": [
+                {
+                    "refId": "A",
+                    "query": "event.action:started-service OR event.action:stopped-service",
+                    "timeField": "@timestamp",
+                    "bucketAggs": [
+                        {
+                            "id": "3",
+                            "type": "terms",
+                            "field": "event.action.keyword",
+                            "settings": {"size": "5", "order": "desc", "orderBy": "_count"}
+                        },
+                        {
+                            "id": "4",
+                            "type": "terms",
+                            "field": "auditd.log.unit.keyword",
+                            "settings": {"size": "20", "order": "desc", "orderBy": "_count"}
+                        }
+                    ],
+                    "metrics": [{"id": "1", "type": "count"}]
+                }
+            ]
+        },
+        {
+            "datasource": {"type": "elasticsearch", "uid": "ef6pmu9oze7eoc"},
+            "fieldConfig": {
+                "defaults": {
+                    "color": {"mode": "palette-classic"},
+                    "custom": {"align": "auto"}
+                },
+                "overrides": []
+            },
+            "gridPos": {"h": 10, "w": 12, "x": 12, "y": 69},
+            "id": 42,
+            "options": {
+                "showHeader": true,
+                "sortBy": [{"displayName": "Count", "desc": true}]
+            },
+            "title": "Audit Rule Triggers",
+            "type": "table",
+            "targets": [
+                {
+                    "refId": "A",
+                    "query": "auditd.log.key:*",
+                    "timeField": "@timestamp",
+                    "bucketAggs": [
+                        {
+                            "id": "2",
+                            "type": "terms",
+                            "field": "auditd.log.key.keyword",
+                            "settings": {"size": "20", "order": "desc", "orderBy": "_count"}
+                        }
+                    ],
+                    "metrics": [{"id": "1", "type": "count"}]
+                }
+            ]
+        },
+        {
+            "datasource": {"type": "elasticsearch", "uid": "ef6pmu9oze7eoc"},
+            "fieldConfig": {
+                "defaults": {
+                    "color": {"mode": "palette-classic"},
+                    "custom": {"align": "auto"}
+                },
+                "overrides": []
+            },
+            "gridPos": {"h": 10, "w": 24, "x": 0, "y": 79},
+            "id": 43,
+            "options": {
+                "showHeader": true,
+                "sortBy": [{"displayName": "Count", "desc": true}]
+            },
+            "title": "File Paths Accessed",
+            "type": "table",
+            "targets": [
+                {
+                    "refId": "A",
+                    "query": "event.action:path AND auditd.log.name:*",
+                    "timeField": "@timestamp",
+                    "bucketAggs": [
+                        {
+                            "id": "2",
+                            "type": "terms",
+                            "field": "auditd.log.name.keyword",
+                            "settings": {"size": "30", "order": "desc", "orderBy": "_count"}
+                        }
+                    ],
+                    "metrics": [{"id": "1", "type": "count"}]
+                }
+            ]
+        },
+        {
+            "collapsed": false,
+            "gridPos": {"h": 1, "w": 24, "x": 0, "y": 89},
+            "id": 105,
+            "title": "Recent Events",
+            "type": "row"
+        },
+        {
+            "datasource": {"type": "elasticsearch", "uid": "ef6pmu9oze7eoc"},
+            "gridPos": {"h": 12, "w": 24, "x": 0, "y": 90},
+            "id": 50,
+            "options": {
+                "dedupStrategy": "none",
+                "enableLogDetails": true,
+                "prettifyLogMessage": false,
+                "showCommonLabels": false,
+                "showLabels": false,
+                "showTime": true,
+                "sortOrder": "Descending",
+                "wrapLogMessage": true
+            },
+            "title": "Recent Command Executions",
+            "type": "logs",
+            "targets": [
+                {
+                    "refId": "A",
+                    "query": "event.action:execve AND NOT process.executable:tr AND NOT process.executable:ps AND NOT process.executable:head AND NOT process.executable:readlink",
+                    "timeField": "@timestamp",
+                    "bucketAggs": [],
+                    "metrics": [{"id": "1", "type": "logs", "settings": {"limit": "100"}}]
+                }
+            ]
+        },
+        {
+            "datasource": {"type": "elasticsearch", "uid": "ef6pmu9oze7eoc"},
+            "gridPos": {"h": 12, "w": 24, "x": 0, "y": 102},
+            "id": 51,
+            "options": {
+                "dedupStrategy": "none",
+                "enableLogDetails": true,
+                "prettifyLogMessage": false,
+                "showCommonLabels": false,
+                "showLabels": false,
+                "showTime": true,
+                "sortOrder": "Descending",
+                "wrapLogMessage": true
+            },
+            "title": "Recent Auth & Session Events",
+            "type": "logs",
+            "targets": [
+                {
+                    "refId": "A",
+                    "query": "event.category:authentication OR event.category:session OR event.action:logged-in",
+                    "timeField": "@timestamp",
+                    "bucketAggs": [],
+                    "metrics": [{"id": "1", "type": "logs", "settings": {"limit": "50"}}]
+                }
+            ]
+        }
+    ],
+    "refresh": "10s",
+    "schemaVersion": 38,
+    "style": "dark",
+    "tags": ["honeypot", "auditd", "sacrificial-vm"],
+    "templating": {
+        "list": []
+    },
+    "time": {
+        "from": "now-5m",
+        "to": "now"
+    },
+    "timepicker": {},
+    "timezone": "",
+    "title": "Sacrificial VM - Auditd Monitor",
+    "uid": null,
+    "version": 0
+}
