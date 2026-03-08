@@ -81,7 +81,17 @@
                     "refId": "A",
                     "query": "NOT src_ip:192.168.* AND NOT container.id:suricata",
                     "timeField": "@timestamp",
-                    "bucketAggs": [],
+                    "bucketAggs": [
+                        {
+                            "id": "2",
+                            "type": "date_histogram",
+                            "field": "@timestamp",
+                            "settings": {
+                                "interval": "auto",
+                                "min_doc_count": 0
+                            }
+                        }
+                    ],
                     "metrics": [
                         {
                             "id": "1",
@@ -153,7 +163,17 @@
                     "refId": "A",
                     "query": "NOT src_ip:192.168.* AND NOT container.id:suricata",
                     "timeField": "@timestamp",
-                    "bucketAggs": [],
+                    "bucketAggs": [
+                        {
+                            "id": "2",
+                            "type": "date_histogram",
+                            "field": "@timestamp",
+                            "settings": {
+                                "interval": "auto",
+                                "min_doc_count": 0
+                            }
+                        }
+                    ],
                     "metrics": [
                         {
                             "id": "1",
@@ -226,7 +246,17 @@
                     "refId": "A",
                     "query": "source.geo.country_name:* AND NOT src_ip:192.168.* AND NOT container.id:suricata",
                     "timeField": "@timestamp",
-                    "bucketAggs": [],
+                    "bucketAggs": [
+                        {
+                            "id": "2",
+                            "type": "date_histogram",
+                            "field": "@timestamp",
+                            "settings": {
+                                "interval": "auto",
+                                "min_doc_count": 0
+                            }
+                        }
+                    ],
                     "metrics": [
                         {
                             "id": "1",
@@ -299,7 +329,17 @@
                     "refId": "A",
                     "query": "honeypot.username:* AND NOT container.id:suricata",
                     "timeField": "@timestamp",
-                    "bucketAggs": [],
+                    "bucketAggs": [
+                        {
+                            "id": "2",
+                            "type": "date_histogram",
+                            "field": "@timestamp",
+                            "settings": {
+                                "interval": "auto",
+                                "min_doc_count": 0
+                            }
+                        }
+                    ],
                     "metrics": [
                         {
                             "id": "1",
@@ -371,7 +411,17 @@
                     "refId": "A",
                     "query": "honeypot.download_url:* AND NOT container.id:suricata",
                     "timeField": "@timestamp",
-                    "bucketAggs": [],
+                    "bucketAggs": [
+                        {
+                            "id": "2",
+                            "type": "date_histogram",
+                            "field": "@timestamp",
+                            "settings": {
+                                "interval": "auto",
+                                "min_doc_count": 0
+                            }
+                        }
+                    ],
                     "metrics": [
                         {
                             "id": "1",
@@ -525,7 +575,17 @@
                     "refId": "A",
                     "query": "honeypot.input:* AND NOT container.id:suricata",
                     "timeField": "@timestamp",
-                    "bucketAggs": [],
+                    "bucketAggs": [
+                        {
+                            "id": "2",
+                            "type": "date_histogram",
+                            "field": "@timestamp",
+                            "settings": {
+                                "interval": "auto",
+                                "min_doc_count": 0
+                            }
+                        }
+                    ],
                     "metrics": [
                         {
                             "id": "1",
@@ -598,7 +658,17 @@
                     "refId": "A",
                     "query": "honeypot.session:* AND NOT container.id:suricata",
                     "timeField": "@timestamp",
-                    "bucketAggs": [],
+                    "bucketAggs": [
+                        {
+                            "id": "2",
+                            "type": "date_histogram",
+                            "field": "@timestamp",
+                            "settings": {
+                                "interval": "auto",
+                                "min_doc_count": 0
+                            }
+                        }
+                    ],
                     "metrics": [
                         {
                             "id": "1",
@@ -925,7 +995,7 @@
                 {
                     "refId": "A",
                     "alias": "Ports",
-                    "query": "NOT (dest_ip:192.168.50.3 AND dest_port:9200) AND NOT src_ip:192.168.* AND NOT container.id:suricata",
+                    "query": "NOT src_ip:192.168.* AND NOT container.id:suricata",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -2196,7 +2266,17 @@
                     "refId": "A",
                     "query": "event_type:yara_match OR type:yara_match",
                     "timeField": "@timestamp",
-                    "bucketAggs": [],
+                    "bucketAggs": [
+                        {
+                            "id": "2",
+                            "type": "date_histogram",
+                            "field": "@timestamp",
+                            "settings": {
+                                "interval": "auto",
+                                "min_doc_count": 0
+                            }
+                        }
+                    ],
                     "metrics": [
                         {
                             "id": "1",
@@ -2268,7 +2348,17 @@
                     "refId": "A",
                     "query": "event_type:yara_match OR type:yara_match",
                     "timeField": "@timestamp",
-                    "bucketAggs": [],
+                    "bucketAggs": [
+                        {
+                            "id": "2",
+                            "type": "date_histogram",
+                            "field": "@timestamp",
+                            "settings": {
+                                "interval": "auto",
+                                "min_doc_count": 0
+                            }
+                        }
+                    ],
                     "metrics": [
                         {
                             "id": "1",
@@ -2549,7 +2639,17 @@
                     "refId": "A",
                     "query": "fields.type:honeypot_sample OR type:honeypot_sample",
                     "timeField": "@timestamp",
-                    "bucketAggs": [],
+                    "bucketAggs": [
+                        {
+                            "id": "2",
+                            "type": "date_histogram",
+                            "field": "@timestamp",
+                            "settings": {
+                                "interval": "auto",
+                                "min_doc_count": 0
+                            }
+                        }
+                    ],
                     "metrics": [
                         {
                             "id": "1",
@@ -2617,7 +2717,17 @@
                     "refId": "A",
                     "query": "fields.type:honeypot_sample OR type:honeypot_sample",
                     "timeField": "@timestamp",
-                    "bucketAggs": [],
+                    "bucketAggs": [
+                        {
+                            "id": "2",
+                            "type": "date_histogram",
+                            "field": "@timestamp",
+                            "settings": {
+                                "interval": "auto",
+                                "min_doc_count": 0
+                            }
+                        }
+                    ],
                     "metrics": [
                         {
                             "id": "1",
@@ -3096,7 +3206,7 @@
                     "refId": "A",
                     "query": "src_ip:$honeypot_subnet AND event_type:http",
                     "timeField": "@timestamp",
-                    "bucketAggs": [],
+                    "bucketAggs": [{"id": "2", "type": "date_histogram", "field": "@timestamp", "settings": {"interval": "auto", "min_doc_count": 0}}],
                     "metrics": [{ "id": "1", "type": "count" }]
                 }
             ],
@@ -3138,7 +3248,7 @@
                     "refId": "A",
                     "query": "src_ip:$honeypot_subnet AND event_type:fileinfo",
                     "timeField": "@timestamp",
-                    "bucketAggs": [],
+                    "bucketAggs": [{"id": "2", "type": "date_histogram", "field": "@timestamp", "settings": {"interval": "auto", "min_doc_count": 0}}],
                     "metrics": [{ "id": "1", "type": "count" }]
                 }
             ],
@@ -3180,7 +3290,7 @@
                     "refId": "A",
                     "query": "src_ip:$honeypot_subnet AND event_type:alert",
                     "timeField": "@timestamp",
-                    "bucketAggs": [],
+                    "bucketAggs": [{"id": "2", "type": "date_histogram", "field": "@timestamp", "settings": {"interval": "auto", "min_doc_count": 0}}],
                     "metrics": [{ "id": "1", "type": "count" }]
                 }
             ],
@@ -3222,7 +3332,7 @@
                     "refId": "A",
                     "query": "src_ip:$honeypot_subnet AND event_type:flow",
                     "timeField": "@timestamp",
-                    "bucketAggs": [],
+                    "bucketAggs": [{"id": "2", "type": "date_histogram", "field": "@timestamp", "settings": {"interval": "auto", "min_doc_count": 0}}],
                     "metrics": [{ "id": "1", "type": "count" }]
                 }
             ],
