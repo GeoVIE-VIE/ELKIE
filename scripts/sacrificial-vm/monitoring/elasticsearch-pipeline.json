@@ -1,12 +1,6 @@
 {
-  "description": "Process logs from sacrificial honeypot VM",
+  "description": "Enrich logs from sacrificial honeypot VM (works with filebeat auditd module)",
   "processors": [
-    {
-      "set": {
-        "field": "event.module",
-        "value": "honeypot-sacrificial"
-      }
-    },
     {
       "set": {
         "field": "observer.type",
@@ -21,52 +15,11 @@
     },
 
     {
-      "grok": {
-        "if": "ctx.service?.type == 'auditd'",
-        "field": "message",
-        "patterns": [
-          "type=%{WORD:audit.type}.*?pid=%{NUMBER:process.pid:int}.*?uid=%{NUMBER:user.id:int}.*?comm=\"%{DATA:process.name}\".*?exe=\"%{DATA:process.executable}\"",
-          "type=%{WORD:audit.type}.*?pid=%{NUMBER:process.pid:int}.*?uid=%{NUMBER:user.id:int}",
-          "type=%{WORD:audit.type}"
-        ],
-        "ignore_failure": true
-      }
-    },
-
-    {
-      "grok": {
-        "if": "ctx.service?.type == 'auditd' && ctx.auditd?.log?.SYSCALL == 'execve'",
-        "field": "message",
-        "patterns": [
-          ".*?a0=\"%{DATA:process.args.0}\".*?a1=\"%{DATA:process.args.1}\".*?a2=\"%{DATA:process.args.2}\"",
-          ".*?a0=\"%{DATA:process.args.0}\".*?a1=\"%{DATA:process.args.1}\"",
-          ".*?a0=\"%{DATA:process.args.0}\""
-        ],
-        "ignore_failure": true
-      }
-    },
-
-    {
       "script": {
-        "if": "ctx.service?.type == 'auditd' && ctx.auditd?.log?.a0 != null",
+        "if": "ctx.event?.action == 'execve' && ctx.process?.args != null && ctx.process.args.size() > 0",
         "lang": "painless",
-        "source": "def log = ctx.auditd.log; def args = []; if (log.a0 != null) args.add(log.a0); if (log.a1 != null) args.add(log.a1); if (log.a2 != null) args.add(log.a2); if (log.a3 != null) args.add(log.a3); if (ctx.process == null) ctx.process = new HashMap(); ctx.process.command_line = String.join(' ', args);"
-      }
-    },
-
-    {
-      "set": {
-        "if": "ctx.event_type == 'alert'",
-        "field": "event.kind",
-        "value": "alert"
-      }
-    },
-
-    {
-      "set": {
-        "if": "ctx.event_type == 'flow'",
-        "field": "event.kind",
-        "value": "event"
+        "source": "ctx.honeypot = new HashMap(); ctx.honeypot.input = String.join(' ', ctx.process.args); if (ctx.process.command_line == null) { ctx.process.command_line = ctx.honeypot.input; }",
+        "ignore_failure": true
       }
     },
 
@@ -100,6 +53,21 @@
     },
 
     {
+      "set": {
+        "if": "ctx.event_type == 'alert'",
+        "field": "event.kind",
+        "value": "alert"
+      }
+    },
+    {
+      "set": {
+        "if": "ctx.event_type == 'flow'",
+        "field": "event.kind",
+        "value": "event"
+      }
+    },
+
+    {
       "geoip": {
         "field": "source.ip",
         "target_field": "source.geo",
@@ -118,9 +86,9 @@
 
     {
       "script": {
-        "if": "ctx.process?.command_line != null",
+        "if": "ctx.honeypot?.input != null",
         "lang": "painless",
-        "source": "def cmd = ctx.process.command_line.toLowerCase(); if (cmd.contains('wget') || cmd.contains('curl')) { if (cmd.contains('|') || cmd.contains('bash') || cmd.contains('sh')) { ctx.event.severity = 9; ctx.threat.tactic = 'Execution'; } else { ctx.event.severity = 6; ctx.threat.tactic = 'Command and Control'; } } else if (cmd.contains('chmod +x') || cmd.contains('chmod 777')) { ctx.event.severity = 7; ctx.threat.tactic = 'Execution'; } else if (cmd.contains('/etc/shadow') || cmd.contains('/etc/passwd')) { ctx.event.severity = 8; ctx.threat.tactic = 'Credential Access'; } else if (cmd.contains('nc ') || cmd.contains('ncat') || cmd.contains('/dev/tcp')) { ctx.event.severity = 9; ctx.threat.tactic = 'Command and Control'; } else if (cmd.contains('crontab') || cmd.contains('/etc/cron')) { ctx.event.severity = 8; ctx.threat.tactic = 'Persistence'; } else { ctx.event.severity = 3; ctx.threat.tactic = 'Discovery'; }",
+        "source": "def cmd = ctx.honeypot.input.toLowerCase(); if (ctx.threat == null) ctx.threat = new HashMap(); if (ctx.event.severity == null) ctx.event.severity = 3; if (cmd.contains('wget') || cmd.contains('curl')) { if (cmd.contains('|') || cmd.contains('bash') || cmd.contains('sh')) { ctx.event.severity = 9; ctx.threat.tactic = 'Execution'; } else { ctx.event.severity = 6; ctx.threat.tactic = 'Command and Control'; } } else if (cmd.contains('chmod +x') || cmd.contains('chmod 777')) { ctx.event.severity = 7; ctx.threat.tactic = 'Execution'; } else if (cmd.contains('/etc/shadow') || cmd.contains('/etc/passwd')) { ctx.event.severity = 8; ctx.threat.tactic = 'Credential Access'; } else if (cmd.contains('nc ') || cmd.contains('ncat') || cmd.contains('/dev/tcp')) { ctx.event.severity = 9; ctx.threat.tactic = 'Command and Control'; } else if (cmd.contains('crontab') || cmd.contains('/etc/cron')) { ctx.event.severity = 8; ctx.threat.tactic = 'Persistence'; } else { ctx.event.severity = 3; ctx.threat.tactic = 'Discovery'; }",
         "ignore_failure": true
       }
     }

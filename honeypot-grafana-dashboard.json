@@ -1764,13 +1764,13 @@
                 {
                     "refId": "A",
                     "alias": "Commands",
-                    "query": "honeypot.input:* AND NOT container.id:suricata",
+                    "query": "event.action:execve AND process.executable:*",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
                             "id": "2",
                             "type": "terms",
-                            "field": "honeypot.input",
+                            "field": "process.executable",
                             "settings": {
                                 "size": 15,
                                 "order": "desc",
