@@ -995,7 +995,7 @@
                 {
                     "refId": "A",
                     "alias": "Ports",
-                    "query": "NOT src_ip:192.168.* AND NOT container.id:suricata",
+                    "query": "NOT dest_ip:192.168.50.3 AND NOT src_ip:192.168.* AND NOT container.id:suricata",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
