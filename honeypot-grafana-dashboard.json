@@ -79,7 +79,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "NOT src_ip:192.168.* AND NOT container.id:suricata",
+                    "query": "*",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -100,9 +100,9 @@
                     ]
                 }
             ],
-            "title": "Total Honeypot Hits",
+            "title": "Total Auditd Events",
             "type": "stat",
-            "description": "Total number of attacks captured by honeypots"
+            "description": "Total auditd events captured"
         },
         {
             "datasource": {
@@ -161,7 +161,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "NOT src_ip:192.168.* AND NOT container.id:suricata",
+                    "query": "source.ip:*",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -178,12 +178,12 @@
                         {
                             "id": "1",
                             "type": "cardinality",
-                            "field": "src_ip"
+                            "field": "source.ip"
                         }
                     ]
                 }
             ],
-            "title": "Unique Attacker IPs",
+            "title": "Unique Source IPs",
             "type": "stat",
             "description": "Number of unique source IPs"
         },
@@ -244,7 +244,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "source.geo.country_name:* AND NOT src_ip:192.168.* AND NOT container.id:suricata",
+                    "query": "source.geo.country_name:*",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -327,7 +327,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "honeypot.username:* AND NOT container.id:suricata",
+                    "query": "event.action:logged-in OR event.action:authenticated",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -350,7 +350,7 @@
             ],
             "title": "Login Attempts",
             "type": "stat",
-            "description": "Total credential attempts"
+            "description": "SSH login and auth events"
         },
         {
             "datasource": {
@@ -409,7 +409,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "honeypot.download_url:* AND NOT container.id:suricata",
+                    "query": "event.action:execve AND (process.executable:\\/tmp\\/* OR process.executable:\\/dev\\/shm\\/* OR process.executable:\\/var\\/tmp\\/*)",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -430,9 +430,9 @@
                     ]
                 }
             ],
-            "title": "Malware Downloads",
+            "title": "Suspicious /tmp Execs",
             "type": "stat",
-            "description": "Files downloaded by attackers"
+            "description": "Executions from /tmp, /dev/shm, /var/tmp"
         },
         {
             "datasource": {
@@ -491,7 +491,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "NOT src_ip:192.168.* AND NOT container.id:suricata",
+                    "query": "event.action:execve",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -512,9 +512,9 @@
                     ]
                 }
             ],
-            "title": "Attacks/Hour (Avg)",
+            "title": "Execs/Hour (Avg)",
             "type": "stat",
-            "description": "Average attacks per hour"
+            "description": "Average command executions per hour"
         },
         {
             "datasource": {
@@ -573,7 +573,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "honeypot.input:* AND NOT container.id:suricata",
+                    "query": "event.action:execve",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -590,14 +590,14 @@
                         {
                             "id": "1",
                             "type": "cardinality",
-                            "field": "honeypot.input"
+                            "field": "process.executable.keyword"
                         }
                     ]
                 }
             ],
-            "title": "Unique Commands",
+            "title": "Unique Executables",
             "type": "stat",
-            "description": "Distinct commands executed"
+            "description": "Distinct executables observed"
         },
         {
             "datasource": {
@@ -656,7 +656,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "honeypot.session:* AND NOT container.id:suricata",
+                    "query": "event.action:started-session OR event.action:ended-session",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -672,15 +672,14 @@
                     "metrics": [
                         {
                             "id": "1",
-                            "type": "cardinality",
-                            "field": "honeypot.session"
+                            "type": "count"
                         }
                     ]
                 }
             ],
-            "title": "Active Sessions",
+            "title": "Sessions",
             "type": "stat",
-            "description": "Unique sessions detected"
+            "description": "Session start/end events"
         },
         {
             "datasource": {
@@ -733,8 +732,8 @@
             "targets": [
                 {
                     "refId": "A",
-                    "alias": "Total hits",
-                    "query": "NOT src_ip:192.168.* AND NOT container.id:suricata",
+                    "alias": "execve",
+                    "query": "event.action:execve",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -756,8 +755,8 @@
                 },
                 {
                     "refId": "B",
-                    "alias": "By Honeypot Type",
-                    "query": "NOT src_ip:192.168.* AND NOT container.id:suricata",
+                    "alias": "network/auth",
+                    "query": "event.action:sockaddr OR event.action:logged-in OR event.action:authenticated",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -767,17 +766,6 @@
                             "settings": {
                                 "interval": "auto",
                                 "min_doc_count": 0
-                            }
-                        },
-                        {
-                            "id": "3",
-                            "type": "terms",
-                            "field": "container.id",
-                            "settings": {
-                                "size": 10,
-                                "order": "desc",
-                                "orderBy": "1",
-                                "min_doc_count": 1
                             }
                         }
                     ],
@@ -789,9 +777,9 @@
                     ]
                 }
             ],
-            "title": "Attack Volume Over Time",
+            "title": "Auditd Event Volume Over Time",
             "type": "timeseries",
-            "description": "Total attacks and breakdown by honeypot type"
+            "description": "Command executions and network/auth events over time"
         },
         {
             "datasource": {
@@ -875,26 +863,15 @@
                 {
                     "refId": "A",
                     "alias": "Attacks",
-                    "query": "NOT src_ip:192.168.* AND NOT container.id:suricata",
+                    "query": "event.action:execve",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
                             "id": "2",
                             "type": "terms",
-                            "field": "src_ip",
+                            "field": "process.executable.keyword",
                             "settings": {
-                                "size": 10,
-                                "order": "desc",
-                                "orderBy": "1",
-                                "min_doc_count": 1
-                            }
-                        },
-                        {
-                            "id": "3",
-                            "type": "terms",
-                            "field": "dest_port",
-                            "settings": {
-                                "size": 3,
+                                "size": 15,
                                 "order": "desc",
                                 "orderBy": "1",
                                 "min_doc_count": 1
@@ -909,9 +886,9 @@
                     ]
                 }
             ],
-            "title": "Top Attacker IPs & Ports",
+            "title": "Top Executables",
             "type": "table",
-            "description": "Most active source IPs"
+            "description": "Most frequently executed binaries"
         },
         {
             "datasource": {
@@ -995,13 +972,13 @@
                 {
                     "refId": "A",
                     "alias": "Ports",
-                    "query": "NOT dest_ip:192.168.50.3 AND NOT src_ip:192.168.* AND NOT container.id:suricata",
+                    "query": "event.action:syscall",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
                             "id": "2",
                             "type": "terms",
-                            "field": "dest_port",
+                            "field": "auditd.log.key.keyword",
                             "settings": {
                                 "size": 10,
                                 "order": "desc",
@@ -1018,9 +995,9 @@
                     ]
                 }
             ],
-            "title": "Top Destination Ports",
+            "title": "Audit Rule Triggers",
             "type": "table",
-            "description": "Most targeted ports"
+            "description": "Which audit rules fired most"
         },
         {
             "datasource": {
@@ -1104,7 +1081,7 @@
                 {
                     "refId": "A",
                     "alias": "Countries",
-                    "query": "NOT src_ip:192.168.* AND NOT container.id:suricata",
+                    "query": "source.geo.country_name:*",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -1174,13 +1151,13 @@
                 {
                     "refId": "A",
                     "alias": "Protocols",
-                    "query": "NOT src_ip:192.168.* AND NOT container.id:suricata",
+                    "query": "*",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
                             "id": "2",
                             "type": "terms",
-                            "field": "protocol",
+                            "field": "event.action.keyword",
                             "settings": {
                                 "size": 10,
                                 "order": "desc",
@@ -1197,9 +1174,9 @@
                     ]
                 }
             ],
-            "title": "Top Protocols / Services",
+            "title": "Event Action Distribution",
             "type": "piechart",
-            "description": "Attack distribution by protocol"
+            "description": "Breakdown by auditd event action"
         },
         {
             "datasource": {
@@ -1244,13 +1221,13 @@
                 {
                     "refId": "A",
                     "alias": "Honeypots",
-                    "query": "NOT src_ip:192.168.* AND NOT container.id:suricata AND NOT container.id:p0f",
+                    "query": "auditd.log.record_type:*",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
                             "id": "2",
                             "type": "terms",
-                            "field": "container.id",
+                            "field": "auditd.log.record_type.keyword",
                             "settings": {
                                 "size": 10,
                                 "order": "desc",
@@ -1267,9 +1244,9 @@
                     ]
                 }
             ],
-            "title": "Attacks by Honeypot Type",
+            "title": "Audit Record Types",
             "type": "piechart",
-            "description": "Distribution across different honeypot services"
+            "description": "Distribution of auditd record types (SOCKADDR, SERVICE_START, USER_LOGIN, etc.)"
         },
         {
             "datasource": {
@@ -1336,8 +1313,8 @@
                             }
                         },
                         "location": {
-                            "latitude": "geoip.location.lat",
-                            "longitude": "geoip.location.lon",
+                            "latitude": "source.geo.location.lat",
+                            "longitude": "source.geo.location.lon",
                             "mode": "coords"
                         },
                         "name": "Attack Sources",
@@ -1369,8 +1346,8 @@
                             }
                         },
                         "location": {
-                            "latitude": "geoip.location.lat",
-                            "longitude": "geoip.location.lon",
+                            "latitude": "source.geo.location.lat",
+                            "longitude": "source.geo.location.lon",
                             "mode": "coords"
                         },
                         "name": "Active Streams",
@@ -1393,11 +1370,11 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "geoip.location.lat:* AND NOT src_ip:192.168.* AND NOT container.id:suricata",
+                    "query": "source.geo.location:*",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
-                            "field": "geoip.country_name",
+                            "field": "source.geo.country_name",
                             "id": "3",
                             "settings": {
                                 "min_doc_count": "1",
@@ -1416,12 +1393,12 @@
                         {
                             "id": "2",
                             "type": "avg",
-                            "field": "geoip.location.lat"
+                            "field": "source.geo.location.lat"
                         },
                         {
                             "id": "4",
                             "type": "avg",
-                            "field": "geoip.location.lon"
+                            "field": "source.geo.location.lon"
                         }
                     ]
                 }
@@ -1430,15 +1407,15 @@
                 {
                     "id": "renameByRegex",
                     "options": {
-                        "regex": "Average geoip.location.lat",
-                        "renamePattern": "geoip.location.lat"
+                        "regex": "Average source.geo.location.lat",
+                        "renamePattern": "source.geo.location.lat"
                     }
                 },
                 {
                     "id": "renameByRegex",
                     "options": {
-                        "regex": "Average geoip.location.lon",
-                        "renamePattern": "geoip.location.lon"
+                        "regex": "Average source.geo.location.lon",
+                        "renamePattern": "source.geo.location.lon"
                     }
                 }
             ],
@@ -1528,13 +1505,13 @@
                 {
                     "refId": "A",
                     "alias": "Usernames",
-                    "query": "honeypot.username:* AND NOT container.id:suricata",
+                    "query": "user.name:*",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
                             "id": "2",
                             "type": "terms",
-                            "field": "honeypot.username",
+                            "field": "user.name.keyword",
                             "settings": {
                                 "size": 15,
                                 "order": "desc",
@@ -1551,9 +1528,9 @@
                     ]
                 }
             ],
-            "title": "Top Usernames Attempted",
+            "title": "Top Users",
             "type": "table",
-            "description": "Most common usernames used in attacks"
+            "description": "Most active user accounts"
         },
         {
             "datasource": {
@@ -1637,13 +1614,13 @@
                 {
                     "refId": "A",
                     "alias": "Passwords",
-                    "query": "honeypot.password:* AND NOT container.id:suricata",
+                    "query": "source.ip:*",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
                             "id": "2",
                             "type": "terms",
-                            "field": "honeypot.password",
+                            "field": "source.ip",
                             "settings": {
                                 "size": 15,
                                 "order": "desc",
@@ -1660,9 +1637,9 @@
                     ]
                 }
             ],
-            "title": "Top Passwords Attempted",
+            "title": "Top Source IPs",
             "type": "table",
-            "description": "Most common passwords used in attacks"
+            "description": "Most active SSH source IPs"
         },
         {
             "datasource": {
@@ -1717,18 +1694,12 @@
                     {
                         "matcher": {
                             "id": "byName",
-                            "options": "honeypot.input"
+                            "options": "process.executable.keyword"
                         },
                         "properties": [
                             {
-                                "id": "links",
-                                "value": [
-                                    {
-                                        "title": "View Raw Logs",
-                                        "url": "/explore?orgId=1&left=%5B%22now-24h%22%2C%22now%22%2C%22ef6pmu9oze7eoc%22%2C%7B%22refId%22%3A%22A%22%2C%22query%22%3A%22honeypot.input%3A%22${__value.raw}%22%20AND%20NOT%20container.id%3Asuricata%22%2C%22timeField%22%3A%22%40timestamp%22%2C%22bucketAggs%22%3A%5B%5D%2C%22metrics%22%3A%5B%7B%22id%22%3A%221%22%2C%22type%22%3A%22logs%22%2C%22settings%22%3A%7B%22limit%22%3A100%7D%7D%5D%7D%5D",
-                                        "targetBlank": true
-                                    }
-                                ]
+                                "id": "custom.width",
+                                "value": 300
                             }
                         ]
                     }
@@ -1770,7 +1741,7 @@
                         {
                             "id": "2",
                             "type": "terms",
-                            "field": "process.executable",
+                            "field": "process.executable.keyword",
                             "settings": {
                                 "size": 15,
                                 "order": "desc",
@@ -1834,13 +1805,13 @@
                 {
                     "refId": "A",
                     "alias": "OS",
-                    "query": "honeypot.os:* AND NOT container.id:suricata",
+                    "query": "event.category:*",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
                             "id": "2",
                             "type": "terms",
-                            "field": "honeypot.os",
+                            "field": "event.category.keyword",
                             "settings": {
                                 "size": 10,
                                 "order": "desc",
@@ -1857,9 +1828,9 @@
                     ]
                 }
             ],
-            "title": "OS Fingerprint Distribution",
+            "title": "Event Category Distribution",
             "type": "piechart",
-            "description": "Detected operating systems"
+            "description": "Breakdown by event category (process, authentication, session, etc.)"
         },
         {
             "datasource": {
@@ -1905,7 +1876,7 @@
                 {
                     "refId": "A",
                     "alias": "Attacks per Hour",
-                    "query": "NOT src_ip:192.168.* AND NOT container.id:suricata",
+                    "query": "event.action:execve",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -1926,9 +1897,9 @@
                     ]
                 }
             ],
-            "title": "Hourly Attack Pattern",
+            "title": "Hourly Execution Pattern",
             "type": "timeseries",
-            "description": "Attack frequency by hour of day"
+            "description": "Command execution frequency by hour"
         },
         {
             "datasource": {
@@ -1959,55 +1930,12 @@
                     {
                         "matcher": {
                             "id": "byName",
-                            "options": "src_ip"
+                            "options": "process.executable"
                         },
                         "properties": [
                             {
                                 "id": "custom.width",
-                                "value": 120
-                            },
-                            {
-                                "id": "links",
-                                "value": [
-                                    {
-                                        "title": "View in Elasticsearch",
-                                        "url": "http://localhost:9200/_search?q=src_ip:${__value.raw}"
-                                    }
-                                ]
-                            }
-                        ]
-                    },
-                    {
-                        "matcher": {
-                            "id": "byName",
-                            "options": "download_url"
-                        },
-                        "properties": [
-                            {
-                                "id": "links",
-                                "value": [
-                                    {
-                                        "title": "Open URL",
-                                        "url": "${__value.raw}"
-                                    }
-                                ]
-                            }
-                        ]
-                    },
-                    {
-                        "matcher": {
-                            "id": "byName",
-                            "options": "file_hash"
-                        },
-                        "properties": [
-                            {
-                                "id": "links",
-                                "value": [
-                                    {
-                                        "title": "VirusTotal",
-                                        "url": "https://www.virustotal.com/gui/file/${__value.raw}"
-                                    }
-                                ]
+                                "value": 250
                             }
                         ]
                     }
@@ -2033,7 +1961,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "NOT src_ip:192.168.* AND NOT container.id:suricata",
+                    "query": "event.action:execve AND NOT process.executable:tr AND NOT process.executable:ps AND NOT process.executable:head AND NOT process.executable:readlink",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
@@ -2061,28 +1989,20 @@
                         "indexByName": {},
                         "renameByName": {
                             "@timestamp": "Time",
-                            "src_ip": "Source IP",
-                            "dest_ip": "Dest IP",
-                            "dest_port": "Port",
-                            "source.geo.country_name": "Country",
-                            "honeypot_type": "Honeypot",
-                            "honeypot.app_proto": "Protocol",
-                            "username": "Username",
-                            "password": "Password",
-                            "command": "Command",
-                            "download_url": "Download URL",
-                            "file_hash": "File Hash",
-                            "event_type": "Event Type",
-                            "os_fingerprint": "OS",
-                            "request_path": "Path",
-                            "session_id": "Session"
+                            "process.executable": "Executable",
+                            "process.args": "Arguments",
+                            "process.pid": "PID",
+                            "process.ppid": "PPID",
+                            "user.name": "User",
+                            "event.action": "Action",
+                            "auditd.log.key": "Audit Rule"
                         }
                     }
                 }
             ],
-            "title": "Recent Honeypot Events",
+            "title": "Recent Command Executions",
             "type": "table",
-            "description": "Detailed event log with clickable links"
+            "description": "Recent commands (filtered out noisy tr/ps/head/readlink)"
         },
         {
             "datasource": {
@@ -2166,7 +2086,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "honeypot.download_url:* AND NOT container.id:suricata",
+                    "query": "event.category:authentication OR event.category:session OR event.action:logged-in",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
@@ -2194,18 +2114,18 @@
                         "indexByName": {},
                         "renameByName": {
                             "@timestamp": "Time",
-                            "src_ip": "Source IP",
+                            "source.ip": "Source IP",
                             "source.geo.country_name": "Country",
-                            "container.id": "Honeypot",
-                            "download_url": "Download URL",
-                            "file_hash": "File Hash"
+                            "user.name": "User",
+                            "event.action": "Action",
+                            "event.outcome": "Outcome"
                         }
                     }
                 }
             ],
-            "title": "Malware Downloads",
+            "title": "Recent Auth & Session Events",
             "type": "table",
-            "description": "Files downloaded by attackers with VirusTotal links"
+            "description": "SSH logins, session starts, authentication events"
         },
         {
             "datasource": {
@@ -3833,7 +3753,7 @@
         ]
     },
     "timezone": "",
-    "title": "Honeypot Threat Overview",
+    "title": "Sacrificial VM - Auditd Threat Overview",
     "uid": "tpot-attack-overview",
     "version": 2,
     "weekStart": ""
