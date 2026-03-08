@@ -46,5 +46,6 @@ filebeat.inputs:
 output.elasticsearch:
   hosts: ["192.168.50.3:9200"]
   index: "sacrificial-vm-%{+yyyy.MM.dd}"
+  pipeline: "honeypot-sacrificial"
 
 setup.ilm.enabled: false
