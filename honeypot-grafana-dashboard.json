@@ -79,7 +79,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "NOT (src_ip:192.168.* OR source.ip:192.168.*) AND NOT container.id:suricata",
+                    "query": "NOT src_ip:192.168.* AND NOT source.ip:192.168.* AND NOT container.id:suricata",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
@@ -152,7 +152,7 @@
                 {
                     "refId": "A",
                     "alias": "T-Pot IPs",
-                    "query": "src_ip:* AND NOT (src_ip:192.168.* OR source.ip:192.168.*) AND NOT container.id:suricata",
+                    "query": "src_ip:* AND NOT src_ip:192.168.* AND NOT source.ip:192.168.* AND NOT container.id:suricata",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
@@ -166,7 +166,7 @@
                 {
                     "refId": "B",
                     "alias": "Sacrificial VM IPs",
-                    "query": "source.ip:* AND NOT (src_ip:192.168.* OR source.ip:192.168.*) AND NOT container.id:suricata",
+                    "query": "source.ip:* AND NOT src_ip:192.168.* AND NOT source.ip:192.168.* AND NOT container.id:suricata",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
@@ -239,7 +239,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "(source.geo.country_name:*) AND NOT (src_ip:192.168.* OR source.ip:192.168.*) AND NOT container.id:suricata",
+                    "query": "(source.geo.country_name:*) AND NOT src_ip:192.168.* AND NOT source.ip:192.168.* AND NOT container.id:suricata",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
@@ -456,7 +456,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "NOT (src_ip:192.168.* OR source.ip:192.168.*) AND NOT container.id:suricata",
+                    "query": "NOT src_ip:192.168.* AND NOT source.ip:192.168.* AND NOT container.id:suricata",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -679,7 +679,7 @@
                 {
                     "refId": "A",
                     "alias": "Total hits",
-                    "query": "NOT (src_ip:192.168.* OR source.ip:192.168.*) AND NOT container.id:suricata",
+                    "query": "NOT src_ip:192.168.* AND NOT source.ip:192.168.* AND NOT container.id:suricata",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -702,7 +702,7 @@
                 {
                     "refId": "B",
                     "alias": "By T-Pot Honeypot",
-                    "query": "container.id:* AND NOT (src_ip:192.168.* OR source.ip:192.168.*) AND NOT container.id:suricata",
+                    "query": "container.id:* AND NOT src_ip:192.168.* AND NOT source.ip:192.168.* AND NOT container.id:suricata",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -736,7 +736,7 @@
                 {
                     "refId": "C",
                     "alias": "Sacrificial VM",
-                    "query": "observer.product:sacrificial-vm AND NOT (src_ip:192.168.* OR source.ip:192.168.*)",
+                    "query": "observer.product:sacrificial-vm AND NOT src_ip:192.168.* AND NOT source.ip:192.168.*",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -843,7 +843,7 @@
                 {
                     "refId": "A",
                     "alias": "T-Pot Attacks",
-                    "query": "src_ip:* AND NOT (src_ip:192.168.* OR source.ip:192.168.*) AND NOT container.id:suricata",
+                    "query": "src_ip:* AND NOT src_ip:192.168.* AND NOT source.ip:192.168.* AND NOT container.id:suricata",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -879,7 +879,7 @@
                 {
                     "refId": "B",
                     "alias": "Sacrificial VM Attacks",
-                    "query": "source.ip:* AND NOT (src_ip:192.168.* OR source.ip:192.168.*) AND NOT container.id:suricata",
+                    "query": "source.ip:* AND NOT src_ip:192.168.* AND NOT source.ip:192.168.* AND NOT container.id:suricata",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -999,7 +999,7 @@
                 {
                     "refId": "A",
                     "alias": "T-Pot Ports",
-                    "query": "dest_port:* AND NOT (dest_ip:192.168.50.3 AND dest_port:9200) AND NOT (src_ip:192.168.* OR source.ip:192.168.*) AND NOT container.id:suricata",
+                    "query": "dest_port:* AND NOT (dest_ip:192.168.50.3 AND dest_port:9200) AND NOT src_ip:192.168.* AND NOT source.ip:192.168.* AND NOT container.id:suricata",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -1024,7 +1024,7 @@
                 {
                     "refId": "B",
                     "alias": "Sacrificial VM Ports",
-                    "query": "destination.port:* AND NOT (destination.ip:192.168.50.3 AND destination.port:9200) AND NOT (src_ip:192.168.* OR source.ip:192.168.*) AND NOT container.id:suricata",
+                    "query": "destination.port:* AND NOT (destination.ip:192.168.50.3 AND destination.port:9200) AND NOT src_ip:192.168.* AND NOT source.ip:192.168.* AND NOT container.id:suricata",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -1133,7 +1133,7 @@
                 {
                     "refId": "A",
                     "alias": "Countries",
-                    "query": "NOT (src_ip:192.168.* OR source.ip:192.168.*) AND NOT container.id:suricata",
+                    "query": "NOT src_ip:192.168.* AND NOT source.ip:192.168.* AND NOT container.id:suricata",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -1203,7 +1203,7 @@
                 {
                     "refId": "A",
                     "alias": "Protocols",
-                    "query": "NOT (src_ip:192.168.* OR source.ip:192.168.*) AND NOT container.id:suricata",
+                    "query": "NOT src_ip:192.168.* AND NOT source.ip:192.168.* AND NOT container.id:suricata",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -1273,7 +1273,7 @@
                 {
                     "refId": "A",
                     "alias": "T-Pot Honeypots",
-                    "query": "container.id:* AND NOT (src_ip:192.168.* OR source.ip:192.168.*) AND NOT container.id:suricata AND NOT container.id:p0f",
+                    "query": "container.id:* AND NOT src_ip:192.168.* AND NOT source.ip:192.168.* AND NOT container.id:suricata AND NOT container.id:p0f",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -1298,7 +1298,7 @@
                 {
                     "refId": "B",
                     "alias": "Sacrificial VM",
-                    "query": "observer.product:sacrificial-vm AND NOT (src_ip:192.168.* OR source.ip:192.168.*)",
+                    "query": "observer.product:sacrificial-vm AND NOT src_ip:192.168.* AND NOT source.ip:192.168.*",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -1447,7 +1447,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "(geoip.location.lat:* OR source.geo.location:*) AND NOT (src_ip:192.168.* OR source.ip:192.168.*) AND NOT container.id:suricata",
+                    "query": "(geoip.location.lat:* OR source.geo.location:*) AND NOT src_ip:192.168.* AND NOT source.ip:192.168.* AND NOT container.id:suricata",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -1959,7 +1959,7 @@
                 {
                     "refId": "A",
                     "alias": "Attacks per Hour",
-                    "query": "NOT (src_ip:192.168.* OR source.ip:192.168.*) AND NOT container.id:suricata",
+                    "query": "NOT src_ip:192.168.* AND NOT source.ip:192.168.* AND NOT container.id:suricata",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -2087,7 +2087,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "NOT (src_ip:192.168.* OR source.ip:192.168.*) AND NOT container.id:suricata",
+                    "query": "NOT src_ip:192.168.* AND NOT source.ip:192.168.* AND NOT container.id:suricata",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [
