@@ -1,19 +1,12 @@
-filebeat.inputs:
-  - type: filestream
-    id: auditd
-    enabled: true
-    paths:
-      - /var/log/audit/audit.log
-    fields:
-      log_type: auditd
-      honeypot_type: sacrificial-vm
-    fields_under_root: false
-    parsers:
-      - multiline:
-          pattern: '^type='
-          negate: true
-          match: after
+filebeat.config.modules:
+  path: ${path.config}/modules.d/*.yml
 
+filebeat.modules:
+  - module: auditd
+    log:
+      enabled: true
+
+filebeat.inputs:
   - type: filestream
     id: auth
     enabled: true
@@ -38,14 +31,14 @@ filebeat.inputs:
       honeypot_type: sacrificial-vm
     fields_under_root: false
 
-# NOTE: The VM currently uses the Filebeat auditd module instead of
-# this filestream config. The auditd module sets service.type=auditd
-# and event.module=auditd (not fields.log_type). The ingest pipeline
-# in elasticsearch-pipeline.json checks service.type accordingly.
+# The auditd module parses audit.log and produces structured fields:
+#   event.action: "execve", process.args, process.executable, etc.
+# The custom pipeline is optional for enrichment (threat scoring).
 
 output.elasticsearch:
   hosts: ["192.168.50.3:9200"]
   index: "sacrificial-vm-%{+yyyy.MM.dd}"
   pipeline: "honeypot-sacrificial"
 
+setup.template.enabled: false
 setup.ilm.enabled: false
