@@ -150,7 +150,7 @@
                 "orientation": "horizontal",
                 "reduceOptions": {
                     "calcs": [
-                        "lastNotNull"
+                        "sum"
                     ],
                     "fields": "",
                     "values": false
@@ -233,7 +233,7 @@
                 "orientation": "horizontal",
                 "reduceOptions": {
                     "calcs": [
-                        "lastNotNull"
+                        "sum"
                     ],
                     "fields": "",
                     "values": false
@@ -316,7 +316,7 @@
                 "orientation": "horizontal",
                 "reduceOptions": {
                     "calcs": [
-                        "lastNotNull"
+                        "sum"
                     ],
                     "fields": "",
                     "values": false
@@ -398,7 +398,7 @@
                 "orientation": "horizontal",
                 "reduceOptions": {
                     "calcs": [
-                        "lastNotNull"
+                        "sum"
                     ],
                     "fields": "",
                     "values": false
@@ -562,7 +562,7 @@
                 "orientation": "horizontal",
                 "reduceOptions": {
                     "calcs": [
-                        "lastNotNull"
+                        "sum"
                     ],
                     "fields": "",
                     "values": false
@@ -645,7 +645,7 @@
                 "orientation": "horizontal",
                 "reduceOptions": {
                     "calcs": [
-                        "lastNotNull"
+                        "sum"
                     ],
                     "fields": "",
                     "values": false
@@ -1138,7 +1138,7 @@
                 },
                 "pieType": "donut",
                 "reduceOptions": {
-                    "calcs": ["lastNotNull"],
+                    "calcs": ["sum"],
                     "fields": "",
                     "values": true
                 },
@@ -1208,7 +1208,7 @@
                 },
                 "pieType": "donut",
                 "reduceOptions": {
-                    "calcs": ["lastNotNull"],
+                    "calcs": ["sum"],
                     "fields": "",
                     "values": true
                 },
@@ -1792,7 +1792,7 @@
                 },
                 "pieType": "donut",
                 "reduceOptions": {
-                    "calcs": ["lastNotNull"],
+                    "calcs": ["sum"],
                     "fields": "",
                     "values": true
                 },
@@ -2255,7 +2255,7 @@
                 "orientation": "horizontal",
                 "reduceOptions": {
                     "calcs": [
-                        "lastNotNull"
+                        "sum"
                     ],
                     "fields": "",
                     "values": false
@@ -2460,7 +2460,7 @@
                 },
                 "pieType": "donut",
                 "reduceOptions": {
-                    "calcs": ["lastNotNull"],
+                    "calcs": ["sum"],
                     "fields": "",
                     "values": true
                 },
@@ -2624,7 +2624,7 @@
                 "orientation": "horizontal",
                 "reduceOptions": {
                     "calcs": [
-                        "lastNotNull"
+                        "sum"
                     ],
                     "fields": "",
                     "values": false
@@ -2691,7 +2691,7 @@
                 },
                 "pieType": "donut",
                 "reduceOptions": {
-                    "calcs": ["lastNotNull"],
+                    "calcs": ["sum"],
                     "fields": "",
                     "values": true
                 },
