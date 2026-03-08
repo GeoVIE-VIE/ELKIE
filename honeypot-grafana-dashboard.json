@@ -3598,7 +3598,8 @@
     "tags": [
         "honeypot",
         "security",
-        "tpot"
+        "auditd",
+        "sacrificial-vm"
     ],
     "templating": {
         "list": [
@@ -3633,53 +3634,13 @@
                 "current": {}
             },
             {
-                "name": "Container",
-                "type": "query",
-                "datasource": {
-                    "type": "elasticsearch",
-                    "uid": "ef6pmu9oze7eoc"
-                },
-                "refresh": 1,
-                "hide": 0,
-                "query": "{\"find\":\"terms\",\"field\":\"container.id\"}",
-                "includeAll": true,
-                "allValue": "*",
-                "multi": true,
-                "label": "Container",
-                "current": {
-                    "selected": true,
-                    "text": "All",
-                    "value": "*"
-                }
-            },
-            {
-                "name": "Attacker_IP",
-                "type": "query",
-                "datasource": {
-                    "type": "elasticsearch",
-                    "uid": "ef6pmu9oze7eoc"
-                },
-                "refresh": 1,
-                "hide": 0,
-                "query": "{\"find\":\"terms\",\"field\":\"src_ip\"}",
-                "includeAll": true,
-                "allValue": "*",
-                "multi": true,
-                "label": "Attacker IP",
-                "current": {
-                    "selected": true,
-                    "text": "All",
-                    "value": "*"
-                }
-            },
-            {
                 "name": "Source_Country",
                 "type": "query",
                 "datasource": {
                     "type": "elasticsearch",
                     "uid": "ef6pmu9oze7eoc"
                 },
-                "refresh": 1,
+                "refresh": 2,
                 "hide": 0,
                 "query": "{\"find\":\"terms\",\"field\":\"source.geo.country_name\"}",
                 "includeAll": true,
@@ -3693,19 +3654,19 @@
                 }
             },
             {
-                "name": "Honeypot_Type",
+                "name": "Event_Action",
                 "type": "query",
                 "datasource": {
                     "type": "elasticsearch",
                     "uid": "ef6pmu9oze7eoc"
                 },
-                "refresh": 1,
+                "refresh": 2,
                 "hide": 0,
-                "query": "{\"find\":\"terms\",\"field\":\"container.id\"}",
+                "query": "{\"find\":\"terms\",\"field\":\"event.action.keyword\"}",
                 "includeAll": true,
                 "allValue": "*",
                 "multi": true,
-                "label": "Honeypot Type",
+                "label": "Event Action",
                 "current": {
                     "selected": true,
                     "text": "All",
@@ -3713,19 +3674,19 @@
                 }
             },
             {
-                "name": "Protocol",
+                "name": "User",
                 "type": "query",
                 "datasource": {
                     "type": "elasticsearch",
                     "uid": "ef6pmu9oze7eoc"
                 },
-                "refresh": 1,
+                "refresh": 2,
                 "hide": 0,
-                "query": "{\"find\":\"terms\",\"field\":\"protocol\"}",
+                "query": "{\"find\":\"terms\",\"field\":\"user.name.keyword\"}",
                 "includeAll": true,
                 "allValue": "*",
                 "multi": true,
-                "label": "Protocol",
+                "label": "User",
                 "current": {
                     "selected": true,
                     "text": "All",
