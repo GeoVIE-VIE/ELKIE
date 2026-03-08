@@ -3058,7 +3058,7 @@
             "gridPos": { "h": 1, "w": 24, "x": 0, "y": 112 },
             "id": 40,
             "panels": [],
-            "title": "Sacrificial VM — HTTP / HTTPS / DNS Traffic",
+            "title": "Sacrificial VM — HTTP / File Activity / Alerts / Flows",
             "type": "row"
         },
         {
@@ -3136,13 +3136,13 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "src_ip:$honeypot_subnet AND event_type:tls",
+                    "query": "src_ip:$honeypot_subnet AND event_type:fileinfo",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [{ "id": "1", "type": "count" }]
                 }
             ],
-            "title": "TLS/HTTPS Connections",
+            "title": "File Downloads",
             "type": "stat"
         },
         {
@@ -3178,13 +3178,13 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "src_ip:$honeypot_subnet AND event_type:dns",
+                    "query": "src_ip:$honeypot_subnet AND event_type:alert",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
                     "metrics": [{ "id": "1", "type": "count" }]
                 }
             ],
-            "title": "DNS Queries",
+            "title": "Suricata Alerts",
             "type": "stat"
         },
         {
@@ -3220,13 +3220,13 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "src_ip:$honeypot_subnet AND event_type:http AND http.hostname:*",
+                    "query": "src_ip:$honeypot_subnet AND event_type:flow",
                     "timeField": "@timestamp",
                     "bucketAggs": [],
-                    "metrics": [{ "id": "1", "type": "cardinality", "field": "http.hostname" }]
+                    "metrics": [{ "id": "1", "type": "count" }]
                 }
             ],
-            "title": "Unique Domains (HTTP)",
+            "title": "Flow Sessions",
             "type": "stat"
         },
         {
@@ -3318,22 +3318,22 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "src_ip:$honeypot_subnet AND event_type:tls AND tls.sni:*",
+                    "query": "src_ip:$honeypot_subnet AND event_type:alert AND alert.signature:*",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
                             "id": "2",
                             "type": "terms",
-                            "field": "tls.sni",
+                            "field": "alert.signature",
                             "settings": { "size": 50, "order": "desc", "orderBy": "_count", "min_doc_count": 1 }
                         }
                     ],
                     "metrics": [{ "id": "1", "type": "count" }]
                 }
             ],
-            "title": "Top HTTPS Domains (TLS SNI)",
+            "title": "Top Alert Signatures",
             "type": "table",
-            "description": "Domains seen in TLS Server Name Indication — reveals what HTTPS sites attackers connect to"
+            "description": "Suricata alert signatures triggered by honeypot traffic — shows detected attack patterns"
         },
         {
             "datasource": {
@@ -3371,22 +3371,22 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "src_ip:$honeypot_subnet AND event_type:dns AND dns.rrname:*",
+                    "query": "src_ip:$honeypot_subnet AND event_type:fileinfo AND fileinfo.filename:*",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
                             "id": "2",
                             "type": "terms",
-                            "field": "dns.rrname",
+                            "field": "fileinfo.filename",
                             "settings": { "size": 50, "order": "desc", "orderBy": "_count", "min_doc_count": 1 }
                         }
                     ],
                     "metrics": [{ "id": "1", "type": "count" }]
                 }
             ],
-            "title": "Top DNS Queries",
+            "title": "Top Downloaded Files",
             "type": "table",
-            "description": "DNS names resolved by attackers — shows C2 domains, download servers, etc."
+            "description": "Files extracted by Suricata from honeypot traffic — shows malware drops, scripts, payloads"
         },
         {
             "datasource": {
@@ -3538,7 +3538,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "src_ip:$honeypot_subnet AND (event_type:http OR event_type:tls)",
+                    "query": "src_ip:$honeypot_subnet AND (event_type:http OR event_type:fileinfo OR event_type:flow OR event_type:alert OR event_type:anomaly)",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -3551,15 +3551,15 @@
                             "id": "3",
                             "type": "terms",
                             "field": "event_type",
-                            "settings": { "size": 5, "order": "desc", "orderBy": "_count", "min_doc_count": 1 }
+                            "settings": { "size": 10, "order": "desc", "orderBy": "_count", "min_doc_count": 1 }
                         }
                     ],
                     "metrics": [{ "id": "1", "type": "count" }]
                 }
             ],
-            "title": "HTTP/HTTPS Traffic Over Time",
+            "title": "All Honeypot Traffic Over Time",
             "type": "timeseries",
-            "description": "Volume of HTTP vs TLS traffic over time from the sacrificial VM"
+            "description": "Volume of HTTP, file, flow, alert, and anomaly traffic over time from the sacrificial VM"
         }
     ],
     "refresh": "30s",
