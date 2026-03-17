@@ -18,7 +18,7 @@
       "script": {
         "if": "ctx.event?.action == 'execve' && ctx.process?.args != null && ctx.process.args.size() > 0",
         "lang": "painless",
-        "source": "ctx.honeypot = new HashMap(); ctx.honeypot.input = String.join(' ', ctx.process.args); if (ctx.process.command_line == null) { ctx.process.command_line = ctx.honeypot.input; }",
+        "source": "ctx.honeypot = new HashMap(); ctx.honeypot.input = String.join(' ', ctx.process.args); ctx.process.command_line = ctx.honeypot.input;",
         "ignore_failure": true
       }
     },
