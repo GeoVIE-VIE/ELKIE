@@ -454,7 +454,7 @@
             "targets": [
                 {
                     "refId": "A",
-                    "query": "event.action:execve AND process.executable:\\/\\/*",
+                    "query": "event.action:execve AND process.executable:\\/*",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
@@ -563,18 +563,18 @@
                 "showHeader": true,
                 "sortBy": [{"displayName": "Count", "desc": true}]
             },
-            "title": "Top Process Arguments (execve)",
+            "title": "Top Commands Executed",
             "type": "table",
             "targets": [
                 {
                     "refId": "A",
-                    "query": "event.action:execve AND process.args:*",
+                    "query": "event.action:execve AND process.command_line:*",
                     "timeField": "@timestamp",
                     "bucketAggs": [
                         {
                             "id": "2",
                             "type": "terms",
-                            "field": "process.args.keyword",
+                            "field": "process.command_line.keyword",
                             "settings": {"size": "30", "order": "desc", "orderBy": "_count"}
                         }
                     ],
