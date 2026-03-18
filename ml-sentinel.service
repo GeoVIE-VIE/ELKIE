@@ -1,0 +1,16 @@
+[Unit]
+Description=ML Sentinel — ML-Enhanced Honeypot Threat Detection
+After=network.target elasticsearch.service
+Wants=network.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/bin/python3 /home/legs/ml_sentinel.py --severity-threshold high --webhook-url "***REDACTED***" --baseline-hours 24 --retrain-interval 3600
+Restart=on-failure
+RestartSec=30
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,16 @@
+[Unit]
+Description=Cowrie Sentinel — Honeypot Session Intelligence
+After=network.target elasticsearch.service
+Wants=elasticsearch.service
+
+[Service]
+Type=simple
+User=legs
+ExecStart=/usr/bin/python3 /home/legs/cowrie_sentinel.py --alert-threshold high --backfill 1 --webhook-url "***REDACTED***"
+Restart=on-failure
+RestartSec=30
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

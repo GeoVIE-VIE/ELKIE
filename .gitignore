@@ -1,0 +1,56 @@
+# System/user files
+.bash_history
+.bash_logout
+.bashrc
+.profile
+.cache/
+.local/
+.ssh/
+.sudo_as_admin_successful
+.viminfo
+
+# Claude Code internals
+.claude/
+.claude.json
+
+# NPM/misc
+.npm/
+.lesshst
+
+# Sensitive files
+.env
+.sentinel_state.json
+.ml_sentinel_state.json
+reported_ips.txt
+abuseipdb.log
+
+# Logs
+*.log
+cowrie_sentinel.log
+
+# Data/temp
+elk/esdata/
+sentinel_alerts/
+ml_models/
+gridpot_build/
+suricata.json
+suricata.json.save
+suricata_sample.json
+fields.json
+populated-fields.txt
+test.txt
+
+# Node
+node_modules/
+package-lock.json
+
+# Docker
+*.tar.gz
+
+# Python
+__pycache__/
+*.pyc
+
+# Editor
+.python_history
+.selected_editor
