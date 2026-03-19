@@ -1,0 +1,16 @@
+[Unit]
+Description=Outlook Sentinel — Email Threat Analysis & Junk Cleanup
+After=network.target
+
+[Service]
+Type=simple
+User=legs
+EnvironmentFile=/home/legs/.sample_analyzer_env
+ExecStart=/usr/bin/python3 /home/legs/outlook_sentinel.py --backfill 24 --webhook-url "${DISCORD_WEBHOOK}"
+Restart=on-failure
+RestartSec=30
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

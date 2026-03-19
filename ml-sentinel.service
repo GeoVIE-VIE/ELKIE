@@ -6,7 +6,7 @@ Wants=network.target
 [Service]
 Type=simple
 User=root
-ExecStart=/usr/bin/python3 /home/legs/ml_sentinel.py --severity-threshold high --webhook-url "***REDACTED***" --baseline-hours 24 --retrain-interval 3600
+ExecStart=/usr/bin/python3 /home/legs/ml_sentinel.py --severity-threshold high --verbosity normal --alert-cooldown 300 --webhook-url "***REDACTED***" --baseline-hours 24 --retrain-interval 3600
 Restart=on-failure
 RestartSec=30
 StandardOutput=journal

@@ -1,0 +1,17 @@
+[Unit]
+Description=PortScan Defender — Auto-block rapid port scanners
+After=network.target docker.service
+Wants=network.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/bin/python3 /home/lepots/portscan_defender.py --threshold 8 --window 60 --block-duration 86400
+Restart=on-failure
+RestartSec=30
+StandardOutput=journal
+StandardError=journal
+Environment=ABUSEIPDB_API_KEY=
+
+[Install]
+WantedBy=multi-user.target

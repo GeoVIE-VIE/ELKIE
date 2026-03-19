@@ -37,11 +37,12 @@ class Config:
     log_file: str = "/home/legs/cowrie_sentinel.log"
     output_dir: str = "/home/legs/sentinel_alerts"
     state_file: str = "/home/legs/.sentinel_state.json"
-    grafana_url: Optional[str] = "https://localhost:3000"
+    grafana_url: Optional[str] = "https://192.168.50.3:3000"
     grafana_auth: Optional[str] = None  # Basic auth header value
     grafana_dashboard_uid: Optional[str] = "tpot-attack-overview"
     backfill_hours: int = 0
     dry_run: bool = False
+    verbosity: str = "normal"              # compact / normal / verbose
 
 SEVERITY_ORDER = {"low": 0, "medium": 1, "high": 2, "critical": 3}
 
@@ -323,7 +324,7 @@ class CowrieSentinel:
 
     # -- scoring -----------------------------------------------------------
 
-    def _score_session(self, sess: Session) -> int:
+    def _score_session(self, sess: Session) -> tuple[int, dict]:
         score = 0
         breakdown = {}
 
@@ -392,7 +393,7 @@ class CowrieSentinel:
             breakdown["credential_diversity"] = 3
 
         sess.score = score
-        return score
+        return score, breakdown
 
     def _classify_session(self, sess: Session) -> str:
         has_commands = len(sess.commands) > 0
@@ -483,12 +484,12 @@ class CowrieSentinel:
     # -- alerting ----------------------------------------------------------
 
     def _finalize_session(self, sess: Session):
-        self._score_session(sess)
+        _, breakdown = self._score_session(sess)
         sess.classification = self._classify_session(sess)
         severity = self._get_severity(sess.score)
-        self._evaluate_alert(sess, severity)
+        self._evaluate_alert(sess, severity, breakdown)
 
-    def _evaluate_alert(self, sess: Session, severity: str):
+    def _evaluate_alert(self, sess: Session, severity: str, breakdown: dict = None):
         threshold = SEVERITY_ORDER.get(self.cfg.alert_threshold, 2)
         sev_level = SEVERITY_ORDER.get(severity, 0)
 
@@ -508,10 +509,10 @@ class CowrieSentinel:
         sess.alerted_at_level = severity
         self.alerted_sessions.add(key)
 
-        alert = self._format_alert(sess, severity)
+        alert = self._format_alert(sess, severity, breakdown)
         self._emit_alert(alert, sess)
 
-    def _format_alert(self, sess: Session, severity: str) -> dict:
+    def _format_alert(self, sess: Session, severity: str, breakdown: dict = None) -> dict:
         hv_cmds = self._check_high_value_commands(sess.commands)
         iocs = self._extract_iocs(sess)
 
@@ -558,6 +559,7 @@ class CowrieSentinel:
                 "domains": iocs["domains"],
                 "file_hashes": iocs["file_hashes"],
             },
+            "score_breakdown": breakdown or {},
         }
 
     def _emit_alert(self, alert: dict, sess: Session):
@@ -602,6 +604,8 @@ class CowrieSentinel:
         score = alert["score"]
         duration = alert["session"]["duration"]
         client_ver = alert["session"].get("client_version", "")
+        alert_id = alert["alert_id"]
+        verbosity = self.cfg.verbosity
 
         color_map = {"critical": 0xED4245, "high": 0xFE8D2F, "medium": 0xFEE75C, "low": 0x57F287}
         icon_map = {"critical": "\U0001f6a8", "high": "\u26a0\ufe0f", "medium": "\U0001f7e1", "low": "\u2139\ufe0f"}
@@ -620,27 +624,55 @@ class CowrieSentinel:
             desc_lines.append(f"Client: `{client_ver}`")
         description = "\n".join(desc_lines)
 
+        # --- Compact mode: minimal phone-friendly embed ---
+        if verbosity == "compact":
+            fields = [
+                {"name": "Threat Score", "value": f"`{score}`", "inline": True},
+                {"name": "Duration", "value": f"`{duration}`", "inline": True},
+                {"name": "Auth Attempts", "value": f"`{alert['auth']['attempts']}`", "inline": True},
+            ]
+            payload = {
+                "embeds": [{
+                    "title": f"{icon} {severity.upper()}: {classification}",
+                    "description": description,
+                    "color": color,
+                    "fields": fields,
+                    "timestamp": alert["timestamp"],
+                    "footer": {"text": f"Cowrie Sentinel  \u2022  {alert_id}"},
+                    "author": {"name": "Cowrie Sentinel  \u2014  SSH Honeypot Intelligence"},
+                }]
+            }
+            self._send_webhook_payload(payload)
+            return
+
+        # --- Normal + Verbose modes ---
+        cred_limit = 8 if verbosity == "normal" else None
+        cmd_limit = 15 if verbosity == "normal" else None
+        cmd_char_limit = 800 if verbosity == "normal" else 1800
+
         fields = [
             {"name": "Threat Score", "value": f"`{score}`", "inline": True},
             {"name": "Duration", "value": f"`{duration}`", "inline": True},
             {"name": "Auth Attempts", "value": f"`{alert['auth']['attempts']}`", "inline": True},
         ]
 
-        # Credentials — compact
+        # Credentials
         if alert["auth"]["credentials"]:
-            creds = alert["auth"]["credentials"][:6]
+            creds = alert["auth"]["credentials"][:cred_limit] if cred_limit else alert["auth"]["credentials"]
             lines = []
             for c in creds:
                 mark = "\u2705" if c.get("success") else "\u274c"
                 lines.append(f"{mark} `{c['username']}:{c['password']}`")
+            if cred_limit and len(alert["auth"]["credentials"]) > cred_limit:
+                lines.append(f"*\u2026and {len(alert['auth']['credentials']) - cred_limit} more*")
             fields.append({"name": "Credentials Tried", "value": "\n".join(lines), "inline": False})
 
         # Commands
         if alert["activity"]["commands"]:
-            cmds = alert["activity"]["commands"][:10]
+            cmds = alert["activity"]["commands"][:cmd_limit] if cmd_limit else alert["activity"]["commands"]
             cmd_text = "\n".join(cmds)
-            if len(cmd_text) > 500:
-                cmd_text = cmd_text[:500] + "\n\u2026"
+            if len(cmd_text) > cmd_char_limit:
+                cmd_text = cmd_text[:cmd_char_limit] + "\n\u2026"
             fields.append({"name": "Commands Executed", "value": f"```bash\n{cmd_text}\n```", "inline": False})
 
         # Threat categories
@@ -648,16 +680,108 @@ class CowrieSentinel:
             cats = set(h["category"].replace("_", " ").title() for h in alert["activity"]["high_value_commands"])
             fields.append({"name": "Threat Categories", "value": "  ".join(f"`{c}`" for c in cats), "inline": False})
 
-        # IOCs — compact
+        # File transfers (normal + verbose)
+        if alert["activity"]["files"]:
+            file_lines = []
+            for f in alert["activity"]["files"]:
+                direction = f.get("direction", "?").upper()
+                url = f.get("url", "")
+                sha = f.get("sha256", "")
+                line = f"\u2022 **{direction}**"
+                if url:
+                    line += f" `{url}`"
+                if sha:
+                    line += f"\n  SHA256: `{sha}`"
+                file_lines.append(line)
+            fields.append({"name": "File Transfers", "value": "\n".join(file_lines), "inline": False})
+
+        # Tunnel destinations (normal + verbose)
+        if alert["activity"]["tunnel_requests"]:
+            tun_lines = [f"\u2022 `{t['dest_ip']}:{t['dest_port']}`" for t in alert["activity"]["tunnel_requests"]]
+            fields.append({"name": "Tunnel Destinations", "value": "\n".join(tun_lines), "inline": False})
+
+        # IOCs — full hashes in normal+, extracted IPs
         ioc_parts = []
         if alert["iocs"]["urls"]:
-            ioc_parts.extend(f"\u2022 `{u}`" for u in alert["iocs"]["urls"][:3])
+            url_limit = 3 if verbosity == "normal" else None
+            urls = alert["iocs"]["urls"][:url_limit] if url_limit else alert["iocs"]["urls"]
+            ioc_parts.extend(f"\u2022 `{u}`" for u in urls)
         if alert["iocs"]["file_hashes"]:
-            ioc_parts.extend(f"\u2022 SHA256: `{h[:16]}\u2026`" for h in alert["iocs"]["file_hashes"][:2])
+            hash_limit = 3 if verbosity == "normal" else None
+            hashes = alert["iocs"]["file_hashes"][:hash_limit] if hash_limit else alert["iocs"]["file_hashes"]
+            ioc_parts.extend(f"\u2022 SHA256: `{h}`" for h in hashes)
         if alert["iocs"]["domains"]:
-            ioc_parts.extend(f"\u2022 `{d}`" for d in alert["iocs"]["domains"][:3])
+            dom_limit = 3 if verbosity == "normal" else None
+            doms = alert["iocs"]["domains"][:dom_limit] if dom_limit else alert["iocs"]["domains"]
+            ioc_parts.extend(f"\u2022 `{d}`" for d in doms)
+        if alert["iocs"]["ips"]:
+            ip_limit = 3 if verbosity == "normal" else None
+            ips = alert["iocs"]["ips"][:ip_limit] if ip_limit else alert["iocs"]["ips"]
+            ioc_parts.extend(f"\u2022 IP: `{ip}`" for ip in ips)
         if ioc_parts:
             fields.append({"name": "Indicators of Compromise", "value": "\n".join(ioc_parts), "inline": False})
+
+        # --- Verbose-only fields ---
+        if verbosity == "verbose":
+            # Score breakdown
+            breakdown = alert.get("score_breakdown", {})
+            if breakdown:
+                bd_lines = [f"`{k}`: **{v}** pts" for k, v in sorted(breakdown.items(), key=lambda x: -x[1])]
+                fields.append({"name": "Score Breakdown", "value": "\n".join(bd_lines), "inline": False})
+
+            # Session timeline
+            fields.append({
+                "name": "Session Timeline",
+                "value": f"First seen: `{alert['session']['first_seen']}`\nLast seen: `{alert['session']['last_seen']}`\nDuration: `{alert['session']['duration']}` ({alert['session']['duration_seconds']:.0f}s)",
+                "inline": False,
+            })
+
+            # Threat intel links
+            intel_lines = [f"\u2022 [AbuseIPDB](https://www.abuseipdb.com/check/{src_ip}) | [Shodan](https://www.shodan.io/host/{src_ip})"]
+            for ip in (alert["iocs"]["ips"] or [])[:3]:
+                intel_lines.append(f"\u2022 `{ip}`: [AbuseIPDB](https://www.abuseipdb.com/check/{ip}) | [Shodan](https://www.shodan.io/host/{ip})")
+            fields.append({"name": "Threat Intel", "value": "\n".join(intel_lines), "inline": False})
+
+        # Grafana links: dashboard overview + Explore raw logs
+        if self.cfg.grafana_url:
+            first_seen = alert["session"].get("first_seen", "")
+            last_seen = alert["session"].get("last_seen", "")
+            time_params = ""
+            try:
+                from_ms = int(datetime.fromisoformat(first_seen.replace("Z", "+00:00")).timestamp() * 1000) - 300000
+                to_ms = int(datetime.fromisoformat(last_seen.replace("Z", "+00:00")).timestamp() * 1000) + 300000
+                time_params = f"&from={from_ms}&to={to_ms}"
+            except Exception:
+                pass
+
+            links = []
+            if self.cfg.grafana_dashboard_uid:
+                dash_link = f"{self.cfg.grafana_url}/d/{self.cfg.grafana_dashboard_uid}?var-src_ip={src_ip}{time_params}"
+                links.append(f"[Dashboard]({dash_link})")
+
+            # Explore link: raw honeypot logs for this IP
+            import urllib.parse
+            explore_query = f"src_ip:{src_ip} OR honeypot.src_ip:{src_ip}"
+            explore_params = urllib.parse.quote(json.dumps({
+                "datasource": "ffffy3uxl7ri8b",
+                "queries": [{"refId": "A", "query": explore_query, "timeField": "@timestamp",
+                             "metrics": [{"id": "1", "type": "logs", "settings": {"limit": 200}}]}],
+                "range": {"from": str(from_ms) if time_params else "now-1h", "to": str(to_ms) if time_params else "now"}
+            }))
+            explore_link = f"{self.cfg.grafana_url}/explore?orgId=1&left={explore_params}"
+            links.append(f"[Raw Logs]({explore_link})")
+
+            # Explore link: sacrificial VM auditd for this session window
+            vm_explore_params = urllib.parse.quote(json.dumps({
+                "datasource": "efffzddwcadq8e",
+                "queries": [{"refId": "A", "query": "service.type:auditd AND event.action:execve", "timeField": "@timestamp",
+                             "metrics": [{"id": "1", "type": "logs", "settings": {"limit": 200}}]}],
+                "range": {"from": str(from_ms) if time_params else "now-1h", "to": str(to_ms) if time_params else "now"}
+            }))
+            vm_link = f"{self.cfg.grafana_url}/explore?orgId=1&left={vm_explore_params}"
+            links.append(f"[VM Auditd]({vm_link})")
+
+            fields.append({"name": "Investigate", "value": " | ".join(links), "inline": False})
 
         payload = {
             "embeds": [{
@@ -666,11 +790,13 @@ class CowrieSentinel:
                 "color": color,
                 "fields": fields,
                 "timestamp": alert["timestamp"],
-                "footer": {"text": f"Cowrie Sentinel  \u2022  Session {alert['session']['id'][:12]}"},
+                "footer": {"text": f"Cowrie Sentinel  \u2022  {alert_id}"},
                 "author": {"name": "Cowrie Sentinel  \u2014  SSH Honeypot Intelligence"},
             }]
         }
+        self._send_webhook_payload(payload)
 
+    def _send_webhook_payload(self, payload: dict):
         try:
             resp = requests.post(self.cfg.webhook_url, json=payload, timeout=10)
             if resp.status_code not in (200, 204):
@@ -800,11 +926,13 @@ def parse_args() -> Config:
     p.add_argument("--alert-threshold", default="high", choices=["low", "medium", "high", "critical"])
     p.add_argument("--log-file", default="/home/legs/cowrie_sentinel.log")
     p.add_argument("--output-dir", default="/home/legs/sentinel_alerts")
-    p.add_argument("--grafana-url", default="https://localhost:3000")
+    p.add_argument("--grafana-url", default="https://192.168.50.3:3000")
     p.add_argument("--grafana-auth", default=None, help="Base64 user:pass for Grafana API")
     p.add_argument("--grafana-dashboard-uid", default="tpot-attack-overview")
     p.add_argument("--backfill", type=int, default=0, dest="backfill_hours", help="Backfill N hours on startup")
     p.add_argument("--dry-run", action="store_true", help="Process events but skip webhooks")
+    p.add_argument("--verbosity", default="normal", choices=["compact", "normal", "verbose"],
+                   help="Webhook detail level: compact (phone), normal, verbose (full)")
     args = p.parse_args()
 
     return Config(
@@ -821,6 +949,7 @@ def parse_args() -> Config:
         grafana_dashboard_uid=args.grafana_dashboard_uid,
         backfill_hours=args.backfill_hours,
         dry_run=args.dry_run,
+        verbosity=args.verbosity,
     )
 
 def main():

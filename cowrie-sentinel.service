@@ -6,7 +6,7 @@ Wants=elasticsearch.service
 [Service]
 Type=simple
 User=legs
-ExecStart=/usr/bin/python3 /home/legs/cowrie_sentinel.py --alert-threshold high --backfill 1 --webhook-url "***REDACTED***"
+ExecStart=/usr/bin/python3 /home/legs/cowrie_sentinel.py --alert-threshold high --backfill 1 --verbosity normal --webhook-url "***REDACTED***"
 Restart=on-failure
 RestartSec=30
 StandardOutput=journal

@@ -54,12 +54,16 @@ class Config:
     webhook_url: Optional[str] = None
     alert_threshold: float = -0.3    # isolation forest decision threshold (more negative = more anomalous)
     severity_threshold: str = "high" # minimum severity to alert on
+    grafana_url: Optional[str] = "https://192.168.50.3:3000"
+    grafana_dashboard_uid: Optional[str] = "tpot-attack-overview"
     log_file: str = "/home/legs/ml_sentinel.log"
     model_dir: str = "/home/legs/ml_models"
     state_file: str = "/home/legs/.ml_sentinel_state.json"
     backfill_hours: int = 0
     train_only: bool = False
     dry_run: bool = False
+    verbosity: str = "normal"              # compact / normal / verbose
+    alert_cooldown_seconds: int = 300      # suppress non-critical alerts within this window
 
 SEVERITY_ORDER = {"low": 0, "medium": 1, "high": 2, "critical": 3}
 
@@ -414,6 +418,7 @@ class MLSentinel:
         self.last_train_time: float = 0
         self.running = True
         self.alert_cooldown: dict = {}  # ip -> last alert time
+        self.last_regular_alert_time: float = 0  # timestamp of last non-critical alert
         self.logger = self._setup_logging()
 
     def _setup_logging(self) -> logging.Logger:
@@ -721,7 +726,8 @@ class MLSentinel:
     def _fire_gridpot_alert(self, severity: str, title: str, src_ip: str,
                             timestamp: str, hp_data: dict, raw_event: dict):
         """Fire an instant GridPot ICS alert with a clean embed."""
-        self.logger.info("GRIDPOT ALERT [%s] %s from %s", severity.upper(), title, src_ip)
+        alert_id = f"gridpot-{int(time.time())}-{severity}"
+        self.logger.info("GRIDPOT ALERT [%s] %s from %s (%s)", severity.upper(), title, src_ip, alert_id)
         if self.cfg.dry_run or not self.cfg.webhook_url:
             return
 
@@ -766,6 +772,29 @@ class MLSentinel:
         if hp_data.get("user_agent"):
             fields.append({"name": "User Agent", "value": f"```{hp_data['user_agent'][:120]}```", "inline": False})
 
+        # Verbose: raw event data
+        if self.cfg.verbosity == "verbose":
+            raw_json = json.dumps(hp_data, indent=2, default=str)
+            if len(raw_json) > 1000:
+                raw_json = raw_json[:1000] + "\n..."
+            fields.append({"name": "Raw Event", "value": f"```json\n{raw_json}\n```", "inline": False})
+
+        # Grafana links
+        if self.cfg.grafana_url:
+            import urllib.parse
+            links = []
+            if self.cfg.grafana_dashboard_uid:
+                links.append(f"[Dashboard]({self.cfg.grafana_url}/d/{self.cfg.grafana_dashboard_uid}?var-src_ip={src_ip})")
+
+            explore_params = urllib.parse.quote(json.dumps({
+                "datasource": "ffffy3uxl7ri8b",
+                "queries": [{"refId": "A", "query": f"container.id:gridpot AND (src_ip:{src_ip} OR honeypot.src_ip:{src_ip})", "timeField": "@timestamp",
+                             "metrics": [{"id": "1", "type": "logs", "settings": {"limit": 200}}]}],
+                "range": {"from": "now-1h", "to": "now"}
+            }))
+            links.append(f"[GridPot Logs]({self.cfg.grafana_url}/explore?orgId=1&left={explore_params})")
+            fields.append({"name": "Investigate", "value": " | ".join(links), "inline": False})
+
         payload = {
             "embeds": [{
                 "title": f"{icon} {title}",
@@ -773,7 +802,7 @@ class MLSentinel:
                 "color": color,
                 "fields": fields,
                 "timestamp": datetime.now(timezone.utc).isoformat(),
-                "footer": {"text": "GridPot ICS Honeypot  \u2022  Tri-State Regional Power Cooperative"},
+                "footer": {"text": f"GridPot ICS Honeypot  \u2022  {alert_id}"},
                 "author": {"name": "ML Sentinel  \u2014  ICS Threat Detection"},
             }]
         }
@@ -783,14 +812,32 @@ class MLSentinel:
                     hp_features: Optional[dict], vm_features: Optional[dict],
                     contributions: list, window_start: str, window_end: str):
         """Format and send a clean ML anomaly/threat Discord alert."""
+        alert_id = f"ml-sentinel-{int(time.time())}-{severity}"
+
+        # Rate limiting: suppress non-critical alerts within cooldown window
+        if severity != "critical" and self.cfg.alert_cooldown_seconds > 0:
+            elapsed = time.time() - self.last_regular_alert_time
+            if elapsed < self.cfg.alert_cooldown_seconds:
+                self.logger.info(
+                    "SUPPRESSED [%s] anomaly=%.3f rules=%d window=%s (cooldown: %ds remaining)",
+                    severity.upper(), anomaly_score, rule_score, window_start[:19],
+                    int(self.cfg.alert_cooldown_seconds - elapsed),
+                )
+                return
+
         self.logger.info(
-            "ALERT [%s] anomaly=%.3f rules=%d window=%s",
-            severity.upper(), anomaly_score, rule_score, window_start[:19]
+            "ALERT [%s] anomaly=%.3f rules=%d window=%s (%s)",
+            severity.upper(), anomaly_score, rule_score, window_start[:19], alert_id
         )
+
+        # Track alert time for cooldown (critical alerts don't reset the timer)
+        if severity != "critical":
+            self.last_regular_alert_time = time.time()
 
         if self.cfg.dry_run or not self.cfg.webhook_url:
             return
 
+        verbosity = self.cfg.verbosity
         color_map = {"critical": 0xED4245, "high": 0xFE8D2F, "medium": 0xFEE75C, "low": 0x57F287}
         icon_map = {"critical": "\U0001f6a8", "high": "\u26a0\ufe0f", "medium": "\U0001f7e1", "low": "\u2139\ufe0f"}
         color = color_map.get(severity, 0x5865F2)
@@ -799,23 +846,45 @@ class MLSentinel:
         is_anomaly = anomaly_score < self.cfg.alert_threshold
         label = "Behavioral Anomaly" if is_anomaly else "Threat Activity"
 
-        # Build clean description
+        # Build description
         desc_lines = [f"ML analysis detected **{label.lower()}** across the honeypot network."]
         if contributions:
-            top = [(k, z) for k, z in contributions[:3] if abs(z) > 1.0]
+            top_count = 3 if verbosity != "verbose" else len(contributions)
+            top = [(k, z) for k, z in contributions[:top_count] if abs(z) > 1.0]
             if top:
                 factors = ", ".join(f"`{k}` ({z:+.1f}\u03c3)" for k, z in top)
                 desc_lines.append(f"Key deviations: {factors}")
         description = "\n".join(desc_lines)
 
-        # Compact metrics row
+        # --- Compact mode ---
+        if verbosity == "compact":
+            fields = [
+                {"name": "Anomaly Score", "value": f"`{anomaly_score:+.3f}`", "inline": True},
+                {"name": "Threat Score", "value": f"`{rule_score}`", "inline": True},
+                {"name": "Window", "value": f"`{window_start[11:19]} UTC`", "inline": True},
+            ]
+            payload = {
+                "embeds": [{
+                    "title": f"{icon} {severity.upper()}: {label}",
+                    "description": description,
+                    "color": color,
+                    "fields": fields,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "footer": {"text": f"ML Sentinel  \u2022  {alert_id}"},
+                    "author": {"name": "ML Sentinel  \u2014  Honeypot Threat Intelligence"},
+                }]
+            }
+            self._send_webhook(payload)
+            return
+
+        # --- Normal + Verbose ---
         fields = [
             {"name": "Anomaly Score", "value": f"`{anomaly_score:+.3f}`", "inline": True},
             {"name": "Threat Score", "value": f"`{rule_score}`", "inline": True},
             {"name": "Window", "value": f"`{window_start[11:19]} UTC`", "inline": True},
         ]
 
-        # Honeypot summary — compact
+        # Honeypot summary
         if hp_features:
             lines = []
             lines.append(f"\u2022 **{hp_features['total_events']:,}** events from **{hp_features['unique_src_ips']}** IPs across **{hp_features['unique_countries']}** countries")
@@ -829,22 +898,32 @@ class MLSentinel:
                 lines.append(f"\u2022 Tunnel requests: **{hp_features['tunnel_requests']}**")
             fields.append({"name": "Honeypot Network", "value": "\n".join(lines), "inline": False})
 
+            # Container event breakdown (normal + verbose)
+            containers = hp_features.get("_containers", {})
+            if containers:
+                ctr_lines = [f"`{name}`: **{count:,}**" for name, count in sorted(containers.items(), key=lambda x: -x[1])]
+                fields.append({"name": "Container Events", "value": "  ".join(ctr_lines), "inline": False})
+
+            cmd_limit = 8 if verbosity == "normal" else None
+            char_limit = 500 if verbosity == "normal" else 1800
             if hp_features.get("_commands"):
-                cmds = hp_features["_commands"][:8]
+                cmds = hp_features["_commands"][:cmd_limit] if cmd_limit else hp_features["_commands"]
                 cmd_text = "\n".join(cmds)
-                if len(cmd_text) > 500:
-                    cmd_text = cmd_text[:500] + "\n\u2026"
+                if len(cmd_text) > char_limit:
+                    cmd_text = cmd_text[:char_limit] + "\n\u2026"
                 fields.append({"name": "Captured Commands", "value": f"```bash\n{cmd_text}\n```", "inline": False})
 
+            country_limit = 4 if verbosity == "normal" else None
             if hp_features.get("_top_countries"):
-                flags = {"United States": "\U0001f1fa\U0001f1f8", "China": "\U0001f1e8\U0001f1f3", "Russia": "\U0001f1f7\U0001f1fa",
+                flags_map = {"United States": "\U0001f1fa\U0001f1f8", "China": "\U0001f1e8\U0001f1f3", "Russia": "\U0001f1f7\U0001f1fa",
                          "Brazil": "\U0001f1e7\U0001f1f7", "India": "\U0001f1ee\U0001f1f3", "Germany": "\U0001f1e9\U0001f1ea",
                          "France": "\U0001f1eb\U0001f1f7", "Netherlands": "\U0001f1f3\U0001f1f1", "South Korea": "\U0001f1f0\U0001f1f7",
                          "Japan": "\U0001f1ef\U0001f1f5", "United Kingdom": "\U0001f1ec\U0001f1e7", "Taiwan": "\U0001f1f9\U0001f1fc"}
-                countries = "  ".join(f"{flags.get(c, '\U0001f310')} {c} ({n:,})" for c, n in hp_features["_top_countries"][:4])
+                top_countries = hp_features["_top_countries"][:country_limit] if country_limit else hp_features["_top_countries"]
+                countries = "  ".join(f"{flags_map.get(c, '\U0001f310')} {c} ({n:,})" for c, n in top_countries)
                 fields.append({"name": "Top Origins", "value": countries, "inline": False})
 
-        # VM summary — compact
+        # VM summary
         if vm_features and vm_features.get("vm_total_events", 0) > 0:
             vm_lines = []
             vm_lines.append(f"\u2022 **{vm_features['vm_execve_count']:,}** process executions, **{vm_features['vm_unique_executables']}** unique binaries")
@@ -854,6 +933,70 @@ class MLSentinel:
                 vm_lines.append(f"\u2022 **{vm_features['vm_network_events']}** network events")
             fields.append({"name": "Sacrificial VM", "value": "\n".join(vm_lines), "inline": False})
 
+            # Top executables (normal + verbose)
+            top_exes = vm_features.get("_vm_top_executables", [])
+            if top_exes:
+                exe_limit = 5 if verbosity == "normal" else 10
+                exe_lines = [f"`{exe}`: **{count}**" for exe, count in top_exes[:exe_limit]]
+                fields.append({"name": "Top Executables", "value": "\n".join(exe_lines), "inline": False})
+
+        # --- Verbose-only fields ---
+        if verbosity == "verbose":
+            # Full feature contributions
+            if contributions:
+                sig_contribs = [(k, z) for k, z in contributions if abs(z) > 0.5]
+                if sig_contribs:
+                    contrib_lines = [f"`{k}`: {z:+.2f}\u03c3" for k, z in sig_contribs]
+                    fields.append({"name": "Feature Contributions", "value": "\n".join(contrib_lines), "inline": False})
+
+            # VM commands
+            if vm_features and vm_features.get("_vm_commands"):
+                vm_cmds = vm_features["_vm_commands"][:20]
+                vm_cmd_text = "\n".join(vm_cmds)
+                if len(vm_cmd_text) > 1000:
+                    vm_cmd_text = vm_cmd_text[:1000] + "\n\u2026"
+                fields.append({"name": "VM Commands", "value": f"```bash\n{vm_cmd_text}\n```", "inline": False})
+
+        # Grafana links: dashboard overview + Explore raw logs
+        if self.cfg.grafana_url:
+            import urllib.parse
+            time_params = ""
+            from_val, to_val = "now-1h", "now"
+            try:
+                from_ms = int(datetime.fromisoformat(window_start.replace("Z", "+00:00")).timestamp() * 1000) - 300000
+                to_ms = int(datetime.fromisoformat(window_end.replace("Z", "+00:00")).timestamp() * 1000) + 300000
+                time_params = f"?from={from_ms}&to={to_ms}"
+                from_val, to_val = str(from_ms), str(to_ms)
+            except Exception:
+                pass
+
+            links = []
+            if self.cfg.grafana_dashboard_uid:
+                dash_link = f"{self.cfg.grafana_url}/d/{self.cfg.grafana_dashboard_uid}{time_params}"
+                links.append(f"[Dashboard]({dash_link})")
+
+            # Explore: honeypot raw logs for this window
+            explore_params = urllib.parse.quote(json.dumps({
+                "datasource": "ffffy3uxl7ri8b",
+                "queries": [{"refId": "A", "query": "honeypot.eventid:* AND NOT container.id:suricata", "timeField": "@timestamp",
+                             "metrics": [{"id": "1", "type": "logs", "settings": {"limit": 200}}]}],
+                "range": {"from": from_val, "to": to_val}
+            }))
+            explore_link = f"{self.cfg.grafana_url}/explore?orgId=1&left={explore_params}"
+            links.append(f"[Honeypot Logs]({explore_link})")
+
+            # Explore: sacrificial VM auditd
+            vm_params = urllib.parse.quote(json.dumps({
+                "datasource": "efffzddwcadq8e",
+                "queries": [{"refId": "A", "query": "service.type:auditd AND event.action:execve", "timeField": "@timestamp",
+                             "metrics": [{"id": "1", "type": "logs", "settings": {"limit": 200}}]}],
+                "range": {"from": from_val, "to": to_val}
+            }))
+            vm_link = f"{self.cfg.grafana_url}/explore?orgId=1&left={vm_params}"
+            links.append(f"[VM Auditd]({vm_link})")
+
+            fields.append({"name": "Investigate", "value": " | ".join(links), "inline": False})
+
         payload = {
             "embeds": [{
                 "title": f"{icon} {severity.upper()}: {label}",
@@ -861,7 +1004,7 @@ class MLSentinel:
                 "color": color,
                 "fields": fields,
                 "timestamp": datetime.now(timezone.utc).isoformat(),
-                "footer": {"text": "ML Sentinel  \u2022  Isolation Forest Anomaly Detection"},
+                "footer": {"text": f"ML Sentinel  \u2022  {alert_id}"},
                 "author": {"name": "ML Sentinel  \u2014  Honeypot Threat Intelligence"},
             }]
         }
@@ -934,11 +1077,17 @@ def parse_args() -> Config:
     p.add_argument("--webhook-url", default=None)
     p.add_argument("--alert-threshold", type=float, default=-0.3)
     p.add_argument("--severity-threshold", default="high", choices=["low", "medium", "high", "critical"])
+    p.add_argument("--grafana-url", default="https://192.168.50.3:3000")
+    p.add_argument("--grafana-dashboard-uid", default="tpot-attack-overview")
     p.add_argument("--log-file", default="/home/legs/ml_sentinel.log")
     p.add_argument("--model-dir", default="/home/legs/ml_models")
     p.add_argument("--backfill", type=int, default=0, dest="backfill_hours")
     p.add_argument("--train-only", action="store_true")
     p.add_argument("--dry-run", action="store_true")
+    p.add_argument("--verbosity", default="normal", choices=["compact", "normal", "verbose"],
+                   help="Webhook detail level: compact (phone), normal, verbose (full)")
+    p.add_argument("--alert-cooldown", type=int, default=300, dest="alert_cooldown_seconds",
+                   help="Seconds to suppress non-critical alerts after last alert")
     args = p.parse_args()
 
     return Config(
@@ -952,11 +1101,15 @@ def parse_args() -> Config:
         webhook_url=args.webhook_url,
         alert_threshold=args.alert_threshold,
         severity_threshold=args.severity_threshold,
+        grafana_url=args.grafana_url,
+        grafana_dashboard_uid=args.grafana_dashboard_uid,
         log_file=args.log_file,
         model_dir=args.model_dir,
         backfill_hours=args.backfill_hours,
         train_only=args.train_only,
         dry_run=args.dry_run,
+        verbosity=args.verbosity,
+        alert_cooldown_seconds=args.alert_cooldown_seconds,
     )
 
 

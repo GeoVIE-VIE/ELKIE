@@ -1,0 +1,85 @@
+services:
+  misp-core:
+    image: ghcr.io/misp/misp-docker/misp-core:latest
+    container_name: misp-core
+    restart: unless-stopped
+    depends_on:
+      misp-db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    ports:
+      - "443:443"
+      - "8080:80"
+    environment:
+      - MYSQL_HOST=misp-db
+      - MYSQL_PORT=3306
+      - MYSQL_DATABASE=misp
+      - MYSQL_USER=misp
+      - MYSQL_PASSWORD=***REDACTED***
+      - MISP_ADMIN_EMAIL=admin@misp.local
+      - MISP_ADMIN_PASSPHRASE=***REDACTED***
+      - MISP_BASEURL=https://192.168.50.3
+      - BASE_URL=https://192.168.50.3
+      - REDIS_HOST=redis
+      - TIMEZONE=UTC
+    volumes:
+      - misp-data:/var/www/MISP/app/files
+      - misp-config:/var/www/MISP/app/Config
+      - misp-certs:/etc/ssl/certs
+      - misp-logs:/var/www/MISP/app/tmp/logs
+      - ./misp-nginx.conf:/etc/nginx/sites-available/misp443:ro
+    networks:
+      - misp-net
+
+  misp-db:
+    image: mariadb:11
+    container_name: misp-db
+    restart: unless-stopped
+    environment:
+      - MYSQL_DATABASE=misp
+      - MYSQL_USER=misp
+      - MYSQL_PASSWORD=***REDACTED***
+      - MYSQL_ROOT_PASSWORD=***REDACTED***
+    volumes:
+      - misp-db-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - misp-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: misp-redis
+    restart: unless-stopped
+    command: redis-server --requirepass redispassword
+    volumes:
+      - misp-redis-data:/data
+    networks:
+      - misp-net
+
+  misp-modules:
+    image: ghcr.io/misp/misp-docker/misp-modules:latest
+    container_name: misp-modules
+    restart: unless-stopped
+    environment:
+      - REDIS_HOST=redis
+    depends_on:
+      - redis
+    networks:
+      - misp-net
+
+volumes:
+  misp-data:
+  misp-config:
+  misp-certs:
+  misp-logs:
+  misp-db-data:
+  misp-redis-data:
+
+networks:
+  misp-net:
+    driver: bridge

@@ -1,0 +1,17 @@
+[Unit]
+Description=Sample Analyzer — Automated Malware Analysis Pipeline
+After=network.target elasticsearch.service
+Wants=elasticsearch.service
+
+[Service]
+Type=simple
+User=legs
+EnvironmentFile=/home/legs/.sample_analyzer_env
+ExecStart=/usr/bin/python3 /home/legs/sample_analyzer.py --verbosity normal --backfill 1 --webhook-url "${DISCORD_WEBHOOK}"
+Restart=on-failure
+RestartSec=30
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
