@@ -95,43 +95,43 @@ Email threat analysis via Microsoft Graph API. Monitors Outlook inbox in real-ti
 #### Portscan Defender (`portscan_defender.py`)
 Detects port scanning activity and triggers automated blocking.
 
+### REMnux Static Analysis (`analyze_sample.sh`)
+Bash script deployed to REMnux VM that runs the full static analysis toolkit:
+
+- SHA256/MD5 hashing, file type identification
+- `strings` — extracts URLs, IPs, paths, crypto keywords, C2 indicators
+- `yara` — scans against ratdecoders rules + custom rules
+- `capa` — capability analysis mapped to MITRE ATT&CK
+- `floss` — deobfuscated/decoded strings for packed samples
+- `peframe` — PE-only: imports, sections, packer detection
+- **Ollama LLM** — feeds all results to qwen2.5:14b for classification, severity, IOCs, TTPs
+- Outputs JSON to `/home/nalyzer/results/<sha256>.json`
+- Idempotent, max 50MB samples, graceful degradation if tools unavailable
+
 ### MISP — Threat Intelligence Platform
 
 Docker deployment (`misp/docker-compose.yml`) providing centralized IOC management:
 
 - **Feeds:** CIRCL OSINT, Botvrij.eu, abuse.ch URLhaus, Feodo Tracker, MalwareBazaar
 - **Integration:** Sample analyzer creates events and checks IOCs on every sample
-- **Correlation:** Connects dots across samples over time ("this C2 domain appeared in 3 different samples")
-- **Web UI:** https://192.168.50.3
+- **Correlation:** Connects dots across samples over time
+- **Stack:** misp-core, MariaDB 11, Redis 7, misp-modules
 
 ### Supporting Scripts
 
 | Script | Purpose |
 |--------|---------|
-| `analyze_sample.sh` | Static analysis script deployed to REMnux |
 | `outlook_auth.py` | One-time OAuth device code flow for Outlook |
 | `scanner_block.sh` | Port scanner blocking |
 | `ReportIPs.sh` | Reports attacker IPs to AbuseIPDB (cron, every 6h) |
-
-## Infrastructure
-
-Runs on a single Proxmox host (flexiserve):
-
-| VMID | Name | Purpose | RAM | Subnet |
-|------|------|---------|-----|--------|
-| 102 | elk-stack | ELK + Grafana + Sentinels + MISP | 32GB | 192.168.50.x |
-| 103 | honeypot | T-Pot (Cowrie, Dionaea, 20+ honeypots) | 10GB | 192.168.40.x |
-| 106 | Static-Analyzisz | REMnux (YARA, capa, floss, Ollama) | 40GB | 192.168.40.x |
-| 107 | ReverseCowrie | Cowrie reverse proxy | 8GB | 192.168.40.x |
-| 109 | sandbox-detonation | Malware detonation VM | 2GB | 192.168.40.x |
 
 ## Elasticsearch Indices
 
 | Index | Retention | Purpose |
 |-------|-----------|---------|
-| `.ds-filebeat-8.19.8-*` | 30 days | Honeypot raw events |
-| `sacrificial-vm-*` | 14 days | Sacrificial VM auditd/auth logs |
-| `.ds-suricata-*` | 14 days | Suricata IDS alerts |
+| `.ds-filebeat-8.19.8-*` | 30 days (ILM) | Honeypot raw events |
+| `sacrificial-vm-*` | 14 days (ILM) | Sacrificial VM auditd/auth logs |
+| `.ds-suricata-*` | 14 days (ILM) | Suricata IDS alerts |
 | `malware-analysis` | Forever | Analyzed malware samples |
 
 ## Service Management
@@ -148,28 +148,30 @@ journalctl -u sample-analyzer -f
 
 # MISP
 cd ~/misp && sudo docker compose ps
-sudo docker compose logs -f misp-core
 ```
+
+## Grafana Dashboards
+
+- **grafana-dashboard.json** — Home network monitoring (Suricata)
+- **honeypot-grafana-dashboard.json** — Honeypot attack monitoring
+
+### Dashboard Features
+
+- Network overview, events over time, DNS queries, HTTP/TLS traffic
+- Geographic attack maps (requires geo_point mapping)
+- Top attackers, targeted ports, credential analysis
+- Commands executed, malware downloads, attacker OS fingerprinting
 
 ## Filebeat & Suricata Configuration
 
 - **Filebeat.yml** — Main config (optimized for 28GB RAM, 8 CPUs)
 - **deploy-filebeat-config.sh** — Deployment script
-- **elasticsearch-index-template.json** — Suricata field mappings (geo_point)
-- **honeypot-elasticsearch-index-template.json** — Honeypot data index template
-- **grafana-dashboard.json** — Home network monitoring dashboard
-- **honeypot-grafana-dashboard.json** — Honeypot monitoring dashboard
+- **elasticsearch-index-template.json** — Suricata field mappings
+- **honeypot-elasticsearch-index-template.json** — Honeypot data mappings
 
-### GeoIP Enrichment
+### Supported T-Pot Honeypot Types
 
-```bash
-curl -X PUT "localhost:9200/_ingest/pipeline/suricata-geoip" -H 'Content-Type: application/json' -d'{
-  "processors": [
-    {"geoip": {"field": "src_ip", "target_field": "source.geo", "ignore_missing": true}},
-    {"geoip": {"field": "dest_ip", "target_field": "destination.geo", "ignore_missing": true}}
-  ]
-}'
-```
+Cowrie, Dionaea, Suricata, p0f, SentryPeer, FATT, Tanner/Snare, Heralding, H0neytr4p, Conpot, Honeytrap, ADBHoney, CiscoASA, Wordpot, Miniprint
 
 ## Discord Alerts
 
