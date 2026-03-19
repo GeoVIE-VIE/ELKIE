@@ -10,19 +10,19 @@ A full-stack security operations platform running on a home lab, built around EL
                          │                                      │
                          │  Elasticsearch + Kibana + Grafana    │
                          │                                      │
-                         │  ┌──────────────────────────────┐   │
+                         │  ┌───────────────────────────────┐   │
                          │  │     Sentinel Daemons          │   │
                          │  │  • Cowrie Sentinel            │   │
                          │  │  • ML Sentinel                │   │
                          │  │  • Sample Analyzer            │   │
                          │  │  • Outlook Sentinel           │   │
                          │  │  • Portscan Defender          │   │
-                         │  └──────────────────────────────┘   │
+                         │  └───────────────────────────────┘   │
                          │                                      │
-                         │  ┌──────────────────────────────┐   │
+                         │  ┌───────────────────────────────┐   │
                          │  │  MISP (Docker)                │   │
                          │  │  Threat Intel Platform        │   │
-                         │  └──────────────────────────────┘   │
+                         │  └───────────────────────────────┘   │
                          └───────┬──────────┬──────────┬────────┘
                                  │          │          │
                     SSH :64295   │  SSH :22 │  SSH :22 │
