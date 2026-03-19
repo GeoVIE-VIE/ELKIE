@@ -1,298 +1,180 @@
-# ELKIE - Filebeat Configuration for Suricata Logs
+# ELKIE — Home Network Security Operations Platform
 
-This repository contains the optimized Filebeat configuration for ingesting Suricata logs from pfSense into Elasticsearch.
+A full-stack security operations platform running on a home lab, built around ELK (Elasticsearch, Logstash, Kibana), honeypots, automated malware analysis, and threat intelligence.
 
-## Files
+## Architecture
 
-- **Filebeat.yml** - Main Filebeat configuration (optimized for 28GB RAM, 8 CPUs, 10Gbps network)
-- **Syslog-NG-Config.txt** - Syslog-NG configuration reference
-- **deploy-filebeat-config.sh** - Deployment script
-- **elasticsearch-index-template.json** - Index template for Suricata field mappings (geo_point, etc.)
-- **grafana-dashboard.json** - Home network monitoring dashboard (Suricata)
-- **honeypot-elasticsearch-index-template.json** - Index template for honeypot data (filebeat-8.19.8*)
-- **honeypot-grafana-dashboard.json** - Dedicated honeypot monitoring dashboard
-
-## Quick Fix for Current Issue
-
-The Filebeat service is failing because it's using an old configuration with `grok` processor (not available). This repository contains the fixed configuration using `dissect` instead.
-
-### Deploy the Fix
-
-```bash
-cd /home/user/ELKIE
-sudo bash deploy-filebeat-config.sh
+```
+                         ┌──────────────────────────────────────┐
+                         │         ELK Stack (192.168.50.3)     │
+                         │                                      │
+                         │  Elasticsearch + Kibana + Grafana    │
+                         │                                      │
+                         │  ┌──────────────────────────────┐   │
+                         │  │     Sentinel Daemons          │   │
+                         │  │  • Cowrie Sentinel            │   │
+                         │  │  • ML Sentinel                │   │
+                         │  │  • Sample Analyzer            │   │
+                         │  │  • Outlook Sentinel           │   │
+                         │  │  • Portscan Defender          │   │
+                         │  └──────────────────────────────┘   │
+                         │                                      │
+                         │  ┌──────────────────────────────┐   │
+                         │  │  MISP (Docker)                │   │
+                         │  │  Threat Intel Platform        │   │
+                         │  └──────────────────────────────┘   │
+                         └───────┬──────────┬──────────┬────────┘
+                                 │          │          │
+                    SSH :64295   │  SSH :22 │  SSH :22 │
+                                 │          │          │
+                    ┌────────────▼┐  ┌──────▼──────┐  ┌▼─────────────┐
+                    │   T-Pot     │  │   REMnux    │  │   Sandbox    │
+                    │ 192.168.40.3│  │ 192.168.40.5│  │ 192.168.40.6 │
+                    │             │  │             │  │              │
+                    │ Cowrie      │  │ YARA, capa  │  │ Detonation   │
+                    │ Dionaea     │  │ floss, LLM  │  │ auditd+pcap  │
+                    │ Honeytrap   │  │ (qwen2.5)   │  │ Auto-restore │
+                    │ + 20 more   │  │             │  │ via Proxmox  │
+                    └─────────────┘  └─────────────┘  └──────────────┘
+                     Honeypot Subnet (192.168.40.0/24) — Isolated
 ```
 
-### Manual Deployment
+**Security model:** ELK (trusted network) initiates all connections. Honeypot subnet machines never connect back to the trusted network.
 
-If you prefer to deploy manually:
+## Components
+
+### Sentinel Daemons
+
+All sentinels follow the same pattern: dataclass Config, argparse CLI, RotatingFileHandler, signal handling, state persistence, poll loop with exponential backoff, Discord webhook alerts.
+
+#### Cowrie Sentinel (`cowrie_sentinel.py`)
+Polls Elasticsearch for Cowrie SSH honeypot events, reconstructs attacker sessions, scores behavior, extracts IOCs, and alerts on high-value sessions.
+
+- Session reconstruction from login → commands → file downloads → disconnect
+- Behavioral scoring (credential stuffing, persistence, lateral movement, crypto mining, etc.)
+- Classification: scanner, brute_forcer, credential_stuffer, interactive_attacker, advanced_threat
+- Severity levels: low / medium / high / critical
+- IOC extraction: credentials, URLs, IPs, domains, file hashes
+- Grafana annotations for session timeline correlation
+
+#### ML Sentinel (`ml_sentinel.py`)
+Machine-learning-enhanced threat detection using Isolation Forest for anomaly detection across honeypot and sacrificial VM events.
+
+- Behavioral baselines with scikit-learn Isolation Forest
+- Feature extraction from sliding time windows
+- Rule-based scoring supplementing ML (download-execute, reverse shells, disk wipe, etc.)
+- Periodic model retraining
+- Dual data source: honeypot containers + sacrificial VM auditd
+
+#### Sample Analyzer (`sample_analyzer.py`)
+Automated malware analysis pipeline — the core of the platform. Orchestrates a 9-step pipeline:
+
+1. **Capture** — Polls ES for Cowrie/Dionaea file events + T-Pot directory scan fallback
+2. **Fetch** — SCPs samples from T-Pot to local staging
+3. **Static Analysis** — Submits to REMnux via SSH: YARA rules, capa (MITRE ATT&CK mapping), FLOSS (string deobfuscation), strings extraction, Ollama qwen2.5:14b LLM threat summary
+4. **Dynamic Analysis** — Sandbox VM detonation: restores Proxmox snapshot via API, uploads sample, executes for 90s, captures pcap + auditd, collects process lists/network connections/new files, restores clean snapshot
+5. **VirusTotal** — Hash lookup for detection ratio and vendor labels
+6. **MalwareBazaar** — Auto-submits novel samples to abuse.ch with classification tags
+7. **MISP** — Checks all IOCs against threat intel feeds, creates event with full IOC set
+8. **Index** — Stores results in `malware-analysis` Elasticsearch index
+9. **Discord Alert** — Rich embed with classification, YARA matches, capa capabilities, LLM assessment, VT detections, sandbox behavioral data, MISP correlations, investigation links
+
+#### Outlook Sentinel (`outlook_sentinel.py`)
+Email threat analysis via Microsoft Graph API. Monitors Outlook inbox in real-time.
+
+- Sender reputation scoring (suspicious TLDs, brand impersonation detection)
+- Phishing keyword analysis in subject and body
+- URL extraction and suspicious URL pattern matching
+- VirusTotal URL lookups for flagged URLs
+- MISP IOC correlation for sender domains and URLs
+- Whitelisted sender domains (LinkedIn, Reddit, banks, etc.) with higher thresholds
+- Auto-moves emails scoring >= 0.7 to Junk Email folder (never deletes)
+- Discord alerts for emails scoring >= 0.5
+- OAuth device code flow with cached refresh tokens
+
+#### Portscan Defender (`portscan_defender.py`)
+Detects port scanning activity and triggers automated blocking.
+
+### MISP — Threat Intelligence Platform
+
+Docker deployment (`misp/docker-compose.yml`) providing centralized IOC management:
+
+- **Feeds:** CIRCL OSINT, Botvrij.eu, abuse.ch URLhaus, Feodo Tracker, MalwareBazaar
+- **Integration:** Sample analyzer creates events and checks IOCs on every sample
+- **Correlation:** Connects dots across samples over time ("this C2 domain appeared in 3 different samples")
+- **Web UI:** https://192.168.50.3
+
+### Supporting Scripts
+
+| Script | Purpose |
+|--------|---------|
+| `analyze_sample.sh` | Static analysis script deployed to REMnux |
+| `outlook_auth.py` | One-time OAuth device code flow for Outlook |
+| `scanner_block.sh` | Port scanner blocking |
+| `ReportIPs.sh` | Reports attacker IPs to AbuseIPDB (cron, every 6h) |
+
+## Infrastructure
+
+Runs on a single Proxmox host (flexiserve):
+
+| VMID | Name | Purpose | RAM | Subnet |
+|------|------|---------|-----|--------|
+| 102 | elk-stack | ELK + Grafana + Sentinels + MISP | 32GB | 192.168.50.x |
+| 103 | honeypot | T-Pot (Cowrie, Dionaea, 20+ honeypots) | 10GB | 192.168.40.x |
+| 106 | Static-Analyzisz | REMnux (YARA, capa, floss, Ollama) | 40GB | 192.168.40.x |
+| 107 | ReverseCowrie | Cowrie reverse proxy | 8GB | 192.168.40.x |
+| 109 | sandbox-detonation | Malware detonation VM | 2GB | 192.168.40.x |
+
+## Elasticsearch Indices
+
+| Index | Retention | Purpose |
+|-------|-----------|---------|
+| `.ds-filebeat-8.19.8-*` | 30 days | Honeypot raw events |
+| `sacrificial-vm-*` | 14 days | Sacrificial VM auditd/auth logs |
+| `.ds-suricata-*` | 14 days | Suricata IDS alerts |
+| `malware-analysis` | Forever | Analyzed malware samples |
+
+## Service Management
 
 ```bash
-# Backup existing config
-sudo cp /etc/filebeat/filebeat.yml /etc/filebeat/filebeat.yml.backup
+# Check all sentinels
+systemctl status cowrie-sentinel ml-sentinel sample-analyzer outlook-sentinel
 
-# Deploy new config
-sudo cp Filebeat.yml /etc/filebeat/filebeat.yml
+# Restart a sentinel
+sudo systemctl restart sample-analyzer
 
-# Test configuration
-sudo filebeat test config
+# View logs
+journalctl -u sample-analyzer -f
 
-# Restart service
-sudo systemctl restart filebeat
-
-# Monitor logs
-sudo journalctl -u filebeat -f
+# MISP
+cd ~/misp && sudo docker compose ps
+sudo docker compose logs -f misp-core
 ```
 
-## Configuration Details
+## Filebeat & Suricata Configuration
 
-The configuration handles JSON logs from Suricata via syslog-ng with the following processors:
+- **Filebeat.yml** — Main config (optimized for 28GB RAM, 8 CPUs)
+- **deploy-filebeat-config.sh** — Deployment script
+- **elasticsearch-index-template.json** — Suricata field mappings (geo_point)
+- **honeypot-elasticsearch-index-template.json** — Honeypot data index template
+- **grafana-dashboard.json** — Home network monitoring dashboard
+- **honeypot-grafana-dashboard.json** — Honeypot monitoring dashboard
 
-1. **decode_json_fields** - Parses the JSON directly from the message field
-2. **drop_fields** - Cleans up the original message field
-
-**Note**: Syslog-NG must be configured with `template("$MESSAGE\n")` to send raw JSON without headers.
-
-### GeoIP Enrichment Setup
-
-The Filebeat config uses an Elasticsearch ingest pipeline for GeoIP enrichment. Create it before starting Filebeat:
+### GeoIP Enrichment
 
 ```bash
-curl -X PUT "localhost:9200/_ingest/pipeline/suricata-geoip" -H 'Content-Type: application/json' -d'
-{
-  "description": "Add GeoIP data to Suricata logs",
+curl -X PUT "localhost:9200/_ingest/pipeline/suricata-geoip" -H 'Content-Type: application/json' -d'{
   "processors": [
-    {
-      "geoip": {
-        "field": "src_ip",
-        "target_field": "source.geo",
-        "ignore_missing": true
-      }
-    },
-    {
-      "geoip": {
-        "field": "dest_ip",
-        "target_field": "destination.geo",
-        "ignore_missing": true
-      }
-    }
+    {"geoip": {"field": "src_ip", "target_field": "source.geo", "ignore_missing": true}},
+    {"geoip": {"field": "dest_ip", "target_field": "destination.geo", "ignore_missing": true}}
   ]
-}
-'
+}'
 ```
 
-This adds geographic data (country, city, coordinates) to your Suricata events for map visualizations.
+## Discord Alerts
 
-### Index Template for Geo_Point Mapping
-
-For map visualizations to work properly, the `source.geo.location` and `destination.geo.location` fields must be mapped as `geo_point`. Create this index template before ingesting data:
-
-```bash
-curl -X PUT "localhost:9200/_index_template/suricata-template" \
-  -H 'Content-Type: application/json' \
-  -d @elasticsearch-index-template.json
-```
-
-**Note**: Existing indices won't be affected. To apply the new mapping, either:
-- Wait for new daily indices to be created (next day)
-- Or delete and recreate the current index: `curl -X DELETE "localhost:9200/suricata-$(date +%Y.%m.%d)"`
-
-## Grafana Dashboard
-
-Import the included `grafana-dashboard.json` for a complete home network monitoring dashboard.
-
-### Dashboard Features
-
-- **Network Overview**: Total events, unique IPs, protocols distribution
-- **Events Over Time**: Time series visualization of network activity
-- **DNS Queries**: Top visited domains with device filtering
-- **HTTP/TLS Traffic**: Website and application monitoring
-- **Geographic Map**: Traffic source/destination visualization (requires geo_point mapping)
-- **Honeypot Monitor**: Activity on subnet 192.168.40.0/24
-- **Security Alerts**: Suricata IDS alert monitoring
-
-### Import Dashboard
-
-1. Open Grafana → Dashboards → Import
-2. Upload `grafana-dashboard.json` or paste its contents
-3. Select your Elasticsearch datasource
-4. Click Import
-
-**Note**: The dashboard is configured for datasource UID `af68payzal7nkd`. Update if your datasource UID is different.
-
-### Performance Optimizations
-
-- **Queue**: 128K events in-memory buffer (~2-3GB RAM)
-- **Workers**: 8 (using all CPUs)
-- **Bulk size**: 5000 events per batch
-- **Max connections**: 100 concurrent TCP connections
-- **Max message size**: 50MB per message
-
-## Monitoring
-
-- **Metrics endpoint**: http://localhost:5066/stats
-- **Logs**: `sudo journalctl -u filebeat -f`
-- **Service status**: `sudo systemctl status filebeat`
-
-## Troubleshooting
-
-### Service won't start
-
-Check the logs:
-```bash
-sudo journalctl -u filebeat -n 50 --no-pager
-```
-
-### Test configuration
-
-```bash
-sudo filebeat test config -c /etc/filebeat/filebeat.yml
-```
-
-### Reset service restart limit
-
-If you see "Start request repeated too quickly":
-```bash
-sudo systemctl reset-failed filebeat
-sudo systemctl start filebeat
-```
-
-## T-Pot Honeypot Monitoring Setup
-
-The honeypot dashboard visualizes data from T-Pot honeypot systems using the `.ds-filebeat-8.19.8-*` data stream pattern.
-
-### Step 1: Create the Ingest Pipeline
-
-The ingest pipeline parses JSON from the message field and normalizes fields across all T-Pot honeypot types.
-
-**Option A: Using Kibana Dev Tools** (recommended)
-Copy and paste the contents of `honeypot-ingest-pipeline-devtools.txt` into Kibana Dev Tools.
-
-**Option B: Using curl**
-```bash
-curl -X PUT "localhost:9200/_ingest/pipeline/tpot-honeypot" \
-  -H 'Content-Type: application/json' \
-  -d @honeypot-ingest-pipeline.json
-```
-
-### Step 2: Apply the Index Template
-
-The index template references the ingest pipeline and defines proper field mappings:
-
-```bash
-curl -X PUT "localhost:9200/_index_template/honeypot-template" \
-  -H 'Content-Type: application/json' \
-  -d @honeypot-elasticsearch-index-template.json
-```
-
-### Step 3: Reindex Existing Data (Optional)
-
-To apply the pipeline to existing data, reindex to a new index:
-
-```bash
-POST _reindex
-{
-  "source": {
-    "index": ".ds-filebeat-8.19.8-*"
-  },
-  "dest": {
-    "index": "honeypot-processed",
-    "pipeline": "tpot-honeypot"
-  }
-}
-```
-
-Or update T-Pot's Filebeat config to use the pipeline for new data:
-```yaml
-output.elasticsearch:
-  pipeline: tpot-honeypot
-```
-
-### Step 4: Add Honeypot Datasource in Grafana
-
-1. Go to **Configuration → Data Sources → Add data source**
-2. Select **Elasticsearch**
-3. Configure:
-   - **Name**: `Elasticsearch - Honeypot`
-   - **URL**: `http://localhost:9200`
-   - **Index name**: `.ds-filebeat-8.19.8-*` (or `honeypot-processed` if reindexed)
-   - **Time field**: `@timestamp`
-   - **Version**: Select your ES version
-4. Click **Save & Test**
-
-### Step 5: Import Honeypot Dashboard
-
-1. Open Grafana → **Dashboards → Import**
-2. Upload `honeypot-grafana-dashboard.json`
-3. Select your honeypot Elasticsearch datasource
-4. Click **Import**
-
-### Honeypot Dashboard Features
-
-- **Overview Stats**: Total events, unique attackers, countries, targeted ports, login attempts, malware downloads
-- **Attack Timeline**: Time series of honeypot activity by honeypot type
-- **Geographic Map**: Visual map showing attacker origins
-- **Top Attackers**: IPs with most connection attempts, including country and ASN info
-- **Targeted Ports**: Most scanned/attacked ports with service name mappings
-- **Credential Analysis**: Top usernames and passwords attempted (normalized across all honeypots)
-- **Commands Executed**: Commands run by attackers in honeypot sessions
-- **Malware Downloads**: URLs and SHA256 hashes of downloaded malware (with VirusTotal links)
-- **Attacker OS**: OS fingerprinting from p0f
-- **Raw Events**: Recent events table for detailed analysis
-
-### Supported T-Pot Honeypot Types
-
-The pipeline parses and normalizes fields from all T-Pot honeypots:
-- **Cowrie** (SSH/Telnet): usernames, passwords, commands, sessions, file downloads
-- **Dionaea** (multi-protocol): connection types, credentials, download URLs
-- **Suricata** (IDS): alerts, signatures, categories, severity
-- **p0f** (passive fingerprinting): OS detection, network distance
-- **SentryPeer** (VoIP): SIP methods, called numbers
-- **FATT** (fingerprinting): JA3/JA3S hashes, HASSH
-- **Tanner/Snare** (web): request paths, attack detection
-- **Heralding** (credential): usernames, passwords, protocols
-- **H0neytr4p** (HTTP): request URIs, user agents
-- **Conpot** (ICS/SCADA): data types, requests
-- **Honeytrap**: payloads, services
-- **ADBHoney** (Android Debug Bridge): commands
-- **CiscoASA**: credentials
-- **Wordpot** (WordPress): attacked paths, plugins, themes
-- **Miniprint** (printer): print data
-
-### Normalized Fields
-
-The pipeline creates consistent field names across all honeypots:
-- `honeypot_type` - The honeypot container name
-- `src_ip`, `dest_ip` - Normalized source/destination IPs
-- `src_port`, `dest_port` - Normalized ports
-- `username`, `password` - Credentials from any honeypot
-- `command` - Commands executed
-- `download_url`, `file_hash` - Malware info
-- `request_path` - Web paths attacked
-- `os_fingerprint` - OS detection
-- `event_type` - Event type/method
-- `geoip.*` - GeoIP data for attacker locations
-
-## Recent Fixes
-
-- **Dec 11, 2025**: Added comprehensive T-Pot ingest pipeline for parsing all honeypot JSON formats
-- **Dec 11, 2025**: Updated dashboard to use normalized fields (works across all T-Pot honeypots)
-- **Dec 11, 2025**: Added dedicated honeypot Grafana dashboard with credential analysis, commands, malware tracking
-- **Dec 11, 2025**: Added honeypot Elasticsearch index template for filebeat-8.19.8* pattern
-- **Dec 11, 2025**: Updated main dashboard to use configurable honeypot subnet variable
-- **Dec 8, 2025**: Added Elasticsearch index template for geo_point mapping (map visualizations)
-- **Dec 8, 2025**: Added Grafana dashboard for home network monitoring
-- **Dec 8, 2025**: Added GeoIP enrichment via Elasticsearch ingest pipeline
-- **Dec 8, 2025**: Simplified config to decode JSON directly (removed dissect processor)
-- **Dec 8, 2025**: Updated syslog-ng to send raw JSON with `template("$MESSAGE\n")`
-- **Dec 7, 2025**: Fixed `dissect` tokenizer to parse full syslog format with priority and timestamp
-- **Dec 7, 2025**: Replaced `grok` processor with `dissect` (grok not available in this Filebeat version)
-- **Dec 7, 2025**: Created automated deployment script and documentation
-
-## Expected Performance
-
-- **Input**: 50,000-100,000 events/second
-- **RAM usage**: 3-5GB
-- **CPU usage**: 10-30%
-- **Network**: 100-500 Mbps
-- **Drop rate**: < 0.1%
+All sentinels post to a shared Discord webhook with rich embeds including:
+- Severity-coded colors and icons
+- Country flags for attacker geolocation
+- Investigation links (Grafana, VirusTotal, MalwareBazaar, AbuseIPDB)
+- Verbosity modes: compact (phone), normal, verbose
