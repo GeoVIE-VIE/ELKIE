@@ -16,9 +16,9 @@ services:
       - MYSQL_PORT=3306
       - MYSQL_DATABASE=misp
       - MYSQL_USER=misp
-      - MYSQL_PASSWORD=***REDACTED***
-      - MISP_ADMIN_EMAIL=admin@misp.local
-      - MISP_ADMIN_PASSPHRASE=***REDACTED***
+      - MYSQL_PASSWORD=${MISP_MYSQL_PASSWORD:-changeme}
+      - MISP_ADMIN_EMAIL=${MISP_ADMIN_EMAIL:-admin@misp.local}
+      - MISP_ADMIN_PASSPHRASE=${MISP_ADMIN_PASSPHRASE:-changeme}
       - MISP_BASEURL=https://192.168.50.3
       - BASE_URL=https://192.168.50.3
       - REDIS_HOST=redis
@@ -39,8 +39,8 @@ services:
     environment:
       - MYSQL_DATABASE=misp
       - MYSQL_USER=misp
-      - MYSQL_PASSWORD=***REDACTED***
-      - MYSQL_ROOT_PASSWORD=***REDACTED***
+      - MYSQL_PASSWORD=${MISP_MYSQL_PASSWORD:-changeme}
+      - MYSQL_ROOT_PASSWORD=${MISP_MYSQL_ROOT_PASSWORD:-changeme}
     volumes:
       - misp-db-data:/var/lib/mysql
     healthcheck:

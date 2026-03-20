@@ -2,7 +2,7 @@
 # Daily MISP feed sync — pull fresh threat intel from all enabled feeds
 # Run via cron: 0 4 * * * /home/legs/misp_feed_sync.sh >> /home/legs/misp_feed_sync.log 2>&1
 
-MISP_KEY="***REDACTED***"
+MISP_KEY="${MISP_API_KEY:-}"
 MISP_URL="https://localhost"
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting MISP feed sync"

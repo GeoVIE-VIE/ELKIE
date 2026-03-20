@@ -19,10 +19,18 @@
 
 # Sensitive files
 .env
+*.env
+.sample_analyzer_env
 .sentinel_state.json
 .ml_sentinel_state.json
+.sample_analyzer_state.json
+.outlook_sentinel_state.json
+.outlook_token_cache.json
+.gitconfig
 reported_ips.txt
 abuseipdb.log
+misp/.env
+sample_staging/
 
 # Logs
 *.log

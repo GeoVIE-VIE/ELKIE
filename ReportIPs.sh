@@ -1,5 +1,5 @@
 #!/bin/bash
-API_KEY="***REDACTED***"
+API_KEY="${ABUSEIPDB_API_KEY:-}"
 REPORTED_FILE="/home/legs/reported_ips.txt"
 
 touch $REPORTED_FILE
