@@ -550,6 +550,137 @@ class OutlookSentinel:
 
         return analysis
 
+    # -- Attachment analysis -----------------------------------------------
+
+    DANGEROUS_EXTENSIONS = {
+        ".exe", ".scr", ".bat", ".cmd", ".com", ".pif", ".msi", ".msp",
+        ".dll", ".ocx", ".cpl", ".inf", ".reg", ".ps1", ".vbs", ".vbe",
+        ".js", ".jse", ".wsf", ".wsh", ".hta", ".lnk", ".iso", ".img",
+        ".jar", ".py", ".rb", ".elf", ".sh", ".app", ".action",
+        ".docm", ".xlsm", ".pptm", ".dotm", ".xltm",  # macro-enabled Office
+        ".zip", ".rar", ".7z", ".gz", ".tar", ".cab",  # archives (may contain malware)
+    }
+
+    SAFE_EXTENSIONS = {
+        ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".svg", ".webp",
+        ".pdf",  # generally safe but could be malicious
+        ".txt", ".csv", ".log",
+        ".mp3", ".mp4", ".wav", ".avi", ".mov",
+        ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",  # non-macro Office
+    }
+
+    def _download_attachments(self, message_id: str) -> list[dict]:
+        """Download attachments from a message via Graph API."""
+        result = self._graph_get(f"/me/messages/{message_id}/attachments")
+        if not result:
+            return []
+
+        attachments = []
+        staging = Path("/home/legs/sample_staging")
+        staging.mkdir(parents=True, exist_ok=True)
+
+        for att in result.get("value", []):
+            if att.get("@odata.type") != "#microsoft.graph.fileAttachment":
+                continue
+
+            name = att.get("name", "unknown")
+            size = att.get("size", 0)
+            content_bytes = att.get("contentBytes", "")
+
+            if not content_bytes or size > 50 * 1024 * 1024:  # 50MB limit
+                continue
+
+            # Check extension
+            ext = "." + name.rsplit(".", 1)[-1].lower() if "." in name else ""
+            is_dangerous = ext in self.DANGEROUS_EXTENSIONS
+            is_safe = ext in self.SAFE_EXTENSIONS
+
+            import base64
+            import hashlib
+            raw = base64.b64decode(content_bytes)
+            sha256 = hashlib.sha256(raw).hexdigest()
+
+            # Save to staging
+            local_path = staging / sha256
+            with open(local_path, "wb") as f:
+                f.write(raw)
+
+            attachments.append({
+                "name": name,
+                "size": size,
+                "sha256": sha256,
+                "extension": ext,
+                "is_dangerous": is_dangerous,
+                "is_safe": is_safe,
+                "local_path": str(local_path),
+                "content_type": att.get("contentType", ""),
+            })
+
+            self.logger.info("  Downloaded attachment: %s (%s, %d bytes)", name, sha256[:16], size)
+
+        return attachments
+
+    def _analyze_attachment(self, attachment: dict) -> Optional[dict]:
+        """Run attachment through the malware analysis pipeline."""
+        sha256 = attachment["sha256"]
+        local_path = Path(attachment["local_path"])
+        name = attachment["name"]
+
+        # Import sample_analyzer for the pipeline
+        try:
+            from sample_analyzer import SampleAnalyzer, Config as SAConfig
+        except ImportError:
+            self.logger.error("Could not import sample_analyzer — skipping attachment analysis")
+            return None
+
+        sa_cfg = SAConfig(
+            webhook_url=None,  # We'll handle alerting ourselves
+            dry_run=self.cfg.dry_run,
+        )
+        analyzer = SampleAnalyzer(sa_cfg)
+
+        # Check VT first (quick, no SSH needed)
+        vt_result = analyzer.vt_lookup(sha256)
+
+        # Submit to REMnux for static analysis
+        ok = analyzer.submit_for_analysis(sha256, local_path)
+        if not ok:
+            self.logger.warning("Failed to submit attachment %s to REMnux", name)
+            return {"sha256": sha256, "name": name, "virustotal": vt_result, "static_analysis": None}
+
+        # Wait for results
+        results = analyzer.wait_for_results(sha256)
+
+        # Dynamic analysis if it's a dangerous file type
+        dynamic = None
+        if attachment["is_dangerous"] and results:
+            dynamic = analyzer.detonate_sample(sha256, local_path)
+
+        analysis = {
+            "sha256": sha256,
+            "name": name,
+            "virustotal": vt_result,
+            "static_analysis": results,
+            "dynamic_analysis": dynamic,
+        }
+
+        # Index in ES and create MISP event if we got results
+        if results:
+            metadata = {
+                "honeypot": "outlook",
+                "src_ip": "",
+                "country": "",
+                "session_id": "",
+                "captured_at": "",
+            }
+            results["virustotal"] = vt_result
+            if dynamic:
+                results["dynamic_analysis"] = dynamic
+            analyzer.index_results(sha256, results, metadata)
+            analyzer.misp_create_event(results, metadata)
+
+        return analysis
+
     # -- Actions -----------------------------------------------------------
 
     def process_email(self, msg: dict) -> Optional[dict]:
@@ -573,6 +704,34 @@ class OutlookSentinel:
         if analysis["reasons"]:
             for r in analysis["reasons"][:3]:
                 self.logger.info("  → %s", r)
+
+        # Attachment analysis — download and analyze if email has attachments and is suspicious
+        if analysis.get("has_attachments") and analysis["score"] >= 0.3:
+            attachments = self._download_attachments(analysis["message_id"])
+            if attachments:
+                analysis["attachments"] = []
+                for att in attachments:
+                    if att["is_safe"] and analysis["score"] < 0.5:
+                        self.logger.info("  Skipping safe attachment: %s", att["name"])
+                        continue
+
+                    self.logger.info("  Analyzing attachment: %s (%s)", att["name"], att["sha256"][:16])
+                    att_result = self._analyze_attachment(att)
+                    if att_result:
+                        analysis["attachments"].append(att_result)
+
+                        # Boost score if attachment is malicious
+                        vt = att_result.get("virustotal", {})
+                        if vt and vt.get("found") and vt.get("detections", 0) > 0:
+                            analysis["score"] = min(analysis["score"] + 0.4, 1.0)
+                            analysis["reasons"].append(f"Attachment '{att['name']}' flagged by VT: {vt.get('detection_ratio', '?')}")
+                            analysis["classification"] = "phishing"
+
+                        static = att_result.get("static_analysis", {})
+                        if static and static.get("yara_matches"):
+                            analysis["score"] = min(analysis["score"] + 0.3, 1.0)
+                            analysis["reasons"].append(f"Attachment YARA: {', '.join(static['yara_matches'][:3])}")
+                            analysis["classification"] = "phishing"
 
         # Auto-move to junk
         if analysis["score"] >= self.cfg.auto_junk_threshold and not self.cfg.dry_run:
@@ -645,6 +804,49 @@ class OutlookSentinel:
         if analysis.get("misp_hits"):
             misp_text = "\n".join(f"\u2022 `{h['value']}` ({h['type']}) — {h['events']} event(s)" for h in analysis["misp_hits"])
             fields.append({"name": "MISP Correlations", "value": misp_text, "inline": False})
+
+        # Attachment analysis results
+        for att in analysis.get("attachments", []):
+            att_parts = [f"**{att.get('name', '?')}** (`{att.get('sha256', '?')[:16]}...`)"]
+
+            vt = att.get("virustotal", {})
+            if vt and vt.get("found"):
+                att_parts.append(f"VT: **{vt.get('detection_ratio', '?')}** detections")
+                if vt.get("suggested_label"):
+                    att_parts.append(f"Label: `{vt['suggested_label']}`")
+            elif vt and not vt.get("found"):
+                att_parts.append("VT: **Not found** (novel)")
+
+            static = att.get("static_analysis", {})
+            if static:
+                if static.get("yara_matches"):
+                    att_parts.append(f"YARA: {', '.join(f'`{y}`' for y in static['yara_matches'][:3])}")
+                if static.get("classification"):
+                    att_parts.append(f"Classification: **{static.get('classification', 'unknown').title()}**")
+                if static.get("llm_summary"):
+                    summary = static["llm_summary"][:300]
+                    if len(static["llm_summary"]) > 300:
+                        summary += "\u2026"
+                    att_parts.append(f"\n{summary}")
+
+            dyn = att.get("dynamic_analysis", {})
+            if dyn:
+                if dyn.get("dns_queries"):
+                    att_parts.append(f"DNS: {', '.join(f'`{d}`' for d in dyn['dns_queries'][:3])}")
+                if dyn.get("outbound_connections"):
+                    conns = [f"`{c['ip']}:{c['port']}`" for c in dyn["outbound_connections"][:3]]
+                    att_parts.append(f"Connections: {', '.join(conns)}")
+
+            att_text = "\n".join(att_parts)
+            if len(att_text) > 900:
+                att_text = att_text[:900] + "\n\u2026"
+            fields.append({"name": "Attachment Analysis", "value": att_text, "inline": False})
+
+            # Add investigation links for the attachment
+            sha = att.get("sha256", "")
+            if sha:
+                links = f"\u2022 [VirusTotal](https://www.virustotal.com/gui/file/{sha}) | [MalwareBazaar](https://bazaar.abuse.ch/sample/{sha}/)"
+                fields.append({"name": "Attachment Links", "value": links, "inline": False})
 
         # Body preview
         preview = analysis.get("body_preview", "")
