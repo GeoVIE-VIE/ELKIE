@@ -30,7 +30,16 @@
 reported_ips.txt
 abuseipdb.log
 misp/.env
+opencti/.env
 sample_staging/
+.honeytokens/
+.aws/
+.openvpn/
+.bitcoin/
+database.yml
+projects/.env*
+Documents/passwords.txt
+reports/
 
 # Logs
 *.log

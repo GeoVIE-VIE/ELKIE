@@ -1,0 +1,17 @@
+[Unit]
+Description=Honeytoken Monitor — Canary Trap Intrusion Detection
+After=network.target
+
+[Service]
+Type=simple
+User=legs
+EnvironmentFile=/home/legs/.sample_analyzer_env
+ExecStartPre=/usr/bin/python3 /home/legs/honeytoken_monitor.py --deploy
+ExecStart=/usr/bin/python3 /home/legs/honeytoken_monitor.py --monitor
+Restart=on-failure
+RestartSec=30
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

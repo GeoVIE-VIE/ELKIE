@@ -1770,7 +1770,28 @@ class SampleAnalyzer:
         except Exception as e:
             self.logger.warning("PDF report generation failed: %s", e)
 
-        # Step 11: Discord alert
+        # Step 11: Generate Sigma detection rules
+        try:
+            from generate_sigma_rules import generate_sigma_rules, save_rules
+            sigma_rules = generate_sigma_rules(results)
+            if sigma_rules:
+                save_rules(sigma_rules, sha256)
+                self.logger.info("Generated %d Sigma rules for %s", len(sigma_rules), sha256[:16])
+        except Exception as e:
+            self.logger.warning("Sigma rule generation failed: %s", e)
+
+        # Step 12: Update ATT&CK Navigator layer
+        try:
+            from generate_attack_navigator import generate_layer
+            layer = generate_layer()
+            if layer:
+                layer_path = Path("/home/legs/reports/attack_navigator_layer.json")
+                with open(layer_path, "w") as f:
+                    json.dump(layer, f, indent=2)
+        except Exception as e:
+            self.logger.warning("ATT&CK Navigator update failed: %s", e)
+
+        # Step 13: Discord alert
         self.fire_discord_alert(results, sample_info)
 
         self.known_hashes.add(sha256)
