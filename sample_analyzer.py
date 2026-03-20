@@ -593,6 +593,69 @@ class SampleAnalyzer:
         self.logger.warning("Timed out waiting for results: %s", sha256[:16])
         return None
 
+    # -- Sample similarity ------------------------------------------------
+
+    def find_similar_samples(self, results: dict) -> list[dict]:
+        """Compare ssdeep hash against all previously indexed samples."""
+        ssdeep_hash = results.get("ssdeep")
+        if not ssdeep_hash:
+            return []
+
+        # Fetch all ssdeep hashes from ES
+        query_result = self._es_post(f"{self.cfg.result_index}/_search", {
+            "size": 500,
+            "_source": ["sha256", "ssdeep", "classification", "file_type"],
+            "query": {"exists": {"field": "ssdeep"}},
+        })
+        if not query_result:
+            return []
+
+        hits = query_result.get("hits", {}).get("hits", [])
+        if not hits:
+            return []
+
+        # Compare using ssdeep
+        similar = []
+        try:
+            import ssdeep as ssdeep_lib
+            for hit in hits:
+                src = hit["_source"]
+                other_hash = src.get("ssdeep", "")
+                other_sha = src.get("sha256", "")
+                if not other_hash or other_sha == results.get("sha256"):
+                    continue
+                try:
+                    score = ssdeep_lib.compare(ssdeep_hash, other_hash)
+                    if score > 0:
+                        similar.append({
+                            "sha256": other_sha,
+                            "similarity": score,
+                            "classification": src.get("classification", "unknown"),
+                            "file_type": (src.get("file_type") or "")[:40],
+                        })
+                except Exception:
+                    continue
+        except ImportError:
+            # ssdeep python module not on ELK — use subprocess
+            for hit in hits:
+                src = hit["_source"]
+                other_hash = src.get("ssdeep", "")
+                other_sha = src.get("sha256", "")
+                if not other_hash or other_sha == results.get("sha256"):
+                    continue
+                try:
+                    result = subprocess.run(
+                        ["ssdeep", "-a", "-d", f"{ssdeep_hash}", f"{other_hash}"],
+                        capture_output=True, text=True, timeout=5,
+                    )
+                    # ssdeep -a outputs score, parse it
+                except Exception:
+                    continue
+
+        # Sort by similarity descending
+        similar.sort(key=lambda x: -x["similarity"])
+        return similar[:10]
+
     # -- Results indexing --------------------------------------------------
 
     def index_results(self, sha256: str, results: dict, metadata: dict):
@@ -1412,6 +1475,14 @@ class SampleAnalyzer:
                 misp_lines.append(f"\u2022 `{ioc['value']}` ({ioc['type']}) — seen in {ioc['events']} event(s)")
             fields.append({"name": "MISP Correlations", "value": "\n".join(misp_lines), "inline": False})
 
+        # Sample similarity
+        similar = results.get("similar_samples", [])
+        if similar:
+            sim_lines = []
+            for s in similar[:5]:
+                sim_lines.append(f"\u2022 **{s['similarity']}%** match — `{s['sha256'][:16]}...` ({s['classification']})")
+            fields.append({"name": "Similar Samples (ssdeep)", "value": "\n".join(sim_lines), "inline": False})
+
         # Ghidra decompilation results
         ghidra = results.get("ghidra")
         if ghidra and isinstance(ghidra, dict):
@@ -1577,7 +1648,14 @@ class SampleAnalyzer:
         # Step 8: Index in Elasticsearch
         self.index_results(sha256, results, sample_info)
 
-        # Step 9: Discord alert
+        # Step 9: Sample similarity check (must be after indexing)
+        similar = self.find_similar_samples(results)
+        if similar:
+            results["similar_samples"] = similar
+            self.logger.info("Found %d similar samples for %s (top: %d%% match)",
+                             len(similar), sha256[:16], similar[0]["similarity"])
+
+        # Step 10: Discord alert
         self.fire_discord_alert(results, sample_info)
 
         self.known_hashes.add(sha256)

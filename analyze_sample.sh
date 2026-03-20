@@ -50,6 +50,12 @@ mkdir -p "$RESULTS_DIR"
 SHA256=$(sha256sum "$SAMPLE" | awk '{print $1}')
 MD5=$(md5sum "$SAMPLE" | awk '{print $1}')
 
+# Fuzzy hash for similarity matching
+SSDEEP_HASH=""
+if command -v ssdeep &>/dev/null; then
+    SSDEEP_HASH=$(timeout 10 ssdeep -b "$SAMPLE" 2>/dev/null | tail -1 | cut -d, -f1)
+fi
+
 # Idempotent: skip if already analyzed
 RESULT_FILE="${RESULTS_DIR}/${SHA256}.json"
 if [ -f "$RESULT_FILE" ]; then
@@ -395,6 +401,7 @@ fi
 
 export SA_SHA256="$SHA256"
 export SA_MD5="$MD5"
+export SA_SSDEEP="${SSDEEP_HASH:-}"
 export SA_FILE_TYPE="$FILE_TYPE"
 export SA_MIME_TYPE="$MIME_TYPE"
 export SA_FILE_SIZE="$FILE_SIZE"
@@ -423,6 +430,7 @@ def read_json_or_default(val, default):
 
 sha256 = os.environ["SA_SHA256"]
 md5 = os.environ["SA_MD5"]
+ssdeep_hash = os.environ.get("SA_SSDEEP", "") or None
 file_type = os.environ["SA_FILE_TYPE"]
 mime_type = os.environ["SA_MIME_TYPE"]
 file_size = int(os.environ["SA_FILE_SIZE"])
@@ -443,6 +451,7 @@ ghidra = read_json_or_default(os.environ.get("SA_GHIDRA", "null"), None)
 result = {
     "sha256": sha256,
     "md5": md5,
+    "ssdeep": ssdeep_hash,
     "file_type": file_type,
     "mime_type": mime_type,
     "file_size": file_size,
