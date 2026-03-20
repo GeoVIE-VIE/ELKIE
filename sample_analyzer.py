@@ -1655,7 +1655,18 @@ class SampleAnalyzer:
             self.logger.info("Found %d similar samples for %s (top: %d%% match)",
                              len(similar), sha256[:16], similar[0]["similarity"])
 
-        # Step 10: Discord alert
+        # Step 10: Generate PDF report
+        try:
+            from generate_report import generate_report as gen_pdf, build_styles
+            report_dir = Path("/home/legs/reports")
+            report_dir.mkdir(parents=True, exist_ok=True)
+            report_path = report_dir / f"{sha256[:16]}_report.pdf"
+            gen_pdf(results, report_path, build_styles())
+            self.logger.info("PDF report generated: %s", report_path)
+        except Exception as e:
+            self.logger.warning("PDF report generation failed: %s", e)
+
+        # Step 11: Discord alert
         self.fire_discord_alert(results, sample_info)
 
         self.known_hashes.add(sha256)
