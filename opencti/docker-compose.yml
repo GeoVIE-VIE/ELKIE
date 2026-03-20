@@ -1,0 +1,227 @@
+services:
+  opencti:
+    image: opencti/platform:latest
+    container_name: opencti
+    restart: unless-stopped
+    depends_on:
+      opencti-redis:
+        condition: service_started
+      opencti-minio:
+        condition: service_started
+      opencti-rabbitmq:
+        condition: service_healthy
+    ports:
+      - "8888:8080"
+    environment:
+      - NODE_OPTIONS=--max-old-space-size=8096
+      - APP__PORT=8080
+      - APP__BASE_URL=${OPENCTI_BASE_URL}
+      - APP__ADMIN__EMAIL=${OPENCTI_ADMIN_EMAIL}
+      - APP__ADMIN__PASSWORD=${OPENCTI_ADMIN_PASSWORD}
+      - APP__ADMIN__TOKEN=${OPENCTI_ADMIN_TOKEN}
+      - APP__APP_LOGS__LOGS_LEVEL=error
+      - APP__ENCRYPTION_KEY=${OPENCTI_ENCRYPTION_KEY}
+      - REDIS__HOSTNAME=opencti-redis
+      - REDIS__PORT=6379
+      - ELASTICSEARCH__URL=http://elasticsearch:9200
+      - ELASTICSEARCH__NUMBER_OF_REPLICAS=0
+      - ELASTICSEARCH__INDEX_PREFIX=opencti
+      - MINIO__ENDPOINT=opencti-minio
+      - MINIO__PORT=9000
+      - MINIO__USE_SSL=false
+      - MINIO__ACCESS_KEY=${MINIO_ROOT_USER}
+      - MINIO__SECRET_KEY=${MINIO_ROOT_PASSWORD}
+      - RABBITMQ__HOSTNAME=opencti-rabbitmq
+      - RABBITMQ__PORT=5672
+      - RABBITMQ__PORT_MANAGEMENT=15672
+      - RABBITMQ__MANAGEMENT_SSL=false
+      - RABBITMQ__USERNAME=${RABBITMQ_DEFAULT_USER}
+      - RABBITMQ__PASSWORD=${RABBITMQ_DEFAULT_PASS}
+    networks:
+      - opencti-net
+      - misp_misp-net
+      - elk_default
+
+  opencti-worker:
+    image: opencti/worker:latest
+    restart: unless-stopped
+    depends_on:
+      - opencti
+    environment:
+      - OPENCTI_URL=http://opencti:8080
+      - OPENCTI_TOKEN=${OPENCTI_ADMIN_TOKEN}
+      - WORKER_LOG_LEVEL=error
+    deploy:
+      replicas: 3
+    networks:
+      - opencti-net
+
+  opencti-redis:
+    image: redis:7-alpine
+    container_name: opencti-redis
+    restart: unless-stopped
+    volumes:
+      - opencti-redis-data:/data
+    networks:
+      - opencti-net
+
+  opencti-minio:
+    image: minio/minio:latest
+    container_name: opencti-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
+    volumes:
+      - opencti-minio-data:/data
+    networks:
+      - opencti-net
+
+  opencti-rabbitmq:
+    image: rabbitmq:3-management
+    container_name: opencti-rabbitmq
+    restart: unless-stopped
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_DEFAULT_USER}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_DEFAULT_PASS}
+    volumes:
+      - opencti-rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_running"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - opencti-net
+
+  # --- Connectors ---
+
+  connector-misp:
+    image: opencti/connector-misp:latest
+    container_name: opencti-connector-misp
+    restart: unless-stopped
+    depends_on:
+      - opencti
+    environment:
+      - OPENCTI_URL=http://opencti:8080
+      - OPENCTI_TOKEN=${OPENCTI_ADMIN_TOKEN}
+      - CONNECTOR_ID=a1b2c3d4-misp-conn-0001-000000000001
+      - CONNECTOR_NAME=MISP
+      - CONNECTOR_SCOPE=misp
+      - CONNECTOR_CONFIDENCE_LEVEL=75
+      - CONNECTOR_LOG_LEVEL=error
+      - CONNECTOR_UPDATE_EXISTING_DATA=false
+      - MISP_URL=https://misp-core
+      - MISP_REFERENCE_URL=https://192.168.50.3
+      - MISP_KEY=${MISP_API_KEY}
+      - MISP_SSL_VERIFY=false
+      - MISP_DATETIME_ATTRIBUTE=timestamp
+      - MISP_CREATE_REPORTS=true
+      - MISP_CREATE_INDICATORS=true
+      - MISP_CREATE_OBSERVABLES=true
+      - MISP_CREATE_OBJECT_OBSERVABLES=true
+      - MISP_REPORT_TYPE=misp-event
+      - MISP_IMPORT_FROM_DATE=2020-01-01
+      - MISP_IMPORT_TAGS=tlp:green,type:OSINT
+      - MISP_INTERVAL=5
+    networks:
+      - opencti-net
+      - misp_misp-net
+
+  connector-virustotal:
+    image: opencti/connector-virustotal:latest
+    container_name: opencti-connector-vt
+    restart: unless-stopped
+    depends_on:
+      - opencti
+    environment:
+      - OPENCTI_URL=http://opencti:8080
+      - OPENCTI_TOKEN=${OPENCTI_ADMIN_TOKEN}
+      - CONNECTOR_ID=a1b2c3d4-vt00-conn-0002-000000000002
+      - CONNECTOR_NAME=VirusTotal
+      - CONNECTOR_SCOPE=StixFile,Artifact,IPv4-Addr,Domain-Name,Url
+      - CONNECTOR_AUTO=true
+      - CONNECTOR_CONFIDENCE_LEVEL=80
+      - CONNECTOR_LOG_LEVEL=error
+      - VIRUSTOTAL_TOKEN=${VT_API_KEY}
+      - VIRUSTOTAL_MAX_TLP=TLP:AMBER
+      - VIRUSTOTAL_REPLACE_WITH_LOWER_SCORE=true
+      - VIRUSTOTAL_LIVEHUNT_NOTIFICATIONS=false
+      - VIRUSTOTAL_FILE_INDICATOR_CREATE_POSITIVES=5
+      - VIRUSTOTAL_IP_INDICATOR_CREATE_POSITIVES=5
+      - VIRUSTOTAL_DOMAIN_INDICATOR_CREATE_POSITIVES=5
+      - VIRUSTOTAL_URL_INDICATOR_CREATE_POSITIVES=5
+    networks:
+      - opencti-net
+
+  connector-abuse-ipdb:
+    image: opencti/connector-abuseipdb:latest
+    container_name: opencti-connector-abuseipdb
+    restart: unless-stopped
+    depends_on:
+      - opencti
+    environment:
+      - OPENCTI_URL=http://opencti:8080
+      - OPENCTI_TOKEN=${OPENCTI_ADMIN_TOKEN}
+      - CONNECTOR_ID=a1b2c3d4-abus-conn-0003-000000000003
+      - CONNECTOR_NAME=AbuseIPDB
+      - CONNECTOR_SCOPE=IPv4-Addr
+      - CONNECTOR_AUTO=true
+      - CONNECTOR_CONFIDENCE_LEVEL=70
+      - CONNECTOR_LOG_LEVEL=error
+      - ABUSEIPDB_API_KEY=${ABUSEIPDB_API_KEY}
+    networks:
+      - opencti-net
+
+  connector-mitre:
+    image: opencti/connector-mitre:latest
+    container_name: opencti-connector-mitre
+    restart: unless-stopped
+    depends_on:
+      - opencti
+    environment:
+      - OPENCTI_URL=http://opencti:8080
+      - OPENCTI_TOKEN=${OPENCTI_ADMIN_TOKEN}
+      - CONNECTOR_ID=a1b2c3d4-mitr-conn-0004-000000000004
+      - CONNECTOR_NAME=MITRE ATT&CK
+      - CONNECTOR_SCOPE=marking-definition,identity,attack-pattern,course-of-action,intrusion-set,campaign,malware,tool,report,external-reference-as-report
+      - CONNECTOR_CONFIDENCE_LEVEL=90
+      - CONNECTOR_LOG_LEVEL=error
+      - CONNECTOR_RUN_AND_TERMINATE=false
+      - MITRE_INTERVAL=7
+    networks:
+      - opencti-net
+
+  connector-cve:
+    image: opencti/connector-cve:latest
+    container_name: opencti-connector-cve
+    restart: unless-stopped
+    depends_on:
+      - opencti
+    environment:
+      - OPENCTI_URL=http://opencti:8080
+      - OPENCTI_TOKEN=${OPENCTI_ADMIN_TOKEN}
+      - CONNECTOR_ID=a1b2c3d4-cve0-conn-0005-000000000005
+      - CONNECTOR_NAME=CVE
+      - CONNECTOR_SCOPE=vulnerability
+      - CONNECTOR_CONFIDENCE_LEVEL=80
+      - CONNECTOR_LOG_LEVEL=error
+      - CONNECTOR_RUN_AND_TERMINATE=false
+      - CVE_INTERVAL=7
+      - CVE_BASE_URL=https://services.nvd.nist.gov/rest/json/cves
+    networks:
+      - opencti-net
+
+volumes:
+  opencti-redis-data:
+  opencti-minio-data:
+  opencti-rabbitmq-data:
+
+networks:
+  opencti-net:
+    driver: bridge
+  misp_misp-net:
+    external: true
+  elk_default:
+    external: true
