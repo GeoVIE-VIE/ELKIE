@@ -330,53 +330,207 @@ class TrafficNoise:
         except Exception:
             pass
 
+    # -- Search query generation (template-based for infinite variety) ----
+
+    _QUERY_TEMPLATES = {
+        "search": {
+            "templates": [
+                "best {product} {year}", "how to {fix_action} {household_item}",
+                "{recipe_adj} {food} recipe", "{food} recipe for {occasion}",
+                "weather in {city} this week", "best {product} under {price}",
+                "{service} near me", "diy {home_project}", "how to {life_skill}",
+                "best {product} for {use_case}", "{city} things to do this weekend",
+                "how much does {service} cost", "{brand} vs {brand} review",
+                "is {product} worth it {year}", "cheap {product} deals",
+                "how to clean {household_item}", "best {food} restaurants in {city}",
+                "{car_brand} {car_type} {year} review", "used {car_brand} for sale near me",
+                "how to save money on {expense}", "{sport} scores today",
+                "{streaming} best shows {year}", "when does {show} come out",
+                "best books {genre} {year}", "how to lose weight {method}",
+                "{exercise} workout for beginners", "best {supplement} for {health_goal}",
+                "{home_project} cost estimate", "how to {cooking_method} {food}",
+                "best {pet} breeds for {living_situation}", "{pet} {pet_issue} remedies",
+                "how to get rid of {pest}", "{holiday} gift ideas {year}",
+                "best {clothing} for {season}", "how to style {clothing}",
+            ],
+            "vars": {
+                "product": ["wireless headphones", "laptop", "monitor", "keyboard", "mouse",
+                    "air fryer", "vacuum cleaner", "mattress", "office chair", "standing desk",
+                    "smart watch", "tablet", "router", "dash cam", "security camera",
+                    "blender", "instant pot", "coffee maker", "air purifier", "dehumidifier",
+                    "electric toothbrush", "noise canceling earbuds", "portable charger",
+                    "gaming headset", "webcam", "microphone", "ring light", "power strip",
+                    "lawn mower", "pressure washer", "drill", "tool set", "generator"],
+                "year": ["2025", "2026"],
+                "fix_action": ["fix", "repair", "replace", "install", "unclog", "patch", "adjust", "rewire"],
+                "household_item": ["leaky faucet", "running toilet", "garbage disposal", "dishwasher",
+                    "dryer", "washing machine", "water heater", "thermostat", "smoke detector",
+                    "ceiling fan", "light switch", "door knob", "window screen", "gutter",
+                    "drywall hole", "squeaky door", "garage door opener", "sprinkler system"],
+                "recipe_adj": ["easy", "quick", "healthy", "keto", "vegan", "gluten free",
+                    "slow cooker", "instant pot", "air fryer", "one pot", "30 minute",
+                    "budget", "meal prep", "high protein", "low carb", "mediterranean"],
+                "food": ["chicken", "salmon", "pasta", "tacos", "steak", "shrimp", "tofu",
+                    "rice bowl", "soup", "chili", "curry", "stir fry", "pizza dough",
+                    "banana bread", "pancakes", "smoothie", "meatloaf", "pulled pork",
+                    "mac and cheese", "fried rice", "ramen", "burrito bowl", "lasagna"],
+                "occasion": ["dinner tonight", "meal prep", "date night", "family dinner",
+                    "super bowl party", "birthday party", "potluck", "camping", "kids"],
+                "city": ["Portland", "Austin", "Denver", "Seattle", "Nashville", "San Diego",
+                    "Miami", "Chicago", "Boston", "Atlanta", "Phoenix", "Las Vegas",
+                    "New York", "Los Angeles", "Houston", "Dallas", "Philadelphia"],
+                "service": ["oil change", "dentist", "urgent care", "tire shop", "barber",
+                    "mechanic", "plumber", "electrician", "dog groomer", "dry cleaner",
+                    "gym", "yoga studio", "nail salon", "tattoo shop", "chiropractor"],
+                "home_project": ["bathroom remodel", "kitchen backsplash", "deck building",
+                    "fence installation", "painting interior walls", "installing shelves",
+                    "garden bed raised", "patio pavers", "closet organization",
+                    "basement finishing", "attic insulation", "crown molding"],
+                "life_skill": ["negotiate salary", "build credit", "file taxes",
+                    "change a tire", "jump start a car", "parallel park",
+                    "tie a tie", "iron a shirt", "sew a button",
+                    "write a resume", "ace a job interview", "meal prep for the week"],
+                "use_case": ["small apartment", "large family", "beginners", "seniors",
+                    "college students", "remote work", "travel", "outdoors", "gaming"],
+                "brand": ["Samsung", "Apple", "Sony", "LG", "Nike", "Adidas",
+                    "Toyota", "Honda", "Tesla", "Dyson", "Ninja", "KitchenAid"],
+                "price": ["$50", "$100", "$200", "$500", "$1000"],
+                "car_brand": ["Toyota", "Honda", "Ford", "Chevy", "Tesla", "Hyundai", "Kia", "BMW", "Subaru"],
+                "car_type": ["SUV", "sedan", "truck", "hybrid", "electric"],
+                "expense": ["groceries", "gas", "insurance", "utilities", "rent", "internet"],
+                "sport": ["NFL", "NBA", "MLB", "UFC", "soccer", "college basketball"],
+                "streaming": ["Netflix", "Hulu", "Disney Plus", "HBO Max", "Prime Video", "Peacock"],
+                "show": ["Stranger Things season 5", "The Last of Us season 3", "House of the Dragon",
+                    "Yellowstone", "Wednesday season 2", "Squid Game season 3"],
+                "genre": ["thriller", "romance", "sci fi", "fantasy", "self help", "biography"],
+                "method": ["intermittent fasting", "walking", "without exercise", "naturally", "keto"],
+                "exercise": ["ab", "arm", "leg", "full body", "HIIT", "yoga", "pilates", "cardio"],
+                "supplement": ["protein powder", "creatine", "multivitamin", "fish oil", "pre workout", "collagen"],
+                "health_goal": ["muscle gain", "energy", "sleep", "joint pain", "weight loss", "recovery"],
+                "cooking_method": ["grill", "smoke", "sous vide", "deep fry", "bake", "roast", "sear"],
+                "pet": ["dog", "cat", "fish", "hamster", "rabbit"],
+                "pet_issue": ["anxiety", "shedding", "bad breath", "fleas", "itching", "not eating"],
+                "living_situation": ["apartments", "families with kids", "first time owners", "active people"],
+                "pest": ["ants", "mice", "roaches", "fruit flies", "mosquitoes", "wasps", "termites"],
+                "holiday": ["Christmas", "birthday", "anniversary", "valentines day", "mothers day", "fathers day"],
+                "clothing": ["jeans", "sneakers", "dress shirt", "winter jacket", "swim trunks", "boots"],
+                "season": ["summer", "winter", "spring", "fall"],
+            },
+        },
+        "adult_search": {
+            "templates": [
+                "best {adj} porn", "{category} videos", "{category} {adj}",
+                "pornhub {category}", "xvideos {category} {adj}",
+                "{ethnicity} {category}", "{body_type} {category}",
+                "best {platform} creators {year}", "top {platform} accounts",
+                "{position} tutorial", "how to {sex_skill}",
+                "best {toy} for {gender}", "{toy} review {year}",
+                "{kink} for beginners", "how to try {kink} safely",
+                "{relationship} dating advice", "{relationship} relationship tips",
+                "best {dating_app} tips", "{dating_app} vs {dating_app}",
+                "how to {dating_action}", "{gender} {dating_action} tips",
+                "{adj} {gender} onlyfans", "free {category} videos",
+                "{body_part} {adj}", "big {body_part} {category}",
+                "amateur {category} {ethnicity}", "homemade {category}",
+                "{orientation} {category} videos", "{orientation} porn best",
+                "{orientation} dating apps", "{orientation} bars near me",
+                "trans {category}", "transgender {dating_action}",
+                "ftm dating advice", "mtf passing tips",
+                "nonbinary {category}", "genderfluid fashion",
+                "drag queen {city} shows", "pride events {city} {year}",
+                "queer friendly {service} near me", "lgbtq therapist near me",
+                "coming out as {orientation}", "how to support {orientation} partner",
+                "{orientation} romance books", "{orientation} movies {year}",
+            ],
+            "vars": {
+                "adj": ["hot", "best", "top rated", "new", "trending", "popular", "amateur",
+                    "professional", "HD", "homemade", "real", "passionate", "rough",
+                    "sensual", "romantic", "intense", "wild", "gentle", "hardcore", "soft"],
+                "category": ["milf", "teen 18+", "mature", "couple", "threesome", "solo",
+                    "lesbian", "gay", "bisexual", "trans", "interracial", "latina",
+                    "asian", "ebony", "blonde", "brunette", "redhead", "BBW",
+                    "petite", "curvy", "muscular", "tattooed", "pierced",
+                    "massage", "stepmom", "stepsister", "teacher", "nurse",
+                    "cosplay", "outdoor", "shower", "pool", "public",
+                    "anal", "oral", "creampie", "squirt", "bondage",
+                    "roleplay", "POV", "gangbang", "orgy", "swingers"],
+                "ethnicity": ["latina", "ebony", "asian", "indian", "middle eastern",
+                    "european", "japanese", "korean", "filipina", "brazilian",
+                    "colombian", "mexican", "african", "caribbean", "mixed race",
+                    "white", "black", "arab", "persian", "thai"],
+                "body_type": ["petite", "curvy", "thick", "slim", "athletic", "BBW",
+                    "fit", "muscular", "tall", "short", "voluptuous", "skinny",
+                    "plus size", "hourglass", "pear shaped", "busty", "flat chested"],
+                "body_part": ["boobs", "ass", "dick", "tits", "butt", "cock",
+                    "breasts", "thighs", "abs", "feet", "legs"],
+                "position": ["missionary", "doggy style", "cowgirl", "reverse cowgirl",
+                    "69", "spooning", "standing", "prone bone", "lotus",
+                    "wheelbarrow", "pretzel", "butterfly"],
+                "sex_skill": ["last longer in bed", "give better head",
+                    "find the g spot", "have multiple orgasms",
+                    "be better at foreplay", "talk dirty", "use handcuffs safely",
+                    "introduce toys in bedroom", "have anal sex safely",
+                    "improve stamina", "give a prostate massage",
+                    "eat pussy", "give a blowjob", "edge properly"],
+                "toy": ["vibrator", "dildo", "butt plug", "cock ring", "fleshlight",
+                    "strap on", "prostate massager", "wand massager", "nipple clamps",
+                    "bondage kit", "sex swing", "remote vibrator", "suction toy"],
+                "gender": ["women", "men", "couples", "him", "her", "nonbinary people"],
+                "kink": ["BDSM", "bondage", "role play", "foot fetish", "domination",
+                    "submission", "edging", "pegging", "cuckolding", "voyeurism",
+                    "exhibitionism", "sensory deprivation", "wax play", "spanking",
+                    "choking", "double penetration", "group sex", "swinging"],
+                "relationship": ["open relationship", "polyamorous", "monogamous",
+                    "long distance", "friends with benefits", "casual",
+                    "dom sub", "sugar daddy", "cougar", "age gap"],
+                "dating_app": ["Tinder", "Bumble", "Hinge", "Grindr", "Her",
+                    "Feeld", "OkCupid", "Scruff", "Taimi", "3Fun"],
+                "dating_action": ["flirt", "sext", "send nudes safely",
+                    "have a one night stand", "find a hookup",
+                    "ask someone out", "recover from rejection",
+                    "write a bio", "take good dating photos"],
+                "platform": ["OnlyFans", "Fansly", "Pornhub", "Chaturbate", "ManyVids"],
+                "orientation": ["gay", "lesbian", "bisexual", "pansexual", "queer",
+                    "asexual", "demisexual", "heteroflexible", "bicurious", "straight"],
+                "city": ["NYC", "LA", "San Francisco", "Miami", "Chicago",
+                    "Atlanta", "Portland", "Austin", "New Orleans", "Seattle"],
+                "service": ["doctor", "therapist", "gym", "bar", "church",
+                    "community center", "bookstore", "cafe", "salon"],
+                "year": ["2025", "2026"],
+            },
+        },
+    }
+
+    def _generate_search_query(self, category: str) -> str:
+        """Generate a realistic search query from templates."""
+        # Map category to template set
+        if category == "adult_search":
+            tset = self._QUERY_TEMPLATES["adult_search"]
+        else:
+            tset = self._QUERY_TEMPLATES["search"]
+
+        template = random.choice(tset["templates"])
+        variables = tset["vars"]
+
+        # Replace all {placeholders} with random values
+        import re as _re
+        def replace_var(match):
+            var_name = match.group(1)
+            if var_name in variables:
+                return random.choice(variables[var_name])
+            return match.group(0)
+
+        query = _re.sub(r'\{(\w+)\}', replace_var, template)
+        return query
+
     def _pick_url(self) -> tuple[str, str]:
         """Pick a random URL from a weighted category."""
         category = random.choice(self._weighted_categories)
         url = random.choice(CATEGORIES[category]["urls"])
 
-        # Sometimes replace with a realistic search query
+        # Sometimes replace with a dynamically generated realistic search query
         if "search" in category and random.random() < 0.3:
-            realistic_searches = [
-                # General
-                "best wireless headphones 2026", "how to fix leaky faucet",
-                "chicken parmesan recipe", "weather forecast this week",
-                "best laptop under 1000", "mortgage rates today",
-                "oil change near me", "diy home improvement ideas",
-                "best streaming service 2026", "python tutorial for beginners",
-                "how to start a garden", "best running shoes for flat feet",
-                "cheap flights to cancun", "how to negotiate salary",
-                "best credit cards for travel", "home workout routine no equipment",
-                "slow cooker recipes easy", "how to remove stains from carpet",
-                "best mattress 2026 review", "how to build a pc gaming",
-                "tax filing deadline 2026", "best electric cars",
-                "protein shake recipes", "how to sleep better at night",
-                "resume tips 2026", "best budget smartphones",
-                # Adult/dating
-                "best dating apps 2026", "tinder tips for guys",
-                "how to write a dating profile", "bumble vs hinge",
-                "best hookup apps", "onlyfans top creators",
-                "couples massage near me", "adult toy store near me",
-                "best vibrators 2026 review", "kink friendly dating apps",
-                "polyamory relationship advice", "fetlife how to use",
-                "sex positive therapist near me", "best condoms review",
-                # LGBTQ
-                "gay bars near me", "pride events 2026 schedule",
-                "best lgbtq dating apps", "grindr safety tips",
-                "coming out stories reddit", "transgender healthcare resources",
-                "queer friendly therapist near me", "drag shows near me tonight",
-                "lesbian bars near me", "nonbinary fashion brands",
-                "bisexual dating tips", "lgbtq community center near me",
-                "gay travel destinations 2026", "how to be a better ally",
-                "pansexual vs bisexual difference", "queer book recommendations",
-                # Tech/cyber
-                "cybersecurity certifications worth it", "comptia security plus study guide",
-                "best vpn for privacy 2026", "how to set up home lab",
-                "kali linux tutorial", "wireshark packet analysis",
-                "elastic stack tutorial", "grafana dashboard examples",
-                "python automation scripts", "docker compose tutorial",
-            ]
-            query = random.choice(realistic_searches)
+            query = self._generate_search_query(category)
             engine = random.choice(["https://www.google.com/search", "https://www.bing.com/search", "https://duckduckgo.com/"])
             url = f"{engine}?q={query.replace(' ', '+')}"
 
