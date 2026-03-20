@@ -1,0 +1,15 @@
+[Unit]
+Description=Traffic Noise Generator — Privacy Defense
+After=network.target
+
+[Service]
+Type=simple
+User=legs
+ExecStart=/usr/bin/python3 /home/legs/traffic_noise.py
+Restart=on-failure
+RestartSec=30
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
