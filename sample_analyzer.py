@@ -1322,6 +1322,87 @@ class SampleAnalyzer:
             except (subprocess.TimeoutExpired, FileNotFoundError):
                 pass
 
+        # Step 10: Memory dump + Volatility forensics
+        memory_forensics = {}
+        memdump_path = results_dir / "memdump.raw"
+        try:
+            vmid = self.cfg.sandbox_vmid
+            node = "flexiserve"
+
+            # Dump memory via Proxmox QEMU monitor (virsh dump equivalent)
+            self.logger.info("Dumping sandbox memory (%s)...", sha256[:16])
+            dump_result = self._pve_api("POST",
+                f"/api2/json/nodes/{node}/qemu/{vmid}/monitor",
+                {"command": f"dump-guest-memory -p /tmp/memdump_{vmid}.raw"})
+
+            if dump_result is not None:
+                time.sleep(5)  # Wait for dump to complete
+
+                # Copy dump from Proxmox host to ELK
+                # Since we can't SCP from Proxmox directly, copy via sandbox SSH
+                # Alternative: use the sandbox itself to dump /proc/kcore or /dev/mem
+                pass
+
+            # Fallback: dump via /proc on the sandbox itself (requires root)
+            self._sandbox_ssh(
+                f"sudo dd if=/dev/mem of=/home/{self.cfg.sandbox_user}/detonation/memdump.raw bs=1M count=256 2>/dev/null || "
+                f"sudo cat /proc/kcore > /home/{self.cfg.sandbox_user}/detonation/memdump.raw 2>/dev/null",
+                timeout=30,
+            )
+
+            # SCP memory dump to local
+            self._sandbox_scp_from(
+                f"/home/{self.cfg.sandbox_user}/detonation/memdump.raw",
+                str(memdump_path),
+                timeout=60,
+            )
+
+            if memdump_path.exists() and memdump_path.stat().st_size > 0:
+                self.logger.info("Memory dump collected: %d bytes", memdump_path.stat().st_size)
+
+                # SCP to REMnux for Volatility analysis
+                remnux_dump = f"/home/nalyzer/results/{sha256}_memdump.raw"
+                self._scp_to(
+                    self.cfg.remnux_host, self.cfg.remnux_port, self.cfg.remnux_user,
+                    self._remnux_pass, str(memdump_path), remnux_dump,
+                )
+
+                # Run Volatility plugins
+                vol_plugins = {
+                    "pslist": f"vol3 -f {remnux_dump} linux.pslist.PsList 2>/dev/null | head -50",
+                    "malfind": f"vol3 -f {remnux_dump} linux.malfind.Malfind 2>/dev/null | head -50",
+                    "lsof": f"vol3 -f {remnux_dump} linux.lsof.Lsof 2>/dev/null | head -30",
+                    "bash_history": f"vol3 -f {remnux_dump} linux.bash.Bash 2>/dev/null | head -30",
+                    "elfs": f"vol3 -f {remnux_dump} linux.elfs.Elfs 2>/dev/null | head -30",
+                    "hidden_modules": f"vol3 -f {remnux_dump} linux.hidden_modules.Hidden_modules 2>/dev/null | head -20",
+                    "network": f"vol3 -f {remnux_dump} linux.ip.Addr 2>/dev/null | head -20",
+                }
+
+                for plugin_name, cmd in vol_plugins.items():
+                    rc, stdout, stderr = self._ssh_cmd(
+                        self.cfg.remnux_host, self.cfg.remnux_port, self.cfg.remnux_user,
+                        cmd, password=self._remnux_pass, timeout=120,
+                    )
+                    if rc == 0 and stdout.strip():
+                        memory_forensics[plugin_name] = stdout.strip()[:3000]
+                        self.logger.info("  Volatility %s: %d lines", plugin_name, len(stdout.strip().splitlines()))
+
+                # Cleanup remote dump
+                self._ssh_cmd(
+                    self.cfg.remnux_host, self.cfg.remnux_port, self.cfg.remnux_user,
+                    f"rm -f {remnux_dump}", password=self._remnux_pass,
+                )
+
+                if memory_forensics:
+                    self.logger.info("Memory forensics complete: %d plugins produced output", len(memory_forensics))
+
+        except Exception as e:
+            self.logger.warning("Memory forensics failed: %s", e)
+
+        # Cleanup local memdump
+        if memdump_path.exists():
+            memdump_path.unlink()
+
         # Assemble dynamic analysis results
         dynamic_results = {
             "detonation_duration": self.cfg.sandbox_timeout,
@@ -1335,11 +1416,14 @@ class SampleAnalyzer:
             "audit_log_size": (results_dir / "audit.log").stat().st_size if (results_dir / "audit.log").exists() else 0,
         }
 
-        self.logger.info("Dynamic analysis complete for %s — %d DNS queries, %d connections, %d new files",
-                         sha256[:16], len(dns_queries), len(connections),
-                         len(dynamic_results["new_files"]))
+        if memory_forensics:
+            dynamic_results["memory_forensics"] = memory_forensics
 
-        # Step 10: Restore clean snapshot (cleanup)
+        self.logger.info("Dynamic analysis complete for %s — %d DNS queries, %d connections, %d new files, %d vol plugins",
+                         sha256[:16], len(dns_queries), len(connections),
+                         len(dynamic_results["new_files"]), len(memory_forensics))
+
+        # Step 11: Restore clean snapshot (cleanup)
         self._sandbox_restore_snapshot()
 
         return dynamic_results
@@ -1474,6 +1558,26 @@ class SampleAnalyzer:
             for ioc in misp["known_iocs"][:5]:
                 misp_lines.append(f"\u2022 `{ioc['value']}` ({ioc['type']}) — seen in {ioc['events']} event(s)")
             fields.append({"name": "MISP Correlations", "value": "\n".join(misp_lines), "inline": False})
+
+        # Memory forensics
+        dyn = results.get("dynamic_analysis", {})
+        mem_forensics = dyn.get("memory_forensics", {}) if dyn else {}
+        if mem_forensics:
+            mem_parts = []
+            malfind = mem_forensics.get("malfind", "")
+            if malfind:
+                mem_parts.append(f"**Malfind (injected code):**\n```\n{malfind[:300]}\n```")
+            hidden = mem_forensics.get("hidden_modules", "")
+            if hidden:
+                mem_parts.append(f"**Hidden modules:** {hidden[:200]}")
+            bash = mem_forensics.get("bash_history", "")
+            if bash:
+                mem_parts.append(f"**Bash history:**\n```\n{bash[:200]}\n```")
+            if mem_parts:
+                mem_text = "\n".join(mem_parts)
+                if len(mem_text) > 900:
+                    mem_text = mem_text[:900] + "\n\u2026"
+                fields.append({"name": "Memory Forensics (Volatility)", "value": mem_text, "inline": False})
 
         # Sample similarity
         similar = results.get("similar_samples", [])
