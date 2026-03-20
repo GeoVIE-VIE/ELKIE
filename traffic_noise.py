@@ -151,6 +151,53 @@ CATEGORIES = {
             "https://www.southwest.com", "https://www.united.com",
         ],
     },
+    "adult": {
+        "weight": 8,
+        "urls": [
+            "https://www.pornhub.com", "https://www.xvideos.com",
+            "https://www.xnxx.com", "https://www.redtube.com",
+            "https://www.youporn.com", "https://www.xhamster.com",
+            "https://www.chaturbate.com", "https://www.onlyfans.com",
+            "https://www.brazzers.com", "https://www.bangbros.com",
+            "https://www.adam4adam.com", "https://www.grindr.com",
+            "https://www.scruff.com", "https://www.xtube.com",
+            "https://www.gaymaletube.com", "https://www.planetromeo.com",
+        ],
+    },
+    "adult_search": {
+        "weight": 5,
+        "urls": [
+            "https://www.google.com/search?q=best+dating+apps+2026",
+            "https://www.google.com/search?q=lgbtq+dating+near+me",
+            "https://www.google.com/search?q=gay+bars+near+me",
+            "https://www.google.com/search?q=pride+events+2026",
+            "https://www.google.com/search?q=transgender+resources",
+            "https://www.google.com/search?q=queer+community+groups",
+            "https://www.google.com/search?q=bisexual+dating+tips",
+            "https://www.google.com/search?q=nonbinary+clothing+brands",
+            "https://www.google.com/search?q=lesbian+travel+destinations",
+            "https://www.google.com/search?q=drag+shows+near+me",
+            "https://www.google.com/search?q=polyamory+relationship+advice",
+            "https://www.google.com/search?q=fetlife+alternatives",
+            "https://www.google.com/search?q=adult+toys+review",
+            "https://www.google.com/search?q=couples+therapy+near+me",
+            "https://www.bing.com/search?q=best+porn+sites+2026",
+            "https://www.bing.com/search?q=onlyfans+creators",
+            "https://duckduckgo.com/?q=anonymous+hookup+apps",
+            "https://duckduckgo.com/?q=sex+positive+communities",
+        ],
+    },
+    "dating": {
+        "weight": 4,
+        "urls": [
+            "https://www.tinder.com", "https://www.bumble.com",
+            "https://www.hinge.com", "https://www.match.com",
+            "https://www.okcupid.com", "https://www.plentyoffish.com",
+            "https://www.eharmony.com", "https://www.zoosk.com",
+            "https://www.grindr.com", "https://www.her.app",
+            "https://www.feeld.co", "https://www.taimi.com",
+        ],
+    },
     "search": {
         "weight": 12,
         "urls": [
@@ -199,6 +246,9 @@ class TrafficNoise:
         self.session = requests.Session()
         self.total_requests = 0
         self.categories_hit = {}
+        self._es_url = "http://localhost:9200"
+        self._es_index = "traffic-noise"
+        self._ensure_es_index()
 
         # Build weighted category list
         self._weighted_categories = []
@@ -220,6 +270,53 @@ class TrafficNoise:
 
         return logger
 
+    def _ensure_es_index(self):
+        """Create traffic-noise index with mappings."""
+        try:
+            resp = requests.get(f"{self._es_url}/{self._es_index}", timeout=5)
+            if resp.status_code == 200:
+                return
+            requests.put(f"{self._es_url}/{self._es_index}", json={
+                "mappings": {
+                    "properties": {
+                        "@timestamp": {"type": "date"},
+                        "category": {"type": "keyword"},
+                        "url": {"type": "keyword"},
+                        "domain": {"type": "keyword"},
+                        "status_code": {"type": "integer"},
+                        "success": {"type": "boolean"},
+                        "user_agent": {"type": "keyword"},
+                        "is_burst": {"type": "boolean"},
+                    }
+                },
+                "settings": {"number_of_shards": 1, "number_of_replicas": 0}
+            }, timeout=5)
+            self.logger.info("Created ES index '%s'", self._es_index)
+        except Exception:
+            pass
+
+    def _index_request(self, url: str, category: str, status_code: int, success: bool, user_agent: str, is_burst: bool):
+        """Index a noise request to ES for Grafana visibility."""
+        import re as _re
+        domain_match = _re.search(r"https?://([^/]+)", url)
+        domain = domain_match.group(1) if domain_match else "unknown"
+
+        try:
+            requests.post(f"{self._es_url}/{self._es_index}/_doc", json={
+                "@timestamp": datetime.now(timezone.utc).isoformat(),
+                "category": category,
+                "url": url[:200],
+                "domain": domain,
+                "status_code": status_code,
+                "success": success,
+                "user_agent": user_agent[:50],
+                "is_burst": is_burst,
+                "source": "traffic-noise",
+                "source_ip": "192.168.50.3",
+            }, timeout=3)
+        except Exception:
+            pass
+
     def _pick_url(self) -> tuple[str, str]:
         """Pick a random URL from a weighted category."""
         category = random.choice(self._weighted_categories)
@@ -236,10 +333,11 @@ class TrafficNoise:
 
         return url, category
 
-    def _make_request(self, url: str) -> bool:
+    def _make_request(self, url: str, category: str = "", is_burst: bool = False) -> bool:
         """Make a single HTTP request that looks like real browsing."""
+        ua = random.choice(USER_AGENTS)
         headers = {
-            "User-Agent": random.choice(USER_AGENTS),
+            "User-Agent": ua,
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
             "Accept-Language": "en-US,en;q=0.9",
             "Accept-Encoding": "gzip, deflate, br",
@@ -269,9 +367,12 @@ class TrafficNoise:
             )
             # Read just enough to trigger the connection
             resp.raw.read(1024)
+            status = resp.status_code
             resp.close()
+            self._index_request(url, category, status, True, ua, is_burst)
             return True
         except Exception:
+            self._index_request(url, category, 0, False, ua, is_burst)
             return False
 
     def _get_sleep_time(self) -> float:
@@ -313,7 +414,7 @@ class TrafficNoise:
                     else:
                         url, cat = self._pick_url()
 
-                    ok = self._make_request(url)
+                    ok = self._make_request(url, cat, is_burst=True)
                     self.total_requests += 1
                     self.categories_hit[cat] = self.categories_hit.get(cat, 0) + 1
 
@@ -323,7 +424,7 @@ class TrafficNoise:
             else:
                 # Single request
                 url, cat = self._pick_url()
-                ok = self._make_request(url)
+                ok = self._make_request(url, cat, is_burst=False)
                 self.total_requests += 1
                 self.categories_hit[cat] = self.categories_hit.get(cat, 0) + 1
 
