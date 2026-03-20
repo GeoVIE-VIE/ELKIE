@@ -332,7 +332,7 @@ class TrafficNoise:
 
     # -- Search query generation (template-based for infinite variety) ----
 
-    _QUERY_TEMPLATES = {
+    _QUERY_TEMPLATES_INLINE = {
         "search": {
             "templates": [
                 "best {product} {year}", "how to {fix_action} {household_item}",
@@ -503,11 +503,17 @@ class TrafficNoise:
 
     def _generate_search_query(self, category: str) -> str:
         """Generate a realistic search query from templates."""
-        # Map category to template set
+        # Use expanded word lists from search_queries.py
+        try:
+            from search_queries import QUERY_TEMPLATES
+            templates = QUERY_TEMPLATES
+        except ImportError:
+            templates = self._QUERY_TEMPLATES_INLINE
+
         if category == "adult_search":
-            tset = self._QUERY_TEMPLATES["adult_search"]
+            tset = templates["adult_search"]
         else:
-            tset = self._QUERY_TEMPLATES["search"]
+            tset = templates["search"]
 
         template = random.choice(tset["templates"])
         variables = tset["vars"]
