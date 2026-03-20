@@ -1033,6 +1033,13 @@ class SampleAnalyzer:
                            "value": f"LLM Threat Assessment (qwen2.5:14b):\n\n{results['llm_summary'][:5000]}",
                            "to_ids": False, "comment": "Automated LLM analysis"})
 
+        # --- Auto-generated YARA rule ---
+        gen_yara = results.get("generated_yara_rule", "")
+        if gen_yara:
+            attrs.append({"type": "yara", "category": "Payload delivery",
+                           "value": gen_yara, "to_ids": True,
+                           "comment": "Auto-generated YARA rule (LLM)"})
+
         # --- Capture metadata ---
         captured_at = metadata.get("captured_at", "")
         if captured_at:
@@ -1404,6 +1411,14 @@ class SampleAnalyzer:
             for ioc in misp["known_iocs"][:5]:
                 misp_lines.append(f"\u2022 `{ioc['value']}` ({ioc['type']}) — seen in {ioc['events']} event(s)")
             fields.append({"name": "MISP Correlations", "value": "\n".join(misp_lines), "inline": False})
+
+        # Auto-generated YARA rule
+        gen_yara = results.get("generated_yara_rule", "")
+        if gen_yara:
+            yara_display = gen_yara[:800]
+            if len(gen_yara) > 800:
+                yara_display += "\n..."
+            fields.append({"name": "Auto-Generated YARA Rule", "value": f"```yara\n{yara_display}\n```", "inline": False})
 
         # Notable strings
         interesting = results.get("interesting_strings", [])
