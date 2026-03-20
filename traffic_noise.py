@@ -301,8 +301,18 @@ class TrafficNoise:
         domain_match = _re.search(r"https?://([^/]+)", url)
         domain = domain_match.group(1) if domain_match else "unknown"
 
+        # Extract search query from URL if present
+        import urllib.parse as _urlparse
+        search_query = ""
         try:
-            requests.post(f"{self._es_url}/{self._es_index}/_doc", json={
+            parsed = _urlparse.urlparse(url)
+            params = _urlparse.parse_qs(parsed.query)
+            search_query = params.get("q", params.get("query", [""]))[0].replace("+", " ")
+        except Exception:
+            pass
+
+        try:
+            doc = {
                 "@timestamp": datetime.now(timezone.utc).isoformat(),
                 "category": category,
                 "url": url[:200],
@@ -313,7 +323,10 @@ class TrafficNoise:
                 "is_burst": is_burst,
                 "source": "traffic-noise",
                 "source_ip": "192.168.50.3",
-            }, timeout=3)
+            }
+            if search_query:
+                doc["search_query"] = search_query
+            requests.post(f"{self._es_url}/{self._es_index}/_doc", json=doc, timeout=3)
         except Exception:
             pass
 
