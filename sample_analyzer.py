@@ -872,84 +872,177 @@ class SampleAnalyzer:
         return {"known_iocs": [], "total_matches": 0}
 
     def misp_create_event(self, results: dict, metadata: dict):
-        """Create a MISP event from analysis results."""
+        """Create a professional MISP event from analysis results."""
         if not self._misp_api_key:
             return
 
         sha256 = results.get("sha256", "")
+        md5 = results.get("md5", "")
         classification = results.get("classification", "unknown")
         severity = results.get("severity", "medium")
+        file_type = results.get("file_type", "unknown")
+        file_size = results.get("file_size", 0)
+        honeypot = metadata.get("honeypot", "unknown")
+        src_ip = metadata.get("src_ip", "")
+        country = metadata.get("country", "")
 
         threat_level = {"critical": 1, "high": 2, "medium": 3, "low": 4}.get(severity, 3)
 
+        # Build descriptive event info
+        size_str = f"{file_size / 1024:.0f}KB" if file_size < 1048576 else f"{file_size / 1048576:.1f}MB"
+        info_parts = [f"[{honeypot.upper()}]", classification.title(), f"({file_type.split(',')[0].strip()}, {size_str})"]
+        if src_ip:
+            info_parts.append(f"from {src_ip}")
+            if country:
+                info_parts.append(f"({country})")
+        event_info = " ".join(info_parts)
+
+        # Build tags — proper taxonomy tags
+        tags = [
+            {"name": "tlp:green"},
+            {"name": "type:OSINT"},
+            {"name": f"malware_classification:malware-category=\"{classification}\""},
+        ]
+
+        # Map classification to kill-chain phase
+        kill_chain_map = {
+            "botnet": "kill-chain:Actions on Objectives",
+            "trojan": "kill-chain:Installation",
+            "miner": "kill-chain:Actions on Objectives",
+            "ransomware": "kill-chain:Actions on Objectives",
+            "backdoor": "kill-chain:Installation",
+            "worm": "kill-chain:Delivery",
+            "dropper": "kill-chain:Delivery",
+        }
+        if classification in kill_chain_map:
+            tags.append({"name": kill_chain_map[classification]})
+
+        # Admiralty scale — reliability of source
+        tags.append({"name": "admiralty-scale:source-reliability=\"b\""})  # Usually reliable (honeypot)
+        tags.append({"name": "admiralty-scale:information-credibility=\"2\""})  # Probably true (automated analysis)
+
+        # VT-based confidence
+        vt = results.get("virustotal", {})
+        if vt and vt.get("found"):
+            detections = vt.get("detections", 0)
+            if detections > 10:
+                tags.append({"name": "admiralty-scale:information-credibility=\"1\""})  # Confirmed by VT
+            if vt.get("suggested_label"):
+                tags.append({"name": f"malware_classification:malware-category=\"{vt['suggested_label']}\""})
+
         event_data = {
             "Event": {
-                "info": f"Honeypot capture: {classification} ({sha256[:16]})",
+                "info": event_info,
                 "threat_level_id": threat_level,
                 "analysis": 2,  # completed
                 "distribution": 0,  # org only
-                "Tag": [
-                    {"name": f"honeypot:classification={classification}"},
-                    {"name": f"honeypot:severity={severity}"},
-                    {"name": "tlp:green"},
-                    {"name": "type:OSINT"},
-                ],
+                "Tag": tags,
                 "Attribute": [],
             }
         }
 
         attrs = event_data["Event"]["Attribute"]
 
-        # File hashes
-        attrs.append({"type": "sha256", "category": "Payload delivery", "value": sha256, "to_ids": True})
-        if results.get("md5"):
-            attrs.append({"type": "md5", "category": "Payload delivery", "value": results["md5"], "to_ids": True})
+        # --- Payload delivery ---
+        attrs.append({"type": "sha256", "category": "Payload delivery", "value": sha256,
+                       "to_ids": True, "comment": f"Sample hash ({classification})"})
+        if md5:
+            attrs.append({"type": "md5", "category": "Payload delivery", "value": md5, "to_ids": True})
+        attrs.append({"type": "filename|sha256", "category": "Payload delivery",
+                       "value": f"{sha256[:16]}|{sha256}", "to_ids": True,
+                       "comment": file_type.split(",")[0].strip()})
+        if file_size:
+            attrs.append({"type": "size-in-bytes", "category": "Payload delivery",
+                           "value": str(file_size), "to_ids": False})
+        attrs.append({"type": "mime-type", "category": "Payload delivery",
+                       "value": results.get("mime_type", "unknown"), "to_ids": False})
 
-        # File info
-        if results.get("file_type"):
-            attrs.append({"type": "text", "category": "Payload delivery", "value": results["file_type"], "to_ids": False, "comment": "file type"})
-
-        # Source IP
-        src_ip = metadata.get("src_ip", "")
+        # --- Network activity: source ---
         if src_ip:
-            attrs.append({"type": "ip-src", "category": "Network activity", "value": src_ip, "to_ids": True, "comment": f"Attacker IP ({metadata.get('country', '')})"})
+            comment = f"Attacker delivering payload via {honeypot}"
+            if country:
+                comment += f" ({country})"
+            attrs.append({"type": "ip-src", "category": "Network activity", "value": src_ip,
+                           "to_ids": True, "comment": comment})
 
-        # YARA matches
+        # --- Antivirus detection ---
         for yara in results.get("yara_matches", []):
-            attrs.append({"type": "text", "category": "Antivirus detection", "value": yara, "to_ids": False, "comment": "YARA match"})
+            attrs.append({"type": "yara", "category": "Payload delivery", "value": yara,
+                           "to_ids": False, "comment": "YARA rule match"})
 
-        # Interesting strings — extract IPs and URLs
+        if vt and vt.get("found"):
+            attrs.append({"type": "link", "category": "External analysis",
+                           "value": f"https://www.virustotal.com/gui/file/{sha256}",
+                           "to_ids": False, "comment": f"VirusTotal: {vt['detection_ratio']} detections"})
+
+        # MalwareBazaar link
+        mb = results.get("malwarebazaar", {})
+        if mb:
+            attrs.append({"type": "link", "category": "External analysis",
+                           "value": f"https://bazaar.abuse.ch/sample/{sha256}/",
+                           "to_ids": False, "comment": "MalwareBazaar"})
+
+        # --- Network IOCs from strings ---
+        seen_iocs = set()
         for s in results.get("interesting_strings", []):
             url_match = re.search(r'https?://\S+', s)
             if url_match:
-                attrs.append({"type": "url", "category": "Network activity", "value": url_match.group(), "to_ids": True})
+                url = url_match.group().rstrip(")'\"")
+                if url not in seen_iocs:
+                    seen_iocs.add(url)
+                    attrs.append({"type": "url", "category": "Network activity", "value": url,
+                                   "to_ids": True, "comment": "Extracted from sample strings"})
                 continue
             ip_match = re.search(r'\b(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\b', s)
             if ip_match:
                 ip = ip_match.group(1)
-                if not ip.startswith(("10.", "192.168.", "127.", "0.")):
-                    attrs.append({"type": "ip-dst", "category": "Network activity", "value": ip, "to_ids": True})
+                if not ip.startswith(("10.", "192.168.", "127.", "0.", "255.")) and ip not in seen_iocs:
+                    seen_iocs.add(ip)
+                    attrs.append({"type": "ip-dst", "category": "Network activity", "value": ip,
+                                   "to_ids": True, "comment": "Extracted from sample strings"})
 
-        # Dynamic analysis IOCs
+        # --- Dynamic analysis IOCs ---
         dyn = results.get("dynamic_analysis", {})
         for domain in dyn.get("dns_queries", []):
-            attrs.append({"type": "domain", "category": "Network activity", "value": domain, "to_ids": True})
+            if domain not in seen_iocs:
+                seen_iocs.add(domain)
+                attrs.append({"type": "domain", "category": "Network activity", "value": domain,
+                               "to_ids": True, "comment": "DNS query during sandbox detonation"})
         for conn in dyn.get("outbound_connections", []):
-            attrs.append({"type": "ip-dst|port", "category": "Network activity", "value": f"{conn['ip']}|{conn['port']}", "to_ids": True})
+            val = f"{conn['ip']}|{conn['port']}"
+            if val not in seen_iocs:
+                seen_iocs.add(val)
+                attrs.append({"type": "ip-dst|port", "category": "Network activity", "value": val,
+                               "to_ids": True, "comment": "Outbound connection during sandbox detonation"})
+        if dyn.get("new_files"):
+            for f in dyn["new_files"][:10]:
+                attrs.append({"type": "filename", "category": "Artifacts dropped", "value": f,
+                               "to_ids": False, "comment": "File created during sandbox detonation"})
 
-        # LLM summary as comment
+        # --- capa capabilities as MITRE ATT&CK TTPs ---
+        for cap in results.get("capa_capabilities", [])[:15]:
+            ns = cap.get("namespace", "")
+            name = cap.get("name", "")
+            if ns:
+                attrs.append({"type": "text", "category": "Other", "value": f"[{ns}] {name}",
+                               "to_ids": False, "comment": "capa capability (MITRE ATT&CK)"})
+
+        # --- LLM threat assessment ---
         if results.get("llm_summary"):
-            attrs.append({"type": "comment", "category": "External analysis", "value": results["llm_summary"][:5000], "to_ids": False})
+            attrs.append({"type": "comment", "category": "External analysis",
+                           "value": f"LLM Threat Assessment (qwen2.5:14b):\n\n{results['llm_summary'][:5000]}",
+                           "to_ids": False, "comment": "Automated LLM analysis"})
 
-        # VT info
-        vt = results.get("virustotal", {})
-        if vt and vt.get("found"):
-            attrs.append({"type": "text", "category": "Antivirus detection", "value": f"VirusTotal: {vt['detection_ratio']} ({vt.get('suggested_label', '')})", "to_ids": False})
+        # --- Capture metadata ---
+        captured_at = metadata.get("captured_at", "")
+        if captured_at:
+            attrs.append({"type": "datetime", "category": "Other", "value": captured_at,
+                           "to_ids": False, "comment": f"Captured by {honeypot} honeypot"})
 
         result = self._misp_api("POST", "/events/add", event_data)
         if result and result.get("Event", {}).get("id"):
             event_id = result["Event"]["id"]
-            self.logger.info("MISP: created event #%s for %s", event_id, sha256[:16])
+            self.logger.info("MISP: created event #%s for %s (%s)", event_id, sha256[:16], event_info[:50])
         else:
             self.logger.error("MISP: failed to create event for %s: %s", sha256[:16], result)
 
@@ -1074,7 +1167,11 @@ class SampleAnalyzer:
         if not self._sandbox_restore_snapshot():
             return None
 
-        # Step 2: Clear auditd logs and start tcpdump
+        # Step 2: Point DNS to INetSim on REMnux, clear auditd, start tcpdump
+        self._sandbox_ssh(
+            "sudo bash -c 'rm -f /etc/resolv.conf && echo nameserver 192.168.40.5 > /etc/resolv.conf'",
+            timeout=5,
+        )
         self._sandbox_ssh("sudo auditctl -D && sudo rm -f /var/log/audit/audit.log && sudo systemctl restart auditd", timeout=10)
         self._sandbox_ssh(
             f"sudo tcpdump -i any -w /home/{self.cfg.sandbox_user}/detonation/capture.pcap -c 10000 &",
