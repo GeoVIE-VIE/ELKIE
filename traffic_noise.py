@@ -335,14 +335,50 @@ class TrafficNoise:
         category = random.choice(self._weighted_categories)
         url = random.choice(CATEGORIES[category]["urls"])
 
-        # Sometimes add random query params to search URLs
+        # Sometimes replace with a realistic search query
         if "search" in category and random.random() < 0.3:
-            terms = [
-                "best deals", "how to", "reviews", "near me", "tutorial",
-                "comparison", "free", "discount", "2026", "new",
-                "diy", "recipe", "workout", "streaming", "download",
+            realistic_searches = [
+                # General
+                "best wireless headphones 2026", "how to fix leaky faucet",
+                "chicken parmesan recipe", "weather forecast this week",
+                "best laptop under 1000", "mortgage rates today",
+                "oil change near me", "diy home improvement ideas",
+                "best streaming service 2026", "python tutorial for beginners",
+                "how to start a garden", "best running shoes for flat feet",
+                "cheap flights to cancun", "how to negotiate salary",
+                "best credit cards for travel", "home workout routine no equipment",
+                "slow cooker recipes easy", "how to remove stains from carpet",
+                "best mattress 2026 review", "how to build a pc gaming",
+                "tax filing deadline 2026", "best electric cars",
+                "protein shake recipes", "how to sleep better at night",
+                "resume tips 2026", "best budget smartphones",
+                # Adult/dating
+                "best dating apps 2026", "tinder tips for guys",
+                "how to write a dating profile", "bumble vs hinge",
+                "best hookup apps", "onlyfans top creators",
+                "couples massage near me", "adult toy store near me",
+                "best vibrators 2026 review", "kink friendly dating apps",
+                "polyamory relationship advice", "fetlife how to use",
+                "sex positive therapist near me", "best condoms review",
+                # LGBTQ
+                "gay bars near me", "pride events 2026 schedule",
+                "best lgbtq dating apps", "grindr safety tips",
+                "coming out stories reddit", "transgender healthcare resources",
+                "queer friendly therapist near me", "drag shows near me tonight",
+                "lesbian bars near me", "nonbinary fashion brands",
+                "bisexual dating tips", "lgbtq community center near me",
+                "gay travel destinations 2026", "how to be a better ally",
+                "pansexual vs bisexual difference", "queer book recommendations",
+                # Tech/cyber
+                "cybersecurity certifications worth it", "comptia security plus study guide",
+                "best vpn for privacy 2026", "how to set up home lab",
+                "kali linux tutorial", "wireshark packet analysis",
+                "elastic stack tutorial", "grafana dashboard examples",
+                "python automation scripts", "docker compose tutorial",
             ]
-            url = url.split("?")[0] + "?q=" + "+".join(random.sample(terms, random.randint(2, 4)))
+            query = random.choice(realistic_searches)
+            engine = random.choice(["https://www.google.com/search", "https://www.bing.com/search", "https://duckduckgo.com/"])
+            url = f"{engine}?q={query.replace(' ', '+')}"
 
         return url, category
 
