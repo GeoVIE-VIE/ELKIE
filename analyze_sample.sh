@@ -166,6 +166,44 @@ except:
 fi
 
 # ---------------------------------------------------------------------------
+# Ghidra headless decompilation (PE and ELF binaries only)
+# ---------------------------------------------------------------------------
+
+GHIDRA_JSON="null"
+GHIDRA_SCRIPT="/home/nalyzer/ghidra_extract.py"
+GHIDRA_BIN="/opt/ghidra/support/analyzeHeadless"
+GHIDRA_PROJECT="/tmp/ghidra_projects"
+
+if ( [ "$IS_PE" = "true" ] || [ "$IS_ELF" = "true" ] ) && [ -x "$GHIDRA_BIN" ] && [ -f "$GHIDRA_SCRIPT" ]; then
+    echo "Running Ghidra headless analysis..."
+    mkdir -p "$GHIDRA_PROJECT"
+
+    # Clean any previous project for this sample
+    rm -rf "${GHIDRA_PROJECT}/sample_${SHA256:0:16}" "${GHIDRA_PROJECT}/sample_${SHA256:0:16}.rep" 2>/dev/null
+
+    # Run Ghidra headless with extraction postscript
+    SA_SHA256="$SHA256" timeout 180 "$GHIDRA_BIN" \
+        "$GHIDRA_PROJECT" "sample_${SHA256:0:16}" \
+        -import "$SAMPLE" \
+        -postscript "$GHIDRA_SCRIPT" \
+        -deleteProject \
+        -analysisTimeoutPerFile 120 \
+        2>/dev/null
+
+    # Read the output
+    GHIDRA_RESULT="/home/nalyzer/results/${SHA256}_ghidra.json"
+    if [ -f "$GHIDRA_RESULT" ]; then
+        GHIDRA_JSON=$(cat "$GHIDRA_RESULT")
+        echo "Ghidra analysis complete"
+    else
+        echo "Ghidra analysis produced no output"
+    fi
+
+    # Cleanup
+    rm -rf "${GHIDRA_PROJECT}/sample_${SHA256:0:16}" "${GHIDRA_PROJECT}/sample_${SHA256:0:16}.rep" 2>/dev/null
+fi
+
+# ---------------------------------------------------------------------------
 # Ollama LLM summary
 # ---------------------------------------------------------------------------
 
@@ -209,6 +247,21 @@ capa Capabilities:
 $(echo "$CAPA_CAPABILITIES" | python3 -c "import json,sys; [print(f'{c[\"namespace\"]}: {c[\"name\"]}') for c in json.load(sys.stdin)[:20]]" 2>/dev/null)
 
 peframe: $([ "$PEFRAME_JSON" = "null" ] && echo "N/A (not a PE file or peframe unavailable)" || echo "$PEFRAME_JSON" | python3 -c "import json,sys; d=json.load(sys.stdin); print(json.dumps({k:v for k,v in d.items() if k in ('imports','sections','packer','strings_analysis')}, indent=2)[:1000])" 2>/dev/null)
+
+Ghidra Decompilation: $([ "$GHIDRA_JSON" = "null" ] && echo "N/A" || echo "$GHIDRA_JSON" | python3 -c "
+import json,sys
+try:
+    d=json.load(sys.stdin)
+    print(f\"Functions: {d.get('num_functions',0)}, Format: {d.get('executable_format','?')}\")
+    print(f\"Suspicious APIs: {', '.join(d.get('suspicious_apis',[]))}\")
+    print('Top functions by size:')
+    for f in d.get('functions',[])[:10]:
+        print(f'  {f[\"name\"]} ({f[\"size\"]} bytes) at {f[\"address\"]}')
+    print(f'Sections: {len(d.get(\"sections\",[]))}')
+    for s in d.get('sections',[]):
+        print(f'  {s[\"name\"]} {s[\"permissions\"]} {s[\"size\"]} bytes')
+except: print('parse error')
+" 2>/dev/null)
 EOF
 
     PROMPT_CONTENT=$(cat "$PROMPT_FILE")
@@ -356,6 +409,7 @@ export SA_STRINGS="$INTERESTING_STRINGS"
 export SA_FLOSS="$FLOSS_STRINGS"
 export SA_CAPA="$CAPA_CAPABILITIES"
 export SA_PEFRAME="$PEFRAME_JSON"
+export SA_GHIDRA="$GHIDRA_JSON"
 
 python3 << 'PYEOF'
 import json, os
@@ -384,6 +438,7 @@ interesting_strings = read_json_or_default(os.environ.get("SA_STRINGS", "[]"), [
 floss_strings = read_json_or_default(os.environ.get("SA_FLOSS", "[]"), [])
 capa_capabilities = read_json_or_default(os.environ.get("SA_CAPA", "[]"), [])
 peframe = read_json_or_default(os.environ.get("SA_PEFRAME", "null"), None)
+ghidra = read_json_or_default(os.environ.get("SA_GHIDRA", "null"), None)
 
 result = {
     "sha256": sha256,
@@ -400,8 +455,9 @@ result = {
     "capa_capabilities": capa_capabilities,
     "peframe": peframe,
     "llm_summary": llm_summary,
+    "ghidra": ghidra,
     "generated_yara_rule": generated_yara,
-    "analysis_version": "1.1.0"
+    "analysis_version": "1.2.0"
 }
 
 with open(result_file, "w") as f:

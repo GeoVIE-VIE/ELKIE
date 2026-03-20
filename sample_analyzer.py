@@ -1412,6 +1412,23 @@ class SampleAnalyzer:
                 misp_lines.append(f"\u2022 `{ioc['value']}` ({ioc['type']}) — seen in {ioc['events']} event(s)")
             fields.append({"name": "MISP Correlations", "value": "\n".join(misp_lines), "inline": False})
 
+        # Ghidra decompilation results
+        ghidra = results.get("ghidra")
+        if ghidra and isinstance(ghidra, dict):
+            ghidra_parts = []
+            ghidra_parts.append(f"**{ghidra.get('num_functions', 0)} functions** | {ghidra.get('executable_format', '?')} | {ghidra.get('language', '?')}")
+            suspicious = ghidra.get("suspicious_apis", [])
+            if suspicious:
+                ghidra_parts.append("**Suspicious APIs:** " + ", ".join(f"`{a}`" for a in suspicious[:8]))
+            top_funcs = ghidra.get("functions", [])[:5]
+            if top_funcs:
+                func_list = "\n".join(f"\u2022 `{f['name']}` ({f['size']}B)" for f in top_funcs)
+                ghidra_parts.append("**Largest functions:**\n" + func_list)
+            ghidra_text = "\n".join(ghidra_parts)
+            if len(ghidra_text) > 800:
+                ghidra_text = ghidra_text[:800] + "\u2026"
+            fields.append({"name": "Ghidra Decompilation", "value": ghidra_text, "inline": False})
+
         # Auto-generated YARA rule
         gen_yara = results.get("generated_yara_rule", "")
         if gen_yara:
