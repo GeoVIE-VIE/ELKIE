@@ -993,6 +993,109 @@ class SampleAnalyzer:
 
     # -- VirusTotal --------------------------------------------------------
 
+    # -- Claude API analysis ------------------------------------------------
+
+    def claude_analyze(self, results: dict) -> Optional[dict]:
+        """Call Claude API for threat assessment and YARA rule generation."""
+        api_key = os.environ.get("CLAUDE_API_KEY", "")
+        if not api_key:
+            return None
+
+        try:
+            import anthropic
+        except ImportError:
+            self.logger.warning("anthropic package not installed — skipping Claude analysis")
+            return None
+
+        sha256 = results.get("sha256", "?")
+        self.logger.info("Calling Claude API for %s...", sha256[:16])
+
+        # Build analysis prompt with all available data
+        strings_text = "\n".join(results.get("interesting_strings", [])[:30])
+        floss_text = "\n".join(results.get("floss_strings", [])[:20])
+        capa_text = json.dumps(results.get("capa_capabilities", [])[:20], indent=2)
+        ghidra_text = json.dumps(results.get("ghidra"), indent=2) if results.get("ghidra") else "N/A"
+        yara_text = json.dumps(results.get("yara_matches", []))
+        dyn = results.get("dynamic_analysis", {})
+        dyn_text = ""
+        if dyn:
+            dyn_text = f"""
+Dynamic Analysis (Sandbox Detonation):
+  DNS Queries: {dyn.get('dns_queries', [])}
+  Outbound Connections: {dyn.get('outbound_connections', [])}
+  New Files Created: {dyn.get('new_files', [])}
+  Detonation Duration: {dyn.get('detonation_duration', '?')}s
+"""
+
+        prompt = f"""You are an elite malware analyst at ELKIE SOC. Analyze these results from a sample captured by our honeypot. Be specific, technical, and actionable.
+
+Provide your response as JSON with these exact keys:
+{{
+  "classification": "one of: botnet, trojan, miner, ransomware, backdoor, worm, dropper, RAT, exploit-kit, unknown",
+  "severity": "one of: critical, high, medium, low",
+  "malware_family": "specific family name or unknown",
+  "summary": "detailed 3-4 paragraph threat assessment covering what it does, how it works, TTPs, IOCs, and recommendations",
+  "yara_rule": "a complete YARA rule to detect this sample (rule name, meta, strings, condition)"
+}}
+
+--- SAMPLE DATA ---
+SHA256: {results.get('sha256', '')}
+MD5: {results.get('md5', '')}
+File Type: {results.get('file_type', '')}
+MIME: {results.get('mime_type', '')}
+Size: {results.get('file_size', 0)} bytes
+Is ELF: {results.get('is_elf', False)}
+Is PE: {results.get('is_pe', False)}
+ssdeep: {results.get('ssdeep', 'N/A')}
+
+YARA Matches: {yara_text}
+
+Interesting Strings:
+{strings_text}
+
+FLOSS Decoded Strings:
+{floss_text}
+
+capa Capabilities:
+{capa_text}
+
+Ghidra Analysis:
+{ghidra_text}
+{dyn_text}"""
+
+        try:
+            client = anthropic.Anthropic(api_key=api_key)
+            response = client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=2000,
+                messages=[{"role": "user", "content": prompt}],
+            )
+
+            text = response.content[0].text
+            cost = (response.usage.input_tokens * 3 / 1_000_000) + (response.usage.output_tokens * 15 / 1_000_000)
+            self.logger.info("Claude API: %d in / %d out tokens ($%.4f) for %s",
+                             response.usage.input_tokens, response.usage.output_tokens, cost, sha256[:16])
+
+            # Try to parse as JSON
+            try:
+                # Find JSON in response
+                import re
+                json_match = re.search(r'\{[\s\S]*\}', text)
+                if json_match:
+                    data = json.loads(json_match.group())
+                    return data
+            except json.JSONDecodeError:
+                pass
+
+            # Fallback: use raw text as summary
+            return {"summary": text, "classification": None, "severity": None, "yara_rule": ""}
+
+        except Exception as e:
+            self.logger.error("Claude API failed for %s: %s", sha256[:16], e)
+            return None
+
+    # -- VirusTotal --------------------------------------------------------
+
     def vt_lookup(self, sha256: str) -> Optional[dict]:
         """Look up a hash on VirusTotal. Returns detection info or None."""
         if not self._vt_api_key:
@@ -1995,7 +2098,17 @@ class SampleAnalyzer:
             self.logger.warning("No results received for %s", sha256[:16])
             return False
 
-        # Step 4: Dynamic analysis (sandbox detonation)
+        # Step 4: Claude API threat analysis + YARA rule generation
+        claude_result = self.claude_analyze(results)
+        if claude_result:
+            results["llm_summary"] = claude_result.get("summary", "")
+            results["generated_yara_rule"] = claude_result.get("yara_rule", "")
+            if claude_result.get("classification"):
+                results["classification"] = claude_result["classification"]
+            if claude_result.get("severity"):
+                results["severity"] = claude_result["severity"]
+
+        # Step 5: Dynamic analysis (sandbox detonation)
         dynamic = self.detonate_sample(sha256, local_path)
         if dynamic:
             results["dynamic_analysis"] = dynamic

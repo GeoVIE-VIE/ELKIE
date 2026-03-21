@@ -40,6 +40,7 @@ database.yml
 projects/.env*
 Documents/passwords.txt
 reports/
+soc-portal/img/
 
 # Logs
 *.log
