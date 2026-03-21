@@ -1650,9 +1650,29 @@ Ghidra Analysis:
         if not self._sandbox_restore_snapshot():
             return None
 
-        # Step 2: Point DNS to INetSim on REMnux, clear auditd, start tcpdump
+        # Step 2: Point DNS to INetSim, set up DoT interception, clear auditd, start tcpdump
         self._sandbox_ssh(
             "sudo bash -c 'rm -f /etc/resolv.conf && echo nameserver 192.168.40.5 > /etc/resolv.conf'",
+            timeout=5,
+        )
+        # Intercept DNS-over-TLS (port 853) — socat strips TLS and forwards to INetSim plain DNS
+        # This tricks malware that uses encrypted DNS into revealing its C2 domains
+        self._sandbox_ssh(
+            "sudo bash -c '"
+            "if command -v socat >/dev/null 2>&1; then "
+            "  openssl req -x509 -newkey rsa:2048 -keyout /tmp/dot.key -out /tmp/dot.crt -days 1 -nodes -subj \"/CN=dns\" 2>/dev/null && "
+            "  nohup socat OPENSSL-LISTEN:853,reuseaddr,fork,cert=/tmp/dot.crt,key=/tmp/dot.key,verify=0 TCP:192.168.40.5:53 > /tmp/dot.log 2>&1 & "
+            "  echo \"DoT interceptor started on 853\"; "
+            "else echo \"socat not installed\"; fi'",
+            timeout=10,
+        )
+        # Also intercept DNS-over-HTTPS (port 443 to common DoH resolvers)
+        # iptables redirects any outbound 853 traffic to our local socat listener
+        self._sandbox_ssh(
+            "sudo iptables -t nat -A OUTPUT -p tcp --dport 853 -j REDIRECT --to-port 853 2>/dev/null; "
+            "sudo iptables -t nat -A OUTPUT -p tcp --dport 443 -d 1.1.1.1 -j DNAT --to-destination 192.168.40.5:80 2>/dev/null; "
+            "sudo iptables -t nat -A OUTPUT -p tcp --dport 443 -d 8.8.8.8 -j DNAT --to-destination 192.168.40.5:80 2>/dev/null; "
+            "sudo iptables -t nat -A OUTPUT -p tcp --dport 443 -d 9.9.9.9 -j DNAT --to-destination 192.168.40.5:80 2>/dev/null",
             timeout=5,
         )
         self._sandbox_ssh("sudo auditctl -D && sudo rm -f /var/log/audit/audit.log && sudo systemctl restart auditd", timeout=10)
