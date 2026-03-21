@@ -884,7 +884,6 @@ class SampleAnalyzer:
         src_ip = metadata.get("src_ip", "")
         if src_ip:
             doc["source"]["src_ip"] = src_ip
-        }
 
         result = self._es_put(
             f"{self.cfg.result_index}/_doc/{sha256}",
