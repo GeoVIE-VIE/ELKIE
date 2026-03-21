@@ -1686,86 +1686,9 @@ Ghidra Analysis:
             except (subprocess.TimeoutExpired, FileNotFoundError):
                 pass
 
-        # Step 10: Memory dump + Volatility forensics
-        memory_forensics = {}
-        memdump_path = results_dir / "memdump.raw"
-        try:
-            vmid = self.cfg.sandbox_vmid
-            node = "flexiserve"
-
-            # Dump memory via Proxmox QEMU monitor (virsh dump equivalent)
-            self.logger.info("Dumping sandbox memory (%s)...", sha256[:16])
-            dump_result = self._pve_api("POST",
-                f"/api2/json/nodes/{node}/qemu/{vmid}/monitor",
-                {"command": f"dump-guest-memory -p /tmp/memdump_{vmid}.raw"})
-
-            if dump_result is not None:
-                time.sleep(5)  # Wait for dump to complete
-
-                # Copy dump from Proxmox host to ELK
-                # Since we can't SCP from Proxmox directly, copy via sandbox SSH
-                # Alternative: use the sandbox itself to dump /proc/kcore or /dev/mem
-                pass
-
-            # Fallback: dump via /proc on the sandbox itself (requires root)
-            self._sandbox_ssh(
-                f"sudo dd if=/dev/mem of=/home/{self.cfg.sandbox_user}/detonation/memdump.raw bs=1M count=256 2>/dev/null || "
-                f"sudo cat /proc/kcore > /home/{self.cfg.sandbox_user}/detonation/memdump.raw 2>/dev/null",
-                timeout=30,
-            )
-
-            # SCP memory dump to local
-            self._sandbox_scp_from(
-                f"/home/{self.cfg.sandbox_user}/detonation/memdump.raw",
-                str(memdump_path),
-                timeout=60,
-            )
-
-            if memdump_path.exists() and memdump_path.stat().st_size > 0:
-                self.logger.info("Memory dump collected: %d bytes", memdump_path.stat().st_size)
-
-                # SCP to REMnux for Volatility analysis
-                remnux_dump = f"/home/nalyzer/results/{sha256}_memdump.raw"
-                self._scp_to(
-                    self.cfg.remnux_host, self.cfg.remnux_port, self.cfg.remnux_user,
-                    self._remnux_pass, str(memdump_path), remnux_dump,
-                )
-
-                # Run Volatility plugins
-                vol_plugins = {
-                    "pslist": f"vol3 -f {remnux_dump} linux.pslist.PsList 2>/dev/null | head -50",
-                    "malfind": f"vol3 -f {remnux_dump} linux.malfind.Malfind 2>/dev/null | head -50",
-                    "lsof": f"vol3 -f {remnux_dump} linux.lsof.Lsof 2>/dev/null | head -30",
-                    "bash_history": f"vol3 -f {remnux_dump} linux.bash.Bash 2>/dev/null | head -30",
-                    "elfs": f"vol3 -f {remnux_dump} linux.elfs.Elfs 2>/dev/null | head -30",
-                    "hidden_modules": f"vol3 -f {remnux_dump} linux.hidden_modules.Hidden_modules 2>/dev/null | head -20",
-                    "network": f"vol3 -f {remnux_dump} linux.ip.Addr 2>/dev/null | head -20",
-                }
-
-                for plugin_name, cmd in vol_plugins.items():
-                    rc, stdout, stderr = self._ssh_cmd(
-                        self.cfg.remnux_host, self.cfg.remnux_port, self.cfg.remnux_user,
-                        cmd, password=self._remnux_pass, timeout=120,
-                    )
-                    if rc == 0 and stdout.strip():
-                        memory_forensics[plugin_name] = stdout.strip()[:3000]
-                        self.logger.info("  Volatility %s: %d lines", plugin_name, len(stdout.strip().splitlines()))
-
-                # Cleanup remote dump
-                self._ssh_cmd(
-                    self.cfg.remnux_host, self.cfg.remnux_port, self.cfg.remnux_user,
-                    f"rm -f {remnux_dump}", password=self._remnux_pass,
-                )
-
-                if memory_forensics:
-                    self.logger.info("Memory forensics complete: %d plugins produced output", len(memory_forensics))
-
-        except Exception as e:
-            self.logger.warning("Memory forensics failed: %s", e)
-
-        # Cleanup local memdump
-        if memdump_path.exists():
-            memdump_path.unlink()
+        # Step 10: Memory forensics — disabled (needs LiME kernel module for proper dumps)
+        # /dev/mem only gives 1MB on modern kernels, producing garbage Volatility results.
+        # TODO: Install LiME on sandbox, enable when GPU available for faster analysis.
 
         # Assemble dynamic analysis results
         dynamic_results = {
@@ -1780,12 +1703,9 @@ Ghidra Analysis:
             "audit_log_size": (results_dir / "audit.log").stat().st_size if (results_dir / "audit.log").exists() else 0,
         }
 
-        if memory_forensics:
-            dynamic_results["memory_forensics"] = memory_forensics
-
-        self.logger.info("Dynamic analysis complete for %s — %d DNS queries, %d connections, %d new files, %d vol plugins",
+        self.logger.info("Dynamic analysis complete for %s — %d DNS queries, %d connections, %d new files",
                          sha256[:16], len(dns_queries), len(connections),
-                         len(dynamic_results["new_files"]), len(memory_forensics))
+                         len(dynamic_results["new_files"]))
 
         # Step 11: Restore clean snapshot (cleanup)
         self._sandbox_restore_snapshot()
