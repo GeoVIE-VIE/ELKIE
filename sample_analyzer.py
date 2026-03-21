@@ -995,6 +995,159 @@ class SampleAnalyzer:
 
     # -- Claude API analysis ------------------------------------------------
 
+    # -- Deep analysis scoring + Ghidra decompilation ---------------------
+
+    DEEP_ANALYSIS_STATE = Path("/home/legs/.deep_analysis_today.json")
+
+    def _score_sample(self, results: dict) -> int:
+        """Score a sample to determine if it deserves deep Ghidra decompilation."""
+        score = 0
+        score += len(results.get("capa_capabilities", [])) * 10
+        score += len(results.get("yara_matches", [])) * 20
+        score += min(len(results.get("interesting_strings", [])), 10) * 5
+        if results.get("is_elf") or results.get("is_pe"):
+            score += 10
+        if results.get("file_size", 0) > 100000:
+            score += 5
+        ghidra = results.get("ghidra")
+        if ghidra and isinstance(ghidra, dict):
+            score += len(ghidra.get("suspicious_apis", [])) * 10
+        dyn = results.get("dynamic_analysis", {})
+        if dyn:
+            score += min(len(dyn.get("outbound_connections", [])), 5) * 20
+            score += min(len(dyn.get("new_files", [])), 3) * 10
+            score += min(len(dyn.get("dns_queries", [])), 5) * 10
+        vt = results.get("virustotal", {})
+        if vt and vt.get("found") and vt.get("detections", 0) > 0:
+            score += 25
+        return score
+
+    def _can_deep_analyze_today(self) -> bool:
+        """Check if we've already done a deep analysis today (max 1/day)."""
+        try:
+            with open(self.DEEP_ANALYSIS_STATE) as f:
+                state = json.load(f)
+            last_date = state.get("date", "")
+            today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            return last_date != today
+        except (FileNotFoundError, json.JSONDecodeError):
+            return True
+
+    def _mark_deep_analyzed(self, sha256: str):
+        """Record that we did a deep analysis today."""
+        with open(self.DEEP_ANALYSIS_STATE, "w") as f:
+            json.dump({
+                "date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+                "sha256": sha256,
+            }, f)
+
+    def deep_ghidra_analysis(self, sha256: str, results: dict) -> Optional[dict]:
+        """Run deep Ghidra decompilation and feed to Claude for code-level analysis."""
+        score = self._score_sample(results)
+        self.logger.info("Sample %s deep analysis score: %d (threshold: 40)", sha256[:16], score)
+
+        if score < 40:
+            return None
+
+        if not self._can_deep_analyze_today():
+            self.logger.info("Deep analysis budget exhausted for today")
+            return None
+
+        if not (results.get("is_elf") or results.get("is_pe")):
+            return None  # Only binaries
+
+        self.logger.info("Running DEEP Ghidra decompilation for %s (score=%d)", sha256[:16], score)
+
+        # Run deep Ghidra script on REMnux
+        remote_sample = f"{self.cfg.remnux_inbox}/{sha256}"
+        rc, _, _ = self._ssh_cmd(
+            self.cfg.remnux_host, self.cfg.remnux_port, self.cfg.remnux_user,
+            f"mkdir -p /tmp/ghidra_deep && rm -rf /tmp/ghidra_deep/sample_{sha256[:16]}* && "
+            f"SA_SHA256={sha256} timeout 300 /opt/ghidra/support/analyzeHeadless "
+            f"/tmp/ghidra_deep sample_{sha256[:16]} "
+            f"-import {remote_sample} "
+            f"-postscript /home/nalyzer/ghidra_deep_extract.py "
+            f"-deleteProject -analysisTimeoutPerFile 240 2>/dev/null",
+            password=self._remnux_pass, timeout=320,
+        )
+
+        # Fetch deep results
+        deep_result_path = f"/home/nalyzer/results/{sha256}_ghidra_deep.json"
+        rc2, deep_json, _ = self._ssh_cmd(
+            self.cfg.remnux_host, self.cfg.remnux_port, self.cfg.remnux_user,
+            f"cat {deep_result_path} 2>/dev/null",
+            password=self._remnux_pass, timeout=15,
+        )
+
+        if rc2 != 0 or not deep_json.strip():
+            self.logger.warning("Deep Ghidra extraction produced no output for %s", sha256[:16])
+            return None
+
+        try:
+            deep_data = json.loads(deep_json)
+        except json.JSONDecodeError:
+            return None
+
+        decompiled = deep_data.get("decompiled_functions", [])
+        if not decompiled:
+            return None
+
+        self.logger.info("Decompiled %d functions for %s — sending to Claude", len(decompiled), sha256[:16])
+
+        # Feed decompiled code to Claude for deep analysis
+        api_key = os.environ.get("CLAUDE_API_KEY", "")
+        if not api_key:
+            return None
+
+        try:
+            import anthropic
+        except ImportError:
+            return None
+
+        functions_text = ""
+        for func in decompiled[:15]:
+            functions_text += f"\n--- Function: {func['name']} ({func['size']} bytes) at {func['address']} ---\n"
+            functions_text += func.get("c_code", "// no code") + "\n"
+
+        prompt = f"""You are an elite reverse engineer analyzing decompiled malware code. This binary was captured from a honeypot.
+
+Analyze each decompiled function and provide:
+
+1. **Function-by-function breakdown** — what each function does in plain English
+2. **C2 Protocol** — how it communicates with command & control (ports, protocols, encryption)
+3. **Exploitation** — any CVEs being exploited, what vulnerabilities it targets
+4. **Evasion techniques** — anti-debug, sandbox detection, packing, string obfuscation
+5. **Persistence mechanisms** — how it survives reboot
+6. **IOCs extracted from code** — hardcoded IPs, domains, ports, file paths, registry keys, mutexes
+7. **MITRE ATT&CK techniques** with specific IDs
+8. **Detection opportunities** — behavioral signatures, YARA patterns based on code
+
+Binary info: {results.get('file_type','')} | {results.get('file_size',0)} bytes | Suspicious APIs: {deep_data.get('suspicious_apis',[])}
+
+DECOMPILED FUNCTIONS:
+{functions_text}"""
+
+        client = anthropic.Anthropic(api_key=api_key)
+        response = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=4000,
+            messages=[{"role": "user", "content": prompt}],
+        )
+
+        analysis = response.content[0].text
+        cost = (response.usage.input_tokens * 3 / 1_000_000) + (response.usage.output_tokens * 15 / 1_000_000)
+        self.logger.info("Deep Claude analysis: %d in / %d out tokens ($%.4f) for %s",
+                         response.usage.input_tokens, response.usage.output_tokens, cost, sha256[:16])
+
+        self._mark_deep_analyzed(sha256)
+
+        return {
+            "deep_analysis": analysis,
+            "decompiled_function_count": len(decompiled),
+            "score": score,
+            "cost": round(cost, 4),
+        }
+
     def claude_analyze(self, results: dict) -> Optional[dict]:
         """Call Claude API for threat assessment and YARA rule generation."""
         api_key = os.environ.get("CLAUDE_API_KEY", "")
@@ -2007,6 +2160,15 @@ Ghidra Analysis:
                 yara_display += "\n..."
             fields.append({"name": "Auto-Generated YARA Rule", "value": f"```yara\n{yara_display}\n```", "inline": False})
 
+        # Deep analysis (decompiled code review)
+        deep = results.get("deep_analysis", "")
+        if deep:
+            deep_display = deep[:900]
+            if len(deep) > 900:
+                deep_display += "\n..."
+            fields.append({"name": f"Deep Code Analysis (score={results.get('deep_analysis_score',0)})",
+                           "value": deep_display, "inline": False})
+
         # Notable strings
         interesting = results.get("interesting_strings", [])
         if interesting:
@@ -2154,7 +2316,16 @@ Ghidra Analysis:
         if mb_result:
             results["malwarebazaar"] = mb_result
 
-        # Step 7: MISP — check known IOCs and create event
+        # Step 7: Deep Ghidra decompilation (if sample scores high enough, max 1/day)
+        deep = self.deep_ghidra_analysis(sha256, results)
+        if deep:
+            results["deep_analysis"] = deep.get("deep_analysis", "")
+            results["deep_analysis_score"] = deep.get("score", 0)
+            results["deep_analysis_cost"] = deep.get("cost", 0)
+            self.logger.info("Deep analysis complete for %s — score=%d, cost=$%.4f",
+                             sha256[:16], deep["score"], deep["cost"])
+
+        # Step 8: MISP — check known IOCs and create event
         misp_iocs = self.misp_check_iocs(results)
         if misp_iocs:
             results["misp"] = misp_iocs
