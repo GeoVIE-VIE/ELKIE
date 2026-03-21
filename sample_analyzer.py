@@ -61,6 +61,8 @@ class Config:
     remnux_inbox: str = "/home/nalyzer/inbox"
     remnux_results: str = "/home/nalyzer/results"
     remnux_script: str = "/home/nalyzer/analyze_sample.sh"
+    remnux_vmid: int = 106
+    remnux_auto_start: bool = True       # auto-start/stop REMnux VM
     # Sandbox (dynamic analysis)
     sandbox_host: str = "192.168.40.6"
     sandbox_port: int = 22
@@ -343,6 +345,15 @@ class SampleAnalyzer:
             self.logger.error("Local analysis script not found: %s", ANALYSIS_SCRIPT_LOCAL)
             return False
 
+        # Skip if REMnux is offline (will deploy when it starts for analysis)
+        rc_test, _, _ = self._ssh_cmd(
+            self.cfg.remnux_host, self.cfg.remnux_port, self.cfg.remnux_user,
+            "echo ok", password=self._remnux_pass, timeout=5,
+        )
+        if rc_test != 0:
+            self.logger.info("REMnux offline — script will be deployed when VM starts for analysis")
+            return True
+
         # Check if remote script exists and get its hash
         rc, remote_hash, _ = self._ssh_cmd(
             self.cfg.remnux_host, self.cfg.remnux_port, self.cfg.remnux_user,
@@ -541,6 +552,57 @@ class SampleAnalyzer:
 
         self.logger.warning("Sample %s not found on T-Pot", sha256[:16])
         return None
+
+    def _ensure_remnux_running(self) -> bool:
+        """Start REMnux VM if not running, wait for SSH."""
+        if not self.cfg.remnux_auto_start or not self._pve_token_id:
+            return True
+
+        node = "flexiserve"
+        vmid = self.cfg.remnux_vmid
+
+        # Check if already reachable via SSH
+        rc, _, _ = self._ssh_cmd(
+            self.cfg.remnux_host, self.cfg.remnux_port, self.cfg.remnux_user,
+            "echo ready", password=self._remnux_pass, timeout=5,
+        )
+        if rc == 0:
+            return True
+
+        # Check VM status via Proxmox
+        status = self._pve_api("GET", f"/api2/json/nodes/{node}/qemu/{vmid}/status/current")
+        vm_status = status.get("data", {}).get("status", "") if status else ""
+
+        if vm_status != "running":
+            self.logger.info("Starting REMnux VM (VMID %d)...", vmid)
+            self._pve_api("POST", f"/api2/json/nodes/{node}/qemu/{vmid}/status/start")
+
+        # Wait for SSH to become available
+        for attempt in range(60):
+            time.sleep(5)
+            rc, _, _ = self._ssh_cmd(
+                self.cfg.remnux_host, self.cfg.remnux_port, self.cfg.remnux_user,
+                "echo ready", password=self._remnux_pass, timeout=5,
+            )
+            if rc == 0:
+                self.logger.info("REMnux ready after %ds", (attempt + 1) * 5)
+                # Deploy analysis script if needed
+                self.ensure_analysis_script()
+                return True
+
+        self.logger.error("REMnux did not become reachable after 5 minutes")
+        return False
+
+    def _stop_remnux(self):
+        """Shut down REMnux VM to save resources."""
+        if not self.cfg.remnux_auto_start or not self._pve_token_id:
+            return
+
+        node = "flexiserve"
+        vmid = self.cfg.remnux_vmid
+
+        self.logger.info("Shutting down REMnux VM to save resources")
+        self._pve_api("POST", f"/api2/json/nodes/{node}/qemu/{vmid}/status/shutdown")
 
     def submit_for_analysis(self, sha256: str, local_path: Path) -> bool:
         """Upload sample to REMnux inbox and trigger analysis."""
@@ -1712,9 +1774,15 @@ class SampleAnalyzer:
             self.known_hashes.add(sha256)
             return True
 
+        # Step 0: Ensure REMnux is running
+        if not self._ensure_remnux_running():
+            self.logger.error("REMnux not available, skipping %s", sha256[:16])
+            return False
+
         # Step 1: Fetch from T-Pot
         local_path = self.fetch_sample(sha256)
         if not local_path:
+            self._stop_remnux()
             return False
 
         # Step 2: Submit to REMnux
@@ -1796,6 +1864,10 @@ class SampleAnalyzer:
 
         self.known_hashes.add(sha256)
         self.logger.info("Pipeline complete for %s", sha256[:16])
+
+        # Shut down REMnux to save resources
+        self._stop_remnux()
+
         return True
 
     # -- Main loop ---------------------------------------------------------
