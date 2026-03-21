@@ -1650,30 +1650,33 @@ Ghidra Analysis:
         if not self._sandbox_restore_snapshot():
             return None
 
-        # Step 2: Point DNS to INetSim, set up DoT interception, clear auditd, start tcpdump
+        # Step 2: Point DNS to INetSim on REMnux, set up DoT interception
         self._sandbox_ssh(
             "sudo bash -c 'rm -f /etc/resolv.conf && echo nameserver 192.168.40.5 > /etc/resolv.conf'",
             timeout=5,
         )
-        # Intercept DNS-over-TLS (port 853) — socat strips TLS and forwards to INetSim plain DNS
-        # This tricks malware that uses encrypted DNS into revealing its C2 domains
+        # Intercept DNS-over-TLS (port 853) — socat strips TLS, forwards to INetSim plain DNS
         self._sandbox_ssh(
             "sudo bash -c '"
             "if command -v socat >/dev/null 2>&1; then "
             "  openssl req -x509 -newkey rsa:2048 -keyout /tmp/dot.key -out /tmp/dot.crt -days 1 -nodes -subj \"/CN=dns\" 2>/dev/null && "
             "  nohup socat OPENSSL-LISTEN:853,reuseaddr,fork,cert=/tmp/dot.crt,key=/tmp/dot.key,verify=0 TCP:192.168.40.5:53 > /tmp/dot.log 2>&1 & "
-            "  echo \"DoT interceptor started on 853\"; "
-            "else echo \"socat not installed\"; fi'",
+            "fi'",
             timeout=10,
         )
-        # Also intercept DNS-over-HTTPS (port 443 to common DoH resolvers)
-        # iptables redirects any outbound 853 traffic to our local socat listener
+        # Redirect DoT/DoH attempts to local interceptors
         self._sandbox_ssh(
             "sudo iptables -t nat -A OUTPUT -p tcp --dport 853 -j REDIRECT --to-port 853 2>/dev/null; "
             "sudo iptables -t nat -A OUTPUT -p tcp --dport 443 -d 1.1.1.1 -j DNAT --to-destination 192.168.40.5:80 2>/dev/null; "
             "sudo iptables -t nat -A OUTPUT -p tcp --dport 443 -d 8.8.8.8 -j DNAT --to-destination 192.168.40.5:80 2>/dev/null; "
             "sudo iptables -t nat -A OUTPUT -p tcp --dport 443 -d 9.9.9.9 -j DNAT --to-destination 192.168.40.5:80 2>/dev/null",
             timeout=5,
+        )
+        # Clear INetSim DNS log on REMnux so we only capture this detonation's queries
+        self._ssh_cmd(
+            self.cfg.remnux_host, self.cfg.remnux_port, self.cfg.remnux_user,
+            "sudo truncate -s 0 /var/log/inetsim/service.log 2>/dev/null",
+            password=self._remnux_pass, timeout=5,
         )
         self._sandbox_ssh("sudo auditctl -D && sudo rm -f /var/log/audit/audit.log && sudo systemctl restart auditd", timeout=10)
         self._sandbox_ssh(
@@ -1759,6 +1762,30 @@ Ghidra Analysis:
         # /dev/mem only gives 1MB on modern kernels, producing garbage Volatility results.
         # TODO: Install LiME on sandbox, enable when GPU available for faster analysis.
 
+        # Step 10: Collect INetSim DNS logs — real C2 domain lookups
+        inetsim_dns = []
+        rc_inet, inet_log, _ = self._ssh_cmd(
+            self.cfg.remnux_host, self.cfg.remnux_port, self.cfg.remnux_user,
+            "grep 'DNS.*Query' /var/log/inetsim/service.log 2>/dev/null | tail -50",
+            password=self._remnux_pass, timeout=10,
+        )
+        if rc_inet == 0 and inet_log.strip():
+            for line in inet_log.strip().splitlines():
+                # INetSim log format: timestamp type src query
+                if "Query" in line:
+                    inetsim_dns.append(line.strip())
+            if inetsim_dns:
+                self.logger.info("INetSim captured %d DNS queries", len(inetsim_dns))
+
+        # Merge INetSim DNS with pcap DNS (dedup)
+        all_dns = list(set(dns_queries))
+        for line in inetsim_dns:
+            # Extract domain from INetSim log line
+            parts = line.split()
+            for p in parts:
+                if '.' in p and not p[0].isdigit() and len(p) > 4 and p not in all_dns:
+                    all_dns.append(p)
+
         # Assemble dynamic analysis results
         dynamic_results = {
             "detonation_duration": self.cfg.sandbox_timeout,
@@ -1766,7 +1793,8 @@ Ghidra Analysis:
             "network_connections": net_out[:3000] if net_out else "",
             "new_files": files_out.strip().splitlines()[:50] if files_out else [],
             "executed_commands": audit_out[:5000] if audit_out else "",
-            "dns_queries": dns_queries,
+            "dns_queries": all_dns,
+            "inetsim_dns_log": inetsim_dns[:30],
             "outbound_connections": self._enrich_connections(connections),
             "pcap_size": pcap_path.stat().st_size if pcap_path.exists() else 0,
             "audit_log_size": (results_dir / "audit.log").stat().st_size if (results_dir / "audit.log").exists() else 0,
