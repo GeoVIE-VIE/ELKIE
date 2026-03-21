@@ -176,12 +176,11 @@ class SampleAnalyzer:
 
     def _ssh_cmd(self, host: str, port: int, user: str, cmd: str,
                  password: str = "", timeout: int = 60) -> tuple[int, str, str]:
-        """Execute command on remote host via SSH. Returns (returncode, stdout, stderr)."""
+        """Execute command on remote host via SSH key auth (falls back to password)."""
         ssh_args = [
-            "sshpass", "-p", password,
             "ssh", "-o", "StrictHostKeyChecking=no",
             "-o", "ConnectTimeout=10",
-            "-o", "BatchMode=no",
+            "-o", "BatchMode=yes",
             "-p", str(port),
             f"{user}@{host}",
             cmd,
@@ -190,7 +189,8 @@ class SampleAnalyzer:
             result = subprocess.run(
                 ssh_args, capture_output=True, text=True, timeout=timeout
             )
-            return result.returncode, result.stdout, result.stderr
+            if result.returncode == 0 or "timeout" not in result.stderr.lower():
+                return result.returncode, result.stdout, result.stderr
         except subprocess.TimeoutExpired:
             self.logger.warning("SSH command timed out after %ds: %s@%s: %s", timeout, user, host, cmd[:80])
             return -1, "", "timeout"
@@ -198,47 +198,100 @@ class SampleAnalyzer:
             self.logger.error("SSH command failed: %s", e)
             return -1, "", str(e)
 
+        # Key auth failed — fall back to password
+        if password:
+            ssh_args_pw = [
+                "sshpass", "-p", password,
+                "ssh", "-o", "StrictHostKeyChecking=no",
+                "-o", "ConnectTimeout=10",
+                "-p", str(port),
+                f"{user}@{host}",
+                cmd,
+            ]
+            try:
+                result = subprocess.run(
+                    ssh_args_pw, capture_output=True, text=True, timeout=timeout
+                )
+                return result.returncode, result.stdout, result.stderr
+            except subprocess.TimeoutExpired:
+                self.logger.warning("SSH command timed out after %ds: %s@%s: %s", timeout, user, host, cmd[:80])
+                return -1, "", "timeout"
+            except Exception as e:
+                return -1, "", str(e)
+
+        return -1, "", "auth failed"
+
     def _scp_from(self, host: str, port: int, user: str, password: str,
                   remote_path: str, local_path: str, timeout: int = 120) -> bool:
-        """Copy file from remote host to local path."""
+        """Copy file from remote host via SSH key auth (falls back to password)."""
         scp_args = [
-            "sshpass", "-p", password,
             "scp", "-o", "StrictHostKeyChecking=no",
             "-o", "ConnectTimeout=10",
+            "-o", "BatchMode=yes",
             "-P", str(port),
             f"{user}@{host}:{remote_path}",
             local_path,
         ]
         try:
             result = subprocess.run(scp_args, capture_output=True, text=True, timeout=timeout)
-            return result.returncode == 0
-        except subprocess.TimeoutExpired:
-            self.logger.warning("SCP download timed out: %s:%s", host, remote_path)
-            return False
-        except Exception as e:
-            self.logger.error("SCP download failed: %s", e)
-            return False
+            if result.returncode == 0:
+                return True
+        except (subprocess.TimeoutExpired, Exception):
+            pass
+
+        # Fall back to password
+        if password:
+            scp_args_pw = [
+                "sshpass", "-p", password,
+                "scp", "-o", "StrictHostKeyChecking=no",
+                "-o", "ConnectTimeout=10",
+                "-P", str(port),
+                f"{user}@{host}:{remote_path}",
+                local_path,
+            ]
+            try:
+                result = subprocess.run(scp_args_pw, capture_output=True, text=True, timeout=timeout)
+                return result.returncode == 0
+            except (subprocess.TimeoutExpired, Exception):
+                pass
+
+        return False
 
     def _scp_to(self, host: str, port: int, user: str, password: str,
                 local_path: str, remote_path: str, timeout: int = 120) -> bool:
-        """Copy file from local path to remote host."""
+        """Copy file to remote host via SSH key auth (falls back to password)."""
         scp_args = [
-            "sshpass", "-p", password,
             "scp", "-o", "StrictHostKeyChecking=no",
             "-o", "ConnectTimeout=10",
+            "-o", "BatchMode=yes",
             "-P", str(port),
             local_path,
             f"{user}@{host}:{remote_path}",
         ]
         try:
             result = subprocess.run(scp_args, capture_output=True, text=True, timeout=timeout)
-            return result.returncode == 0
-        except subprocess.TimeoutExpired:
-            self.logger.warning("SCP upload timed out: %s -> %s:%s", local_path, host, remote_path)
-            return False
-        except Exception as e:
-            self.logger.error("SCP upload failed: %s", e)
-            return False
+            if result.returncode == 0:
+                return True
+        except (subprocess.TimeoutExpired, Exception):
+            pass
+
+        # Fall back to password
+        if password:
+            scp_args_pw = [
+                "sshpass", "-p", password,
+                "scp", "-o", "StrictHostKeyChecking=no",
+                "-o", "ConnectTimeout=10",
+                "-P", str(port),
+                local_path,
+                f"{user}@{host}:{remote_path}",
+            ]
+            try:
+                result = subprocess.run(scp_args_pw, capture_output=True, text=True, timeout=timeout)
+                return result.returncode == 0
+            except (subprocess.TimeoutExpired, Exception):
+                pass
+
+        return False
 
     # -- Elasticsearch helpers ---------------------------------------------
 

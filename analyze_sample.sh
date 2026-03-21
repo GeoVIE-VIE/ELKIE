@@ -282,7 +282,7 @@ payload = json.dumps({
     'model': 'qwen2.5:14b',
     'prompt': prompt,
     'stream': False,
-    'options': {'temperature': 0.3, 'num_predict': 1024}
+    'options': {'temperature': 0.3, 'num_predict': 512}
 }).encode()
 
 req = urllib.request.Request(
@@ -350,7 +350,7 @@ payload = json.dumps({
     'model': 'qwen2.5:14b',
     'prompt': prompt,
     'stream': False,
-    'options': {'temperature': 0.2, 'num_predict': 1024}
+    'options': {'temperature': 0.2, 'num_predict': 512}
 }).encode()
 
 req = urllib.request.Request(
