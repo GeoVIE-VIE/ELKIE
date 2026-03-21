@@ -617,25 +617,23 @@ class SampleAnalyzer:
             self.logger.error("Failed to upload sample %s to REMnux", sha256[:16])
             return False
 
-        # Trigger analysis (run in background on REMnux)
+        # Trigger analysis in background on REMnux (don't wait for completion)
         rc, stdout, stderr = self._ssh_cmd(
             self.cfg.remnux_host, self.cfg.remnux_port, self.cfg.remnux_user,
-            f"bash {self.cfg.remnux_script} {remote_sample}",
+            f"nohup bash {self.cfg.remnux_script} {remote_sample} > /tmp/analysis_{sha256[:16]}.log 2>&1 &",
             password=self._remnux_pass,
-            timeout=self.cfg.analysis_timeout,
+            timeout=10,
         )
 
-        if rc == 0:
-            self.logger.info("Analysis triggered for %s", sha256[:16])
-            return True
-        else:
-            self.logger.error("Analysis failed for %s: %s", sha256[:16], stderr[:200])
-            return False
+        self.logger.info("Analysis triggered in background for %s", sha256[:16])
+        return True
 
     def wait_for_results(self, sha256: str) -> Optional[dict]:
-        """Poll REMnux for analysis results, then fetch them."""
+        """Poll REMnux for analysis results — waits up to 20 minutes for LLM."""
         remote_result = f"{self.cfg.remnux_results}/{sha256}.json"
-        deadline = time.time() + self.cfg.analysis_timeout
+        max_wait = 1200  # 20 minutes — LLM on CPU is slow
+        deadline = time.time() + max_wait
+        self.logger.info("Waiting for results (up to %ds): %s", max_wait, sha256[:16])
 
         while time.time() < deadline:
             rc, stdout, _ = self._ssh_cmd(
@@ -650,9 +648,9 @@ class SampleAnalyzer:
                 except json.JSONDecodeError:
                     self.logger.warning("Invalid JSON in results for %s, retrying", sha256[:16])
 
-            time.sleep(10)
+            time.sleep(15)
 
-        self.logger.warning("Timed out waiting for results: %s", sha256[:16])
+        self.logger.warning("Timed out waiting for results after %ds: %s", max_wait, sha256[:16])
         return None
 
     # -- Sample similarity ------------------------------------------------
@@ -732,11 +730,16 @@ class SampleAnalyzer:
             "indexed_at": datetime.now(timezone.utc).isoformat(),
             "source": {
                 "honeypot": metadata.get("honeypot", "unknown"),
-                "src_ip": metadata.get("src_ip", ""),
                 "country": metadata.get("country", ""),
                 "session_id": metadata.get("session_id", ""),
                 "captured_at": metadata.get("captured_at", ""),
             },
+        }
+
+        # Only include src_ip if it's a valid IP (ES rejects empty strings for ip type)
+        src_ip = metadata.get("src_ip", "")
+        if src_ip:
+            doc["source"]["src_ip"] = src_ip
         }
 
         result = self._es_put(
