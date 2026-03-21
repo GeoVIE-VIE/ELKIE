@@ -1500,6 +1500,55 @@ Ghidra Analysis:
             self.logger.error("Proxmox API %s %s failed: %s", method, path, e)
             return None
 
+    def _enrich_connections(self, connections: list) -> list:
+        """Filter internal IPs and enrich external ones with geo/reputation."""
+        enriched = []
+        seen = set()
+
+        for conn in connections:
+            ip = conn.get("ip", "")
+            port = conn.get("port", "")
+            key = f"{ip}:{port}"
+
+            # Skip internal/private IPs
+            if ip.startswith(("192.168.", "10.", "172.16.", "172.17.", "127.", "0.")):
+                continue
+            # Skip duplicates
+            if key in seen:
+                continue
+            seen.add(key)
+
+            entry = {"ip": ip, "port": port}
+
+            # Quick IPInfo lookup
+            try:
+                r = requests.get(f"https://ipinfo.io/{ip}/json", timeout=5)
+                if r.status_code == 200:
+                    info = r.json()
+                    entry["hostname"] = info.get("hostname", "")
+                    entry["city"] = info.get("city", "")
+                    entry["country"] = info.get("country", "")
+                    entry["org"] = info.get("org", "")
+            except Exception:
+                pass
+
+            # Shodan InternetDB (free, no key needed)
+            try:
+                r = requests.get(f"https://internetdb.shodan.io/{ip}", timeout=5)
+                if r.status_code == 200:
+                    shodan = r.json()
+                    entry["shodan_ports"] = shodan.get("ports", [])
+                    entry["shodan_tags"] = shodan.get("tags", [])
+                    entry["shodan_hostnames"] = shodan.get("hostnames", [])
+                    entry["shodan_vulns"] = shodan.get("vulns", [])[:5]
+            except Exception:
+                pass
+
+            enriched.append(entry)
+            time.sleep(0.3)  # Rate limit
+
+        return enriched
+
     def _sandbox_ssh(self, cmd: str, timeout: int = 30) -> tuple[int, str, str]:
         """Run command on sandbox VM via SSH key auth."""
         ssh_args = [
@@ -1698,7 +1747,7 @@ Ghidra Analysis:
             "new_files": files_out.strip().splitlines()[:50] if files_out else [],
             "executed_commands": audit_out[:5000] if audit_out else "",
             "dns_queries": dns_queries,
-            "outbound_connections": connections,
+            "outbound_connections": self._enrich_connections(connections),
             "pcap_size": pcap_path.stat().st_size if pcap_path.exists() else 0,
             "audit_log_size": (results_dir / "audit.log").stat().st_size if (results_dir / "audit.log").exists() else 0,
         }
@@ -1825,14 +1874,28 @@ Ghidra Analysis:
             if dyn.get("dns_queries"):
                 dyn_parts.append("**DNS Queries:**\n" + "\n".join(f"\u2022 `{d}`" for d in dyn["dns_queries"][:5]))
             if dyn.get("outbound_connections"):
-                conns = [f"`{c['ip']}:{c['port']}`" for c in dyn["outbound_connections"][:5]]
-                dyn_parts.append("**Outbound Connections:**\n" + "\n".join(f"\u2022 {c}" for c in conns))
+                conn_lines = []
+                for c in dyn["outbound_connections"][:5]:
+                    line = f"`{c['ip']}:{c['port']}`"
+                    details = []
+                    if c.get("hostname"):
+                        details.append(c["hostname"])
+                    if c.get("country"):
+                        details.append(c["country"])
+                    if c.get("org"):
+                        details.append(c["org"])
+                    if c.get("shodan_tags"):
+                        details.extend(c["shodan_tags"])
+                    if details:
+                        line += f" ({', '.join(details[:3])})"
+                    conn_lines.append(f"\u2022 {line}")
+                dyn_parts.append("**Outbound Connections:**\n" + "\n".join(conn_lines))
             if dyn.get("new_files"):
                 dyn_parts.append("**Files Created:**\n" + "\n".join(f"\u2022 `{f}`" for f in dyn["new_files"][:5]))
             if dyn_parts:
                 dyn_text = "\n".join(dyn_parts)
-                if len(dyn_text) > 900:
-                    dyn_text = dyn_text[:900] + "\n\u2026"
+                if len(dyn_text) > 1000:
+                    dyn_text = dyn_text[:1000] + "\n\u2026"
                 fields.append({"name": "Dynamic Analysis (Sandbox)", "value": dyn_text, "inline": False})
 
         # MISP correlation
