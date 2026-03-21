@@ -648,10 +648,154 @@ class SampleAnalyzer:
                 except json.JSONDecodeError:
                     self.logger.warning("Invalid JSON in results for %s, retrying", sha256[:16])
 
+            # Log progress — check if analysis script is still running
+            if int(time.time()) % 60 < 15:  # every ~60s
+                rc_check, ps_out, _ = self._ssh_cmd(
+                    self.cfg.remnux_host, self.cfg.remnux_port, self.cfg.remnux_user,
+                    f"ps aux | grep 'analyze_sample.*{sha256[:16]}' | grep -v grep | head -1",
+                    password=self._remnux_pass, timeout=5,
+                )
+                if rc_check == 0 and ps_out.strip():
+                    elapsed = int(time.time() - (deadline - max_wait))
+                    self.logger.info("  Still analyzing %s (%ds elapsed)...", sha256[:16], elapsed)
+
             time.sleep(15)
 
-        self.logger.warning("Timed out waiting for results after %ds: %s", max_wait, sha256[:16])
+        # Check if script is still running — if so, add to pending for catch-up
+        rc_check, ps_out, _ = self._ssh_cmd(
+            self.cfg.remnux_host, self.cfg.remnux_port, self.cfg.remnux_user,
+            f"ps aux | grep 'analyze_sample.*{sha256[:16]}' | grep -v grep",
+            password=self._remnux_pass, timeout=5,
+        )
+        if rc_check == 0 and ps_out.strip():
+            self.logger.warning("Analysis still running for %s after %ds — will catch up later", sha256[:16], max_wait)
+            self._add_pending(sha256)
+        else:
+            self.logger.warning("Analysis timed out and not running for %s", sha256[:16])
+
         return None
+
+    # -- Pending results catch-up ------------------------------------------
+
+    def _add_pending(self, sha256: str):
+        """Track samples that timed out but are still being analyzed."""
+        pending_file = Path("/home/legs/.pending_analysis.json")
+        pending = []
+        try:
+            with open(pending_file) as f:
+                pending = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            pass
+
+        if sha256 not in pending:
+            pending.append(sha256)
+            with open(pending_file, "w") as f:
+                json.dump(pending, f)
+
+    def check_pending_results(self):
+        """Check for results from samples that timed out — runs every poll cycle."""
+        pending_file = Path("/home/legs/.pending_analysis.json")
+        try:
+            with open(pending_file) as f:
+                pending = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            return
+
+        if not pending:
+            return
+
+        # Check if REMnux is reachable
+        rc, _, _ = self._ssh_cmd(
+            self.cfg.remnux_host, self.cfg.remnux_port, self.cfg.remnux_user,
+            "echo ok", password=self._remnux_pass, timeout=5,
+        )
+        if rc != 0:
+            return
+
+        completed = []
+        for sha256 in pending:
+            remote_result = f"{self.cfg.remnux_results}/{sha256}.json"
+            rc, stdout, _ = self._ssh_cmd(
+                self.cfg.remnux_host, self.cfg.remnux_port, self.cfg.remnux_user,
+                f"cat {remote_result} 2>/dev/null",
+                password=self._remnux_pass, timeout=15,
+            )
+            if rc == 0 and stdout.strip():
+                try:
+                    results = json.loads(stdout)
+                except json.JSONDecodeError:
+                    continue
+
+                self.logger.info("CATCH-UP: Results ready for %s!", sha256[:16])
+
+                # Check if still analyzing (LLM might still be running)
+                rc_ps, ps_out, _ = self._ssh_cmd(
+                    self.cfg.remnux_host, self.cfg.remnux_port, self.cfg.remnux_user,
+                    f"ps aux | grep 'analyze_sample.*{sha256[:16]}' | grep -v grep",
+                    password=self._remnux_pass, timeout=5,
+                )
+                if rc_ps == 0 and ps_out.strip():
+                    self.logger.info("  LLM still working on %s — waiting for completion", sha256[:16])
+                    continue
+
+                metadata = {
+                    "honeypot": "cowrie",
+                    "src_ip": "",
+                    "country": "",
+                    "session_id": f"catchup-{sha256[:8]}",
+                    "captured_at": results.get("analyzed_at", ""),
+                }
+
+                # VT lookup
+                vt = self.vt_lookup(sha256)
+                if vt:
+                    results["virustotal"] = vt
+
+                # MISP
+                misp_iocs = self.misp_check_iocs(results)
+                if misp_iocs:
+                    results["misp"] = misp_iocs
+                self.misp_create_event(results, metadata)
+
+                # Index
+                self.index_results(sha256, results, metadata)
+
+                # Similarity
+                similar = self.find_similar_samples(results)
+                if similar:
+                    results["similar_samples"] = similar
+
+                # PDF
+                try:
+                    from generate_report import generate_report as gen_pdf, build_styles
+                    report_dir = Path("/home/legs/reports")
+                    report_dir.mkdir(parents=True, exist_ok=True)
+                    gen_pdf(results, report_dir / f"{sha256[:16]}_report.pdf", build_styles())
+                except Exception:
+                    pass
+
+                # Sigma
+                try:
+                    from generate_sigma_rules import generate_sigma_rules, save_rules
+                    sigma_rules = generate_sigma_rules(results)
+                    if sigma_rules:
+                        save_rules(sigma_rules, sha256)
+                except Exception:
+                    pass
+
+                # Discord
+                self.fire_discord_alert(results, metadata)
+
+                completed.append(sha256)
+                self.known_hashes.add(sha256)
+                self.logger.info("CATCH-UP complete for %s", sha256[:16])
+
+        # Remove completed from pending
+        if completed:
+            remaining = [s for s in pending if s not in completed]
+            with open(pending_file, "w") as f:
+                json.dump(remaining, f)
+            self.logger.info("Catch-up: %d completed, %d still pending", len(completed), len(remaining))
 
     # -- Sample similarity ------------------------------------------------
 
@@ -1917,6 +2061,7 @@ class SampleAnalyzer:
                     consecutive_errors = 0
 
                 self.cleanup_old_samples()
+                self.check_pending_results()
                 self.save_state()
 
             except Exception as e:
