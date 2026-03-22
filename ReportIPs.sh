@@ -11,12 +11,7 @@ touch $REPORTED_FILE
 curl -s "$ES_URL/$INDEX/_search" -H 'Content-Type: application/json' -d '{
   "size": 0,
   "query": {
-    "bool": {
-      "must": [
-        {"term": {"honeypot.eventid": "cowrie.login.success"}},
-        {"range": {"@timestamp": {"gte": "now-24h"}}}
-      ]
-    }
+    "term": {"honeypot.eventid": "cowrie.login.success"}
   },
   "aggs": {
     "unique_ips": {
