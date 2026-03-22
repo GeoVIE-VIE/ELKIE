@@ -66,6 +66,22 @@ fi
 echo "Analyzing: $SHA256 (${FILE_SIZE} bytes)"
 
 # ---------------------------------------------------------------------------
+# Unpack (UPX, etc.) before analysis to reveal hidden strings/code
+# ---------------------------------------------------------------------------
+
+UNPACKED=false
+if command -v upx &>/dev/null; then
+    cp "$SAMPLE" "${SAMPLE}.packed"
+    if timeout 30 upx -d "$SAMPLE" 2>/dev/null; then
+        echo "UPX unpacked successfully — analyzing unpacked binary"
+        UNPACKED=true
+    else
+        mv "${SAMPLE}.packed" "$SAMPLE"
+    fi
+    rm -f "${SAMPLE}.packed"
+fi
+
+# ---------------------------------------------------------------------------
 # File type
 # ---------------------------------------------------------------------------
 
