@@ -43,6 +43,8 @@ reports/
 soc-portal/img/
 soc-portal/index.html
 grafana-dashboard.json
+traffic_noise.py
+search_queries.py
 
 # Logs
 *.log

@@ -45,7 +45,6 @@ A full-stack security operations platform running on a Dell R640 (96 cores, 128G
    │                            │         │  │ • Cowrie Sentinel        │  │
    │                            │         │  │ • ML Sentinel            │  │
    │                            │         │  │ • Outlook Sentinel       │  │
-   │                            │         │  │ • Traffic Noise Gen      │  │
    │                            │         │  │ • Honeytoken Monitor     │  │
    │                            │         │  └──────────────────────────┘  │
    │                            │         │                                │
@@ -154,7 +153,6 @@ All sentinels follow the same pattern: dataclass Config, argparse CLI, RotatingF
 | `cowrie_sentinel.py` | Cowrie session reconstruction, behavioral scoring, IOC extraction |
 | `ml_sentinel.py` | Isolation Forest anomaly detection across honeypot + sacrificial VM |
 | `outlook_sentinel.py` | Email threat analysis via Microsoft Graph API |
-| `traffic_noise.py` | Privacy traffic generator (548K+ search queries across general + adult categories) |
 | `honeytoken_monitor.py` | Canary file access detection on sacrificial VM |
 
 ### REMnux Static Analysis (`analyze_sample.sh`)
@@ -188,7 +186,7 @@ Bash script deployed to REMnux VM:
 | `generate_sigma_rules.py` | Auto-generates Sigma detection rules |
 | `generate_attack_navigator.py` | MITRE ATT&CK Navigator heatmap |
 | `ReportIPs.sh` | Reports attacker IPs to AbuseIPDB (cron, every 6h) |
-| `search_queries.py` | 548K+ template-based search query generation for traffic noise |
+
 | `shodan_recon.py` | Country infrastructure recon with Shodan API |
 
 ## Elasticsearch Indices
@@ -198,7 +196,6 @@ Bash script deployed to REMnux VM:
 | `.ds-filebeat-8.19.9-*` | 30 days (ILM) | Honeypot raw events + sacrificial VM auth/auditd |
 | `.ds-suricata-*` | 14 days (ILM) | Suricata IDS alerts (46M+ events) |
 | `malware-analysis` | Forever | Analyzed malware samples with full results |
-| `traffic-noise` | 30 days | Privacy traffic generator logs |
 
 ## Grafana Dashboards
 
@@ -214,10 +211,7 @@ Bash script deployed to REMnux VM:
 - **Sacrificial VM — Auditd** — Process activity, executables, network connections
 
 ### Home Network Monitor (local only — not tracked in git)
-Suricata IDS monitoring with device IP filter, event type filtering, and honeypot subnet isolation. Includes:
-- **Adult Content Monitoring** — NSFW activity tracking via TLS SNI: total requests, unique devices/sites, timeline by device, top sites visited, device-to-site breakdown with MAC addresses
-- **Network Overview** — Events, flows, DNS queries, HTTP/TLS traffic
-- **Security Alerts** — Suricata IDS alerts by severity and signature
+Suricata IDS monitoring with device IP filter, event type filtering, network overview, DNS/HTTP/TLS traffic analysis, and security alerts.
 
 ## SOC Portal
 
