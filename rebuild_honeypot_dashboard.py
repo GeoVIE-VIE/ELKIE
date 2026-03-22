@@ -111,19 +111,9 @@ P.append(multi_table("Attackers — IP / Honeypot / Country", HP,
     f"{EXT} AND {ACTIVE}",
     [("src_ip", "20"), ("container.name", "5"), ("source.geo.country_name", "3")]))
 
-# ===== COWRIE =====
-P.append(row("Cowrie SSH — Port 22"))
-P.append(tt("Top Passwords", HP, "honeypot.password:*", "honeypot.password", 0, 8))
-P.append(tt("Top Usernames", HP, "honeypot.username:*", "honeypot.username", 8, 8))
-P.append(pie("Login Outcome", HP, "honeypot.eventid:cowrie.login.*", "honeypot.eventid", 16, 8))
-
-P.append(tt("Top Commands", HP, "honeypot.eventid:cowrie.command.input", "honeypot.input", 0, 12))
-P.append(tt("SSH Client Versions", HP, "honeypot.eventid:cowrie.client.version", "honeypot.version", 12, 12))
-
-# Successful logins: IP → Username → Password
-P.append(multi_table("Successful Logins — IP / User / Password", HP,
-    "honeypot.eventid:cowrie.login.success",
-    [("src_ip", "20"), ("honeypot.username", "3"), ("honeypot.password", "3")]))
+# ===== COWRIE (sacrificial VM PAM auth on 192.168.40.99) =====
+# NOTE: old Cowrie container section removed — all SSH goes to sacrificial VM now
+# PAM auth panels are in the section below
 
 # Commands: IP → Command
 P.append(multi_table("Commands Executed — IP / Command", HP,
@@ -194,49 +184,50 @@ P.append(multi_table("Extracted Samples — Hash / Type / Class / Source", MA,
 
 P.append(ts("Extraction Timeline", MA, "*", h=5))
 
-# ===== SACRIFICIAL VM — PAM HONEYPOT =====
-P.append(row("Sacrificial VM — SSH Honeypot"))
+# ===== COWRIE SSH (Sacrificial VM PAM Auth) =====
+P.append(row("Cowrie SSH — Port 22"))
 SV = "log_type:honeypot_auth"
 ny(4)
-P.append(stat("Total Auth Attempts", VM, SV, 0))
-P.append(stat("Successful Logins", VM, f"{SV} AND auth_success:true", 4))
-P.append(stat("Failed Attempts", VM, f"{SV} AND auth_success:false", 8))
-P.append(stat("Unique IPs", VM, SV, 12, mt="cardinality", f="src_ip.keyword"))
-P.append(stat("Unique Usernames", VM, SV, 16, mt="cardinality", f="username.keyword"))
-P.append(stat("Unique Passwords", VM, SV, 20, mt="cardinality", f="password.keyword"))
+P.append(stat("Total Auth Attempts", HP, SV, 0))
+P.append(stat("Successful Logins", HP, f"{SV} AND auth_success:true", 4))
+P.append(stat("Failed Attempts", HP, f"{SV} AND auth_success:false", 8))
+P.append(stat("Unique IPs", HP, SV, 12, mt="cardinality", f="src_ip"))
+P.append(stat("Unique Usernames", HP, SV, 16, mt="cardinality", f="username"))
+P.append(stat("Unique Passwords", HP, SV, 20, mt="cardinality", f="password"))
 
-P.append(ts("Auth Attempts Over Time", VM, SV, split="auth_success", h=6))
+P.append(ts("Auth Attempts Over Time", HP, SV, split="auth_success", h=6))
 
-P.append(tt("Top Source IPs", VM, SV, "src_ip.keyword", 0, 8))
-P.append(tt("Top Usernames", VM, SV, "username.keyword", 8, 8))
-P.append(tt("Top Passwords", VM, SV, "password.keyword", 16, 8))
+P.append(tt("Top Source IPs", HP, SV, "src_ip", 0, 8))
+P.append(tt("Top Usernames", HP, SV, "username", 8, 8))
+P.append(tt("Top Passwords", HP, SV, "password", 16, 8))
 
-P.append(pie("Auth Reasons", VM, SV, "auth_reason.keyword", 0, 8))
-P.append(tt("Successful Logins by IP", VM, f"{SV} AND auth_success:true", "src_ip.keyword", 8, 8))
-P.append(tt("Successful Credentials", VM, f"{SV} AND auth_success:true", "username.keyword", 16, 8))
+P.append(pie("Auth Reasons", HP, SV, "auth_reason", 0, 8))
+P.append(tt("Successful Logins by IP", HP, f"{SV} AND auth_success:true", "src_ip", 8, 8))
+P.append(tt("Successful Credentials", HP, f"{SV} AND auth_success:true", "username", 16, 8))
 
-P.append(logs("Recent Auth Log", VM, SV, h=8))
+P.append(logs("Recent Auth Log", HP, SV, h=8))
 
 # ===== SACRIFICIAL VM — AUDITD =====
+AQ = "service.type:auditd AND agent.name:prodction1"
 P.append(row("Sacrificial VM — Auditd"))
 ny(4)
-P.append(stat("Auditd Events", VM, "service.type:auditd", 0))
-P.append(stat("execve", VM, "event.action.keyword:execve", 4))
-P.append(stat("Auth Events", VM, "event.category.keyword:authentication", 8))
-P.append(stat("Sessions", VM, "event.category.keyword:session", 12))
-P.append(stat("Network", VM, "event.action.keyword:sockaddr", 16))
-P.append(stat("Unique Binaries", VM, "event.action.keyword:execve", 20, mt="cardinality", f="process.executable.keyword"))
+P.append(stat("Auditd Events", HP, AQ, 0))
+P.append(stat("execve", HP, f"{AQ} AND event.action:execve", 4))
+P.append(stat("Auth Events", HP, f"{AQ} AND event.category:authentication", 8))
+P.append(stat("Sessions", HP, f"{AQ} AND event.category:session", 12))
+P.append(stat("Network", HP, f"{AQ} AND event.action:sockaddr", 16))
+P.append(stat("Unique Binaries", HP, f"{AQ} AND event.action:execve", 20, mt="cardinality", f="process.executable"))
 
-P.append(ts("Process Activity", VM, "event.action.keyword:execve", split="process.name.keyword", h=6))
+P.append(ts("Process Activity", HP, f"{AQ} AND event.action:execve", split="process.name", h=6))
 
-P.append(tt("Top Executables", VM, "event.action.keyword:execve", "process.executable.keyword", 0, 12))
-P.append(tt("Top Processes", VM, "event.action.keyword:execve", "process.name.keyword", 12, 12))
+P.append(tt("Top Executables", HP, f"{AQ} AND event.action:execve", "process.executable", 0, 12))
+P.append(tt("Top Processes", HP, f"{AQ} AND event.action:execve", "process.name", 12, 12))
 
-P.append(tt("Network by Process", VM, "event.action.keyword:sockaddr", "process.name.keyword", 0, 8))
-P.append(pie("Audit Keys", VM, "auditd.log.key:*", "auditd.log.key.keyword", 8, 8))
-P.append(tt("Auth Users", VM, "event.category.keyword:authentication", "user.name.keyword", 16, 8))
+P.append(tt("Network by Process", HP, f"{AQ} AND event.action:sockaddr", "process.name", 0, 8))
+P.append(pie("Audit Keys", HP, f"{AQ} AND auditd.log.key:*", "auditd.log.key", 8, 8))
+P.append(tt("Auth Users", HP, f"{AQ} AND event.category:authentication", "user.name", 16, 8))
 
-P.append(ts("Auth Timeline", VM, "event.category.keyword:authentication", h=5))
+P.append(ts("Auth Timeline", HP, f"{AQ} AND event.category:authentication", h=5))
 
 # ===== DEPLOY =====
 r = requests.post(f"{BASE}/api/dashboards/db", headers=H, json={

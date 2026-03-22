@@ -33,7 +33,7 @@ STATE_FILE = "/var/lib/honeypot/auth_state.json"
 LOG_FILE = "/var/log/honeypot/auth.json"
 CRED_FILE = "/etc/honeypot/credentials.conf"
 MIN_FAILURES = 3       # Minimum failed attempts before allowing success
-MAX_FAILURES = 100     # Maximum failures before allowing (randomized between min-max)
+MAX_FAILURES = 20      # Maximum failures before allowing (randomized between min-max)
 STATE_EXPIRY = 604800  # Forget IP state after 7 days
 
 # --- Default credentials if config file missing ---
@@ -97,6 +97,7 @@ def save_state(state):
 def log_attempt(ip, username, password, success, reason):
     """Log auth attempt as JSON for Filebeat."""
     Path(LOG_FILE).parent.mkdir(parents=True, exist_ok=True)
+    eventid = "cowrie.login.success" if success else "cowrie.login.failed"
     entry = {
         "@timestamp": datetime.now(timezone.utc).isoformat(),
         "honeypot_event": "ssh_auth",
@@ -105,6 +106,12 @@ def log_attempt(ip, username, password, success, reason):
         "password": password,
         "auth_success": success,
         "auth_reason": reason,
+        "container": {"name": "cowrie"},
+        "honeypot": {
+            "eventid": eventid,
+            "username": username,
+            "password": password,
+        },
     }
     try:
         with open(LOG_FILE, "a") as f:

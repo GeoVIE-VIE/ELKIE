@@ -1,24 +1,32 @@
 #!/bin/bash
 # Report attacker IPs to AbuseIPDB with enriched intel from honeypot data
+source /home/legs/.sample_analyzer_env 2>/dev/null
 API_KEY="${ABUSEIPDB_API_KEY:-}"
 REPORTED_FILE="/home/legs/reported_ips.txt"
 ES_URL="http://localhost:9200"
-INDEX=".ds-filebeat-8.19.8-*"
+INDEX="filebeat-*"
 
 touch $REPORTED_FILE
 
-# Get successful logins from last 24h (avoid re-reporting old ones)
-curl -s "$ES_URL/$INDEX/_search" -H 'Content-Type: application/json' -d '{
-  "size": 0,
-  "query": {
-    "term": {"honeypot.eventid": "cowrie.login.success"}
-  },
-  "aggs": {
-    "unique_ips": {
-      "terms": {"field": "src_ip", "size": 500}
-    }
-  }
-}' | jq -r '.aggregations.unique_ips.buckets[].key' | sort -u | while read IP; do
+# Get successful logins from both Cowrie container events AND PAM auth events
+{
+  # Old Cowrie container logins
+  curl -s "$ES_URL/$INDEX/_search" -H 'Content-Type: application/json' -d '{
+    "size": 0,
+    "query": {"term": {"honeypot.eventid": "cowrie.login.success"}},
+    "aggs": {"unique_ips": {"terms": {"field": "src_ip", "size": 1000}}}
+  }' | jq -r '.aggregations.unique_ips.buckets[].key' 2>/dev/null
+
+  # New PAM auth successes on sacrificial VM
+  curl -s "$ES_URL/$INDEX/_search" -H 'Content-Type: application/json' -d '{
+    "size": 0,
+    "query": {"bool": {"must": [
+      {"term": {"honeypot_event": "ssh_auth"}},
+      {"term": {"auth_success": true}}
+    ]}},
+    "aggs": {"unique_ips": {"terms": {"field": "src_ip", "size": 1000}}}
+  }' | jq -r '.aggregations.unique_ips.buckets[].key' 2>/dev/null
+} | sort -u | while read IP; do
 
   [[ -z "$IP" ]] && continue
   grep -q "$IP" $REPORTED_FILE && continue
