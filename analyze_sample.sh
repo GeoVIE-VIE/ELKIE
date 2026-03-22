@@ -70,16 +70,21 @@ echo "Analyzing: $SHA256 (${FILE_SIZE} bytes)"
 # ---------------------------------------------------------------------------
 
 UNPACKED=false
-if command -v upx &>/dev/null; then
-    cp "$SAMPLE" "${SAMPLE}.packed"
-    if timeout 30 upx -d "$SAMPLE" 2>/dev/null; then
-        echo "UPX unpacked successfully — analyzing unpacked binary"
-        UNPACKED=true
-    else
-        mv "${SAMPLE}.packed" "$SAMPLE"
+# Try multiple UPX versions (newest first) to handle all packer versions
+for UPX_BIN in upx5 upx; do
+    if command -v "$UPX_BIN" &>/dev/null; then
+        cp "$SAMPLE" "${SAMPLE}.packed"
+        if timeout 30 "$UPX_BIN" -d "$SAMPLE" 2>/dev/null; then
+            echo "Unpacked with $UPX_BIN — analyzing unpacked binary"
+            UNPACKED=true
+            rm -f "${SAMPLE}.packed"
+            break
+        else
+            mv "${SAMPLE}.packed" "$SAMPLE"
+        fi
+        rm -f "${SAMPLE}.packed"
     fi
-    rm -f "${SAMPLE}.packed"
-fi
+done
 
 # ---------------------------------------------------------------------------
 # File type
