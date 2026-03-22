@@ -109,6 +109,7 @@ A full-stack security operations platform running on a Dell R640 (96 cores, 128G
 ### Network Security Model
 
 - **ELK (trusted net)** initiates all connections — honeypot subnet never connects back
+- **Elasticsearch isolation** — honeypot subnet has no access to ES :9200. Logs ship through an nginx ingest-only proxy on :5044 that allows `POST`/`PUT` (writes) and blocks all reads (`_search`, `_cat`, `_cluster`). Even with shell access on a honeypot, attackers cannot query logs or map the internal network
 - **Sacrificial VM** accessed only via T-Pot jump host (`ssh -J`)
 - **REMnux** auto-started/stopped via Proxmox API — only runs during analysis
 - **Sandbox** snapshot restored after every detonation
