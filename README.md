@@ -9,86 +9,101 @@ A full-stack security operations platform running on a Dell R640 (96 cores, 128G
        │
        │ Port 22 (NAT)
        ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                    pfSense (192.168.0.1)                           │
-│              Gateway / Firewall / NAT / NTP                        │
-└────┬──────────────┬──────────────┬──────────────┬───────────────────┘
-     │              │              │              │
-  VLAN 0         VLAN 2        VLAN 40         VLAN 50
-  LAN             Kali      Honeypot Net     Trusted Net
-192.168.0.0/24  192.168.2.0  192.168.40.0/24  192.168.50.0/24
-     │              │              │              │
-     │         ┌────▼────┐        │         ┌────▼──────────────────────────┐
-     │         │  Kali   │        │         │    ELK Stack (192.168.50.3)   │
-     │         │  .2.160 │        │         │                               │
-     │         │ Shodan  │        │         │  Elasticsearch + Kibana       │
-     │         │ Recon   │        │         │  Grafana (78-panel dashboard) │
-     │         └─────────┘        │         │                               │
-     │                            │         │  ┌─────────────────────────┐  │
-     │                            │         │  │   Sentinel Daemons      │  │
-     │                            │         │  │ • Sample Analyzer       │  │
-     │                            │         │  │ • Cowrie Sentinel       │  │
-     │                            │         │  │ • ML Sentinel           │  │
-     │                            │         │  │ • Outlook Sentinel      │  │
-     │                            │         │  │ • Traffic Noise Gen     │  │
-     │                            │         │  │ • Honeytoken Monitor    │  │
-     │                            │         │  └─────────────────────────┘  │
-     │                            │         │                               │
-     │                            │         │  ┌─────────────────────────┐  │
-     │                            │         │  │ Docker Containers       │  │
-     │                            │         │  │ • MISP (Threat Intel)   │  │
-     │                            │         │  │ • OpenCTI (Graph Intel) │  │
-     │                            │         │  └─────────────────────────┘  │
-     │                            │         │                               │
-     │                            │         │  SOC Portal (:9090)           │
-     │                            │         │  PDF Reports (:9090/reports)  │
-     │                            │         └──────┬───────────────────────┘
-     │                            │                │
-     │                            │        SSH :64295 (key auth)
-     │                            │                │
-     │                       ┌────▼────────────────▼──────────┐
-     │                       │       T-Pot (192.168.40.3)      │
-     │                       │                                  │
-     │                       │  Cowrie (SSH :22, shell mode)    │
-     │                       │  Dionaea (FTP :21, MySQL :3306)  │
-     │                       │  Tanner/Snare (HTTP :80)         │
-     │                       │  H0neytr4p (HTTPS :443)          │
-     │                       │  + 15 more honeypots             │
-     │                       │                                  │
-     │                       │  Jump host for sacrificial VM    │
-     │                       └────────┬───────────┬─────────────┘
-     │                                │           │
-     │                         SSH :22│    SSH :22│
-     │                                │           │
-     │              ┌─────────────────▼┐   ┌──────▼──────────┐
-     │              │  Sacrificial VM   │   │    REMnux       │
-     │              │  192.168.40.99    │   │  192.168.40.5   │
-     │              │                   │   │                 │
-     │              │  Custom PAM Auth  │   │  YARA, capa     │
-     │              │  Per-IP brute sim │   │  floss, strings │
-     │              │  3-100 failures   │   │  UPX 5.0 unpack │
-     │              │  7-day IP memory  │   │  Ghidra (deep)  │
-     │              │                   │   │  Auto start/stop│
-     │              │  20 fake users    │   │  via Proxmox API│
-     │              │  Crypto wallets   │   └─────────────────┘
-     │              │  AWS/K8s creds    │
-     │              │  Jenkins configs  │   ┌─────────────────┐
-     │              │  Webapp .env      │   │    Sandbox      │
-     │              │                   │   │  192.168.40.6   │
-     │              │  Filebeat → ES    │   │                 │
-     │              │  Auditd logging   │   │  Detonation VM  │
-     │              └───────────────────┘   │  90s execution  │
-     │                                      │  pcap + auditd  │
-     │                                      │  Auto-restore   │
-     │         Proxmox (192.168.99.160)     │  via Proxmox API│
-     │         VM lifecycle management      └─────────────────┘
-     │
-  ┌──▼──────────────────────┐
-  │   Home Network Devices   │
-  │  TrueNAS, IoT, phones,  │
-  │  cameras, smart bulbs    │
-  │  Suricata IDS monitoring │
-  └──────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────────────┐
+│                           pfSense (192.168.0.1)                               │
+│                     Gateway / Firewall / NAT / NTP                            │
+└──┬──────────────┬──────────────┬──────────────┬──────────────┬────────────────┘
+   │              │              │              │              │
+ VLAN 0        VLAN 2        VLAN 40        VLAN 50        VLAN 99
+  LAN           Kali       Honeypot Net   Trusted Net     Mgmt Net
+192.168.0.x   192.168.2.x  192.168.40.x   192.168.50.x   192.168.99.x
+   │              │              │              │              │
+   │         ┌────▼────┐        │              │         ┌────▼─────────────┐
+   │         │  Kali   │        │              │         │    Proxmox       │
+   │         │  .2.160 │        │              │         │  192.168.99.160  │
+   │         │ Shodan  │        │              │         │                  │
+   │         │ Recon   │        │              │         │  Dell R640       │
+   │         └─────────┘        │              │         │  96 cores        │
+   │                            │              │         │  128GB RAM       │
+   │                            │              │         │                  │
+   │                            │              │         │  VM lifecycle    │
+   │                            │              │         │  API :8006       │
+   │                            │              │         │  Snapshots       │
+   │                            │              │         │  Auto start/stop │
+   │                            │              │         └──────────────────┘
+   │                            │              │                 ▲
+   │                            │              │                 │ API :8006
+   │                            │         ┌────▼─────────────────┴─────────┐
+   │                            │         │    ELK Stack (192.168.50.3)    │
+   │                            │         │                                │
+   │                            │         │  Elasticsearch + Kibana        │
+   │                            │         │  Grafana (78-panel dashboard)  │
+   │                            │         │                                │
+   │                            │         │  ┌──────────────────────────┐  │
+   │                            │         │  │   Sentinel Daemons       │  │
+   │                            │         │  │ • Sample Analyzer        │  │
+   │                            │         │  │ • Cowrie Sentinel        │  │
+   │                            │         │  │ • ML Sentinel            │  │
+   │                            │         │  │ • Outlook Sentinel       │  │
+   │                            │         │  │ • Traffic Noise Gen      │  │
+   │                            │         │  │ • Honeytoken Monitor     │  │
+   │                            │         │  └──────────────────────────┘  │
+   │                            │         │                                │
+   │                            │         │  ┌──────────────────────────┐  │
+   │                            │         │  │ Docker Containers        │  │
+   │                            │         │  │ • MISP (Threat Intel)    │  │
+   │                            │         │  │ • OpenCTI (Graph Intel)  │  │
+   │                            │         │  └──────────────────────────┘  │
+   │                            │         │                                │
+   │                            │         │  SOC Portal (:9090)            │
+   │                            │         │  PDF Reports (:9090/reports)   │
+   │                            │         └──────┬─────────────────────────┘
+   │                            │                │
+   │                            │        SSH :64295 (key auth)
+   │                            │                │
+   │                       ┌────▼────────────────▼──────────┐
+   │                       │       T-Pot (192.168.40.3)      │
+   │                       │                                  │
+   │                       │  Cowrie (SSH :22, shell mode)    │
+   │                       │  Dionaea (FTP :21, MySQL :3306)  │
+   │                       │  Tanner/Snare (HTTP :80)         │
+   │                       │  H0neytr4p (HTTPS :443)          │
+   │                       │  + 15 more honeypots             │
+   │                       │                                  │
+   │                       │  Jump host for sacrificial VM    │
+   │                       └────────┬───────────┬─────────────┘
+   │                                │           │
+   │                         SSH :22│    SSH :22│
+   │                                │           │
+   │              ┌─────────────────▼┐   ┌──────▼──────────┐
+   │              │  Sacrificial VM   │   │    REMnux       │
+   │              │  192.168.40.99    │   │  192.168.40.5   │
+   │              │                   │   │                 │
+   │              │  Custom PAM Auth  │   │  YARA, capa     │
+   │              │  Per-IP brute sim │   │  floss, strings │
+   │              │  3-100 failures   │   │  UPX 5.0 unpack │
+   │              │  7-day IP memory  │   │  Ghidra (deep)  │
+   │              │                   │   │  Auto start/stop│
+   │              │  20 fake users    │   │  via Proxmox API│
+   │              │  Crypto wallets   │   └─────────────────┘
+   │              │  AWS/K8s creds    │
+   │              │  Jenkins configs  │   ┌─────────────────┐
+   │              │  Webapp .env      │   │    Sandbox      │
+   │              │                   │   │  192.168.40.6   │
+   │              │  Filebeat → ES    │   │                 │
+   │              │  Auditd logging   │   │  Detonation VM  │
+   │              └───────────────────┘   │  90s execution  │
+   │                                      │  pcap + auditd  │
+   │                                      │  Auto-restore   │
+   │                                      │  via Proxmox API│
+   │                                      └─────────────────┘
+   │
+┌──▼──────────────────────┐
+│   Home Network Devices   │
+│  TrueNAS, IoT, phones,  │
+│  cameras, smart bulbs    │
+│  Suricata IDS monitoring │
+└──────────────────────────┘
 ```
 
 ### Network Security Model
