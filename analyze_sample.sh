@@ -74,12 +74,15 @@ UNPACKED=false
 for UPX_BIN in upx5 upx; do
     if command -v "$UPX_BIN" &>/dev/null; then
         cp "$SAMPLE" "${SAMPLE}.packed"
-        if timeout 30 "$UPX_BIN" -d "$SAMPLE" 2>/dev/null; then
-            echo "Unpacked with $UPX_BIN — analyzing unpacked binary"
+        UPX_OUTPUT=$("$UPX_BIN" -d "$SAMPLE" 2>&1)
+        if [ $? -eq 0 ]; then
+            NEW_SIZE=$(stat -c%s "$SAMPLE" 2>/dev/null)
+            echo "Unpacked with $UPX_BIN: ${FILE_SIZE} → ${NEW_SIZE} bytes"
             UNPACKED=true
             rm -f "${SAMPLE}.packed"
             break
         else
+            echo "UPX unpack failed with $UPX_BIN: $UPX_OUTPUT"
             mv "${SAMPLE}.packed" "$SAMPLE"
         fi
         rm -f "${SAMPLE}.packed"
@@ -104,9 +107,9 @@ echo "$FILE_TYPE" | grep -qi "ELF" && IS_ELF=true
 
 INTERESTING_STRINGS="[]"
 if command -v strings &>/dev/null; then
-    INTERESTING_STRINGS=$(timeout 30 strings -n 6 "$SAMPLE" 2>/dev/null | \
-        grep -iE '(https?://|ftp://|[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+|\.onion|\.top|\.xyz|\.ru|\.cn|/tmp/|/dev/shm|/var/tmp|/bin/sh|/bin/bash|cmd\.exe|powershell|wget|curl|chmod|crontab|authorized_keys|shadow|passwd|stratum|pool\.|xmrig|monero|bitcoin|wallet|c2|beacon|bot|scan|exploit|payload|shell|bind|reverse|connect|socket|download|upload|encrypt|decrypt|ransom|lock|crypto|base64|eval|exec)' | \
-        head -100 | sort -u | json_array_from_lines) || INTERESTING_STRINGS="[]"
+    INTERESTING_STRINGS=$(timeout 60 strings -n 6 "$SAMPLE" 2>/dev/null | \
+        grep -iE '(https?://|ftp://|[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+|\.onion|\.top|\.xyz|\.ru|\.cn|\.com|\.net|\.org|/tmp/|/dev/shm|/var/tmp|/bin/sh|/bin/bash|cmd\.exe|powershell|wget|curl|chmod|crontab|authorized_keys|shadow|passwd|stratum|pool\.|xmrig|monero|bitcoin|wallet|c2|beacon|bot|scan|exploit|payload|shell|bind|reverse|connect|socket|download|upload|encrypt|decrypt|ransom|lock|crypto|base64|eval|exec|nicehash|donate|mining|miner|redtail|mirai|gafgyt|tsunami)' | \
+        head -200 | sort -u | json_array_from_lines) || INTERESTING_STRINGS="[]"
 fi
 
 # ---------------------------------------------------------------------------
