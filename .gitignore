@@ -41,6 +41,8 @@ projects/.env*
 Documents/passwords.txt
 reports/
 soc-portal/img/
+soc-portal/index.html
+grafana-dashboard.json
 
 # Logs
 *.log
