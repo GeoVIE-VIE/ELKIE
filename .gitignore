@@ -46,6 +46,13 @@ soc-portal/img/
 *.log
 cowrie_sentinel.log
 
+# State/temp files
+.deep_analysis_today.json
+.pending_analysis.json
+.wget-hsts
+new1.txt
+*.deb
+
 # Data/temp
 elk/esdata/
 sentinel_alerts/

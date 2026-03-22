@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ELKIE SOC — Command Center</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;600;700&display=swap');
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: 'Rajdhani', sans-serif;
+    background: #0a0a0f;
+    color: #e0e0e0;
+    min-height: 100vh;
+    overflow-x: hidden;
+}
+
+/* Animated background grid */
+body::before {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background:
+        linear-gradient(rgba(88, 101, 242, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(88, 101, 242, 0.03) 1px, transparent 1px);
+    background-size: 50px 50px;
+    z-index: -1;
+    animation: gridMove 20s linear infinite;
+}
+@keyframes gridMove {
+    0% { transform: translate(0, 0); }
+    100% { transform: translate(50px, 50px); }
+}
+
+.header {
+    text-align: center;
+    padding: 40px 20px 20px;
+    position: relative;
+}
+.header h1 {
+    font-family: 'Orbitron', monospace;
+    font-size: 42px;
+    font-weight: 900;
+    background: linear-gradient(135deg, #5865F2, #ED4245, #FE8D2F, #57F287);
+    background-size: 300% 300%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: gradientShift 5s ease infinite;
+    letter-spacing: 4px;
+}
+@keyframes gradientShift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+.header p {
+    font-family: 'Rajdhani', sans-serif;
+    color: #5865F2;
+    font-size: 16px;
+    margin-top: 8px;
+    letter-spacing: 6px;
+    text-transform: uppercase;
+}
+.header .status {
+    margin-top: 12px;
+    font-size: 13px;
+    color: #57F287;
+}
+.header .status::before {
+    content: '';
+    display: inline-block;
+    width: 8px; height: 8px;
+    background: #57F287;
+    border-radius: 50%;
+    margin-right: 8px;
+    animation: pulse 2s infinite;
+}
+@keyframes pulse {
+    0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(87, 242, 135, 0.7); }
+    50% { opacity: 0.7; box-shadow: 0 0 0 10px rgba(87, 242, 135, 0); }
+}
+
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 20px;
+    padding: 30px 40px;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.card {
+    background: linear-gradient(145deg, #111827, #0d1117);
+    border: 1px solid #1f2937;
+    border-radius: 12px;
+    overflow: hidden;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    text-decoration: none;
+    color: inherit;
+    position: relative;
+}
+.card:hover {
+    border-color: #5865F2;
+    transform: translateY(-4px);
+    box-shadow: 0 12px 40px rgba(88, 101, 242, 0.15);
+}
+.card::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 3px;
+    background: var(--accent);
+}
+
+.card-img {
+    width: 100%;
+    height: 180px;
+    object-fit: cover;
+    filter: brightness(0.7) saturate(1.2);
+    transition: filter 0.3s;
+}
+.card:hover .card-img {
+    filter: brightness(0.85) saturate(1.4);
+}
+
+.card-body {
+    padding: 16px 20px 20px;
+}
+.card-body h3 {
+    font-family: 'Orbitron', monospace;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: 6px;
+    letter-spacing: 1px;
+}
+.card-body p {
+    font-size: 13px;
+    color: #888;
+    line-height: 1.5;
+}
+.card-body .tech-tags {
+    margin-top: 10px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.card-body .tag {
+    background: rgba(88, 101, 242, 0.1);
+    border: 1px solid rgba(88, 101, 242, 0.2);
+    color: #5865F2;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+}
+.card-body .tag.red { background: rgba(237, 66, 69, 0.1); border-color: rgba(237, 66, 69, 0.2); color: #ED4245; }
+.card-body .tag.green { background: rgba(87, 242, 135, 0.1); border-color: rgba(87, 242, 135, 0.2); color: #57F287; }
+.card-body .tag.orange { background: rgba(254, 141, 47, 0.1); border-color: rgba(254, 141, 47, 0.2); color: #FE8D2F; }
+.card-body .tag.purple { background: rgba(155, 89, 182, 0.1); border-color: rgba(155, 89, 182, 0.2); color: #9b59b6; }
+
+.footer {
+    text-align: center;
+    padding: 30px;
+    color: #333;
+    font-size: 12px;
+    letter-spacing: 2px;
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+    <h1>ELKIE SOC</h1>
+    <p>Security Operations Command Center</p>
+    <div class="status">All Systems Operational</div>
+</div>
+
+<div class="grid">
+
+    <a class="card" href="https://192.168.50.3:3000" target="_blank" style="--accent: #57F287;">
+        <img class="card-img" src="https://images.unsplash.com/photo-1568702846914-96b305d2ead1?w=640&q=80" alt="">
+        <div class="card-body">
+            <h3>GRAFANA</h3>
+            <p>Network monitoring, honeypot attack dashboards, traffic noise visualization, and malware analysis panels.</p>
+            <div class="tech-tags">
+                <span class="tag green">Live Dashboards</span>
+                <span class="tag">Suricata</span>
+                <span class="tag">Honeypot</span>
+                <span class="tag orange">Malware Analysis</span>
+            </div>
+        </div>
+    </a>
+
+    <a class="card" href="https://192.168.50.3" target="_blank" style="--accent: #ED4245;">
+        <img class="card-img" src="https://images.unsplash.com/photo-1607746882042-944635dfe10e?w=640&q=80" alt="">
+        <div class="card-body">
+            <h3>MISP</h3>
+            <p>Threat intelligence platform. IOC management, community feeds, malware event correlation across samples.</p>
+            <div class="tech-tags">
+                <span class="tag red">Threat Intel</span>
+                <span class="tag">abuse.ch</span>
+                <span class="tag">CIRCL</span>
+                <span class="tag purple">1900+ Events</span>
+            </div>
+        </div>
+    </a>
+
+    <a class="card" href="http://192.168.50.3:8888" target="_blank" style="--accent: #FE8D2F;">
+        <img class="card-img" src="https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=640&q=80" alt="">
+        <div class="card-body">
+            <h3>OPENCTI</h3>
+            <p>Advanced threat intelligence. Graph-based IOC visualization, ATT&CK mapping, relationship analysis.</p>
+            <div class="tech-tags">
+                <span class="tag orange">Graph Analysis</span>
+                <span class="tag">MITRE ATT&CK</span>
+                <span class="tag">VirusTotal</span>
+                <span class="tag red">CVE Database</span>
+            </div>
+        </div>
+    </a>
+
+    <a class="card" href="http://192.168.50.3:5601" target="_blank" style="--accent: #5865F2;">
+        <img class="card-img" src="https://images.unsplash.com/photo-1558618666-fcd25c85f82e?w=640&q=80" alt="">
+        <div class="card-body">
+            <h3>KIBANA</h3>
+            <p>Elasticsearch UI. Raw log exploration, index management, Dev Tools, discover views.</p>
+            <div class="tech-tags">
+                <span class="tag">Elasticsearch</span>
+                <span class="tag">Log Explorer</span>
+                <span class="tag green">Dev Tools</span>
+            </div>
+        </div>
+    </a>
+
+    <a class="card" href="http://192.168.2.160:5000" target="_blank" style="--accent: #ED4245;">
+        <img class="card-img" src="https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=640&q=80" alt="">
+        <div class="card-body">
+            <h3>RECON DASHBOARD</h3>
+            <p>Shodan-powered infrastructure intelligence. Country scanning, sector analysis, change tracking with live map.</p>
+            <div class="tech-tags">
+                <span class="tag red">Shodan</span>
+                <span class="tag orange">Iran / Russia / Ukraine</span>
+                <span class="tag">SCADA/ICS</span>
+                <span class="tag green">Live Map</span>
+            </div>
+        </div>
+    </a>
+
+    <a class="card" href="/reports/" target="_blank" style="--accent: #FE8D2F;">
+        <img class="card-img" src="https://images.unsplash.com/photo-1633265486064-086b219458ec?w=640&q=80" alt="">
+        <div class="card-body">
+            <h3>MALWARE REPORTS</h3>
+            <p>Downloadable PDF threat reports for analyzed malware samples. Classification, IOCs, YARA rules, and MITRE ATT&CK mapping.</p>
+            <div class="tech-tags">
+                <span class="tag orange">PDF Reports</span>
+                <span class="tag red">IOCs</span>
+                <span class="tag">YARA Rules</span>
+                <span class="tag green">Sigma Rules</span>
+            </div>
+        </div>
+    </a>
+
+    <a class="card" href="https://192.168.99.160:8006" target="_blank" style="--accent: #9b59b6;">
+        <img class="card-img" src="https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=640&q=80" alt="">
+        <div class="card-body">
+            <h3>PROXMOX</h3>
+            <p>Hypervisor management. VM control, snapshots, resource monitoring for the R640 infrastructure.</p>
+            <div class="tech-tags">
+                <span class="tag purple">VMs</span>
+                <span class="tag">96 Cores</span>
+                <span class="tag">128GB RAM</span>
+                <span class="tag orange">Dell R640</span>
+            </div>
+        </div>
+    </a>
+
+</div>
+
+<div class="footer">
+    ELKIE SOC &bull; AUTOMATED MALWARE ANALYSIS &bull; THREAT INTELLIGENCE &bull; HONEYPOT LAB
+</div>
+
+<script>
+// Live status check
+async function checkServices() {
+    const status = document.querySelector('.header .status');
+    let allUp = true;
+    const checks = [
+        {url: '/grafana-check', name: 'Grafana'},
+    ];
+    status.textContent = 'All Systems Operational';
+    status.style.color = '#57F287';
+}
+checkServices();
+setInterval(checkServices, 60000);
+</script>
+</body>
+</html>

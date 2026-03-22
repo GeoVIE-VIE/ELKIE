@@ -71,6 +71,10 @@ class Config:
     sandbox_snapshot: str = "clean"
     sandbox_enabled: bool = True
     sandbox_timeout: int = 90          # detonation duration in seconds
+    # Sacrificial VM (via T-Pot jump host)
+    sacrificial_host: str = "192.168.40.99"
+    sacrificial_port: int = 22
+    sacrificial_user: str = "root"
     pve_api_url: str = "https://192.168.99.160:8006"
     pve_token_id: str = ""
     pve_token_secret: str = ""
@@ -292,6 +296,53 @@ class SampleAnalyzer:
                 pass
 
         return False
+
+    def _sacrificial_ssh_cmd(self, cmd: str, timeout: int = 60) -> tuple[int, str, str]:
+        """Execute command on sacrificial VM via T-Pot jump host."""
+        jump = f"{self.cfg.tpot_user}@{self.cfg.tpot_host}:{self.cfg.tpot_port}"
+        ssh_args = [
+            "ssh", "-o", "StrictHostKeyChecking=no",
+            "-o", "ConnectTimeout=15",
+            "-o", "BatchMode=yes",
+            "-J", jump,
+            "-p", str(self.cfg.sacrificial_port),
+            f"{self.cfg.sacrificial_user}@{self.cfg.sacrificial_host}",
+            cmd,
+        ]
+        try:
+            result = subprocess.run(ssh_args, capture_output=True, text=True, timeout=timeout)
+            return result.returncode, result.stdout, result.stderr
+        except subprocess.TimeoutExpired:
+            self.logger.warning("Sacrificial VM SSH timed out after %ds: %s", timeout, cmd[:80])
+            return -1, "", "timeout"
+        except Exception as e:
+            self.logger.error("Sacrificial VM SSH failed: %s", e)
+            return -1, "", str(e)
+
+    def _sacrificial_scp_from(self, remote_path: str, local_path: str, timeout: int = 120) -> bool:
+        """Copy file from sacrificial VM via T-Pot jump host (uses ssh+cat, SCP subsystem unavailable)."""
+        jump = f"{self.cfg.tpot_user}@{self.cfg.tpot_host}:{self.cfg.tpot_port}"
+        ssh_args = [
+            "ssh", "-o", "StrictHostKeyChecking=no",
+            "-o", "ConnectTimeout=15",
+            "-o", "BatchMode=yes",
+            "-J", jump,
+            "-p", str(self.cfg.sacrificial_port),
+            f"{self.cfg.sacrificial_user}@{self.cfg.sacrificial_host}",
+            f"cat {shlex.quote(remote_path)}",
+        ]
+        try:
+            with open(local_path, "wb") as f:
+                result = subprocess.run(ssh_args, stdout=f, stderr=subprocess.PIPE, timeout=timeout)
+            if result.returncode == 0:
+                return True
+            # Clean up empty file on failure
+            Path(local_path).unlink(missing_ok=True)
+            return False
+        except (subprocess.TimeoutExpired, Exception) as e:
+            self.logger.warning("Sacrificial VM SCP failed: %s", e)
+            Path(local_path).unlink(missing_ok=True)
+            return False
 
     # -- Elasticsearch helpers ---------------------------------------------
 
@@ -564,11 +615,10 @@ class SampleAnalyzer:
         return samples
 
     def _scan_sacrificial_vm(self) -> list[dict]:
-        """Scan sacrificial VM for files dropped by attackers in common locations."""
+        """Scan sacrificial VM for files dropped by attackers (via T-Pot jump host)."""
         samples = []
         scan_dirs = ["/tmp", "/dev/shm", "/var/tmp", "/root", "/home"]
-        rc, stdout, _ = self._ssh_cmd(
-            "192.168.40.99", 22, "root",
+        rc, stdout, _ = self._sacrificial_ssh_cmd(
             f"find {' '.join(scan_dirs)} -type f -mmin -60 "
             f"-not -name '*.log' -not -name '*.json' -not -name '.*' "
             f"-size +100c -size -50M "
@@ -580,8 +630,13 @@ class SampleAnalyzer:
                 parts = line.strip().split(maxsplit=1)
                 if len(parts) == 2 and len(parts[0]) == 64:
                     filepath = parts[1]
-                    # Skip system files
-                    if any(skip in filepath for skip in ['/proc/', '/sys/', '.bash_history', '.bashrc']):
+                    # Skip system/decoy files
+                    if any(skip in filepath for skip in [
+                        '/proc/', '/sys/', '.bash_history', '.bashrc', '.profile',
+                        '.ssh/', '.env', '.kube/', '.aws/', '.my.cnf', '.pgpass',
+                        '.bitcoin/', 'crypto-bot/', '.vault-token',
+                        '/opt/webapp/', '/opt/ansible/', '/var/lib/jenkins/',
+                    ]):
                         continue
                     samples.append({
                         "sha256": parts[0],
@@ -638,10 +693,9 @@ class SampleAnalyzer:
                     self.logger.info("Fetched sample %s from %s", sha256[:16], sample_dir)
                     return local_path
 
-        # Also check sacrificial VM
+        # Also check sacrificial VM (via T-Pot jump host)
         scan_dirs = "/tmp /dev/shm /var/tmp /root /home"
-        rc, stdout, _ = self._ssh_cmd(
-            "192.168.40.99", 22, "root",
+        rc, stdout, _ = self._sacrificial_ssh_cmd(
             f"find {scan_dirs} -type f -exec sha256sum {{}} \\; 2>/dev/null | grep '^{sha256}' | head -1",
             timeout=30,
         )
@@ -649,7 +703,7 @@ class SampleAnalyzer:
             parts = stdout.strip().split(maxsplit=1)
             if len(parts) == 2:
                 remote_path = parts[1]
-                ok = self._scp_from("192.168.40.99", 22, "root", "", remote_path, str(local_path))
+                ok = self._sacrificial_scp_from(remote_path, str(local_path))
                 if ok:
                     self.logger.info("Fetched sample %s from sacrificial VM", sha256[:16])
                     return local_path

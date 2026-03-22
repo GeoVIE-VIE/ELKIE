@@ -112,6 +112,7 @@ SyslogFacility AUTH
 SSHD
 
 # Configure Filebeat to ship honeypot auth logs
+mkdir -p /etc/filebeat/inputs.d
 cat > /etc/filebeat/inputs.d/honeypot-auth.yml << 'FB'
 - type: log
   enabled: true
@@ -125,7 +126,7 @@ cat > /etc/filebeat/inputs.d/honeypot-auth.yml << 'FB'
 FB
 
 # Restart services
-systemctl restart sshd
+systemctl restart ssh || systemctl restart sshd
 systemctl restart filebeat 2>/dev/null || true
 
 echo "=== Honeypot PAM Auth Setup Complete ==="

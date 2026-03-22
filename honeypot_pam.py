@@ -32,9 +32,9 @@ from pathlib import Path
 STATE_FILE = "/var/lib/honeypot/auth_state.json"
 LOG_FILE = "/var/log/honeypot/auth.json"
 CRED_FILE = "/etc/honeypot/credentials.conf"
-MIN_FAILURES = 2       # Minimum failed attempts before allowing success
-MAX_FAILURES = 5       # Maximum failures before allowing (randomized between min-max)
-STATE_EXPIRY = 86400   # Forget IP state after 24 hours
+MIN_FAILURES = 3       # Minimum failed attempts before allowing success
+MAX_FAILURES = 100     # Maximum failures before allowing (randomized between min-max)
+STATE_EXPIRY = 604800  # Forget IP state after 7 days
 
 # --- Default credentials if config file missing ---
 DEFAULT_CREDS = {
@@ -99,12 +99,12 @@ def log_attempt(ip, username, password, success, reason):
     Path(LOG_FILE).parent.mkdir(parents=True, exist_ok=True)
     entry = {
         "@timestamp": datetime.now(timezone.utc).isoformat(),
-        "event": "ssh_auth",
+        "honeypot_event": "ssh_auth",
         "src_ip": ip,
         "username": username,
         "password": password,
-        "success": success,
-        "reason": reason,
+        "auth_success": success,
+        "auth_reason": reason,
     }
     try:
         with open(LOG_FILE, "a") as f:
