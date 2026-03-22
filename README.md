@@ -10,9 +10,9 @@ A full-stack security operations platform running on a Dell R640 (96 cores, 128G
        │ Port 22 (NAT)
        ▼
 ┌────────────────────────────────────────────────────────────────────────────────┐
-│                           pfSense (192.168.0.1)                               │
-│                     Gateway / Firewall / NAT / NTP                            │
-└──┬──────────────┬──────────────┬──────────────┬──────────────┬────────────────┘
+│                           pfSense (192.168.0.1)                                │
+│                     Gateway / Firewall / NAT / NTP                             │
+└──┬──────────────┬──────────────┬──────────────┬──────────────┬─────────────────┘
    │              │              │              │              │
  VLAN 0        VLAN 2        VLAN 40        VLAN 50        VLAN 99
   LAN           Kali       Honeypot Net   Trusted Net     Mgmt Net
