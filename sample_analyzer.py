@@ -1058,11 +1058,22 @@ class SampleAnalyzer:
 
         self.logger.info("Running DEEP Ghidra decompilation for %s (score=%d)", sha256[:16], score)
 
-        # Run deep Ghidra script on REMnux
+        # Ensure sample is on REMnux
         remote_sample = f"{self.cfg.remnux_inbox}/{sha256}"
+        local_sample = STAGING_DIR / sha256
+        if local_sample.exists():
+            self._scp_to(
+                self.cfg.remnux_host, self.cfg.remnux_port, self.cfg.remnux_user,
+                self._remnux_pass, str(local_sample), remote_sample
+            )
+        # Also deploy the deep extract script
+        self._scp_to(
+            self.cfg.remnux_host, self.cfg.remnux_port, self.cfg.remnux_user,
+            self._remnux_pass, "/home/legs/ghidra_deep_extract.py", "/home/nalyzer/ghidra_deep_extract.py"
+        )
         rc, _, _ = self._ssh_cmd(
             self.cfg.remnux_host, self.cfg.remnux_port, self.cfg.remnux_user,
-            f"mkdir -p /tmp/ghidra_deep && rm -rf /tmp/ghidra_deep/sample_{sha256[:16]}* && "
+            f"mkdir -p /tmp/ghidra_deep; rm -rf /tmp/ghidra_deep/sample_{sha256[:16]}*; "
             f"SA_SHA256={sha256} timeout 300 /opt/ghidra/support/analyzeHeadless "
             f"/tmp/ghidra_deep sample_{sha256[:16]} "
             f"-import {remote_sample} "

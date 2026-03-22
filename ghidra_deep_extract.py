@@ -1,4 +1,5 @@
-# Ghidra headless postscript — DEEP extraction with decompiled C code
+# -*- coding: utf-8 -*-
+# Ghidra headless postscript -- DEEP extraction with decompiled C code
 # Run via: analyzeHeadless ... -postscript ghidra_deep_extract.py
 #
 # Decompiles top 20 functions by size and outputs readable C code.
