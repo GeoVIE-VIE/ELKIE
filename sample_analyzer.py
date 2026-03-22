@@ -462,6 +462,9 @@ class SampleAnalyzer:
         if now - self.last_dir_scan > 300:
             dir_samples = self._scan_tpot_dirs()
             samples.extend(dir_samples)
+            # Also scan sacrificial VM for attacker-dropped files
+            vm_samples = self._scan_sacrificial_vm()
+            samples.extend(vm_samples)
             self.last_dir_scan = now
 
         return samples
@@ -560,6 +563,38 @@ class SampleAnalyzer:
 
         return samples
 
+    def _scan_sacrificial_vm(self) -> list[dict]:
+        """Scan sacrificial VM for files dropped by attackers in common locations."""
+        samples = []
+        scan_dirs = ["/tmp", "/dev/shm", "/var/tmp", "/root", "/home"]
+        rc, stdout, _ = self._ssh_cmd(
+            "192.168.40.99", 22, "root",
+            f"find {' '.join(scan_dirs)} -type f -mmin -60 "
+            f"-not -name '*.log' -not -name '*.json' -not -name '.*' "
+            f"-size +100c -size -50M "
+            f"-exec sha256sum {{}} \\; 2>/dev/null | head -50",
+            timeout=30,
+        )
+        if rc == 0 and stdout.strip():
+            for line in stdout.strip().splitlines():
+                parts = line.strip().split(maxsplit=1)
+                if len(parts) == 2 and len(parts[0]) == 64:
+                    filepath = parts[1]
+                    # Skip system files
+                    if any(skip in filepath for skip in ['/proc/', '/sys/', '.bash_history', '.bashrc']):
+                        continue
+                    samples.append({
+                        "sha256": parts[0],
+                        "src_ip": "",
+                        "country": "",
+                        "honeypot": "sacrificial-vm",
+                        "captured_at": datetime.now(timezone.utc).isoformat(),
+                        "session_id": "",
+                        "filepath": filepath,
+                    })
+
+        return samples
+
     # -- Sample processing pipeline ----------------------------------------
 
     def fetch_sample(self, sha256: str) -> Optional[Path]:
@@ -603,7 +638,23 @@ class SampleAnalyzer:
                     self.logger.info("Fetched sample %s from %s", sha256[:16], sample_dir)
                     return local_path
 
-        self.logger.warning("Sample %s not found on T-Pot", sha256[:16])
+        # Also check sacrificial VM
+        scan_dirs = "/tmp /dev/shm /var/tmp /root /home"
+        rc, stdout, _ = self._ssh_cmd(
+            "192.168.40.99", 22, "root",
+            f"find {scan_dirs} -type f -exec sha256sum {{}} \\; 2>/dev/null | grep '^{sha256}' | head -1",
+            timeout=30,
+        )
+        if rc == 0 and sha256 in stdout:
+            parts = stdout.strip().split(maxsplit=1)
+            if len(parts) == 2:
+                remote_path = parts[1]
+                ok = self._scp_from("192.168.40.99", 22, "root", "", remote_path, str(local_path))
+                if ok:
+                    self.logger.info("Fetched sample %s from sacrificial VM", sha256[:16])
+                    return local_path
+
+        self.logger.warning("Sample %s not found on T-Pot or sacrificial VM", sha256[:16])
         return None
 
     def _ensure_remnux_running(self) -> bool:
