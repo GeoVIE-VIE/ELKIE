@@ -164,14 +164,164 @@ API_TO_ATTACK = {
     "setuid": "T1548",
 }
 
+# Map strace syscalls to ATT&CK
+STRACE_TO_ATTACK = {
+    "connect": "T1095",
+    "bind": "T1571",
+    "sendto": "T1095",
+    "execve": "T1059.004",
+    "clone": "T1106",
+    "fork": "T1106",
+    "ptrace": "T1055",
+    "mprotect": "T1055",
+    "openat": "T1005",
+    "unlink": "T1070.004",
+    "rename": "T1036.005",
+}
+
+# Sensitive file paths for strace file operations
+SENSITIVE_PATHS = {
+    "/etc/shadow": "T1003.008",
+    "/etc/passwd": "T1003.008",
+    "/etc/crontab": "T1053.003",
+    "/etc/cron": "T1053.003",
+    "/root/.ssh": "T1098.004",
+    "authorized_keys": "T1098.004",
+    "/etc/ld.so.preload": "T1574.006",
+    "/etc/systemd": "T1543",
+}
+
 
 def get_all_samples():
     resp = requests.post(f"{ES_URL}/{RESULT_INDEX}/_search", json={
         "size": 500, "_source": ["sha256", "capa_capabilities", "yara_matches",
                                   "ghidra", "classification", "severity", "analyzed_at",
-                                  "interesting_strings", "llm_summary"],
+                                  "interesting_strings", "llm_summary",
+                                  "dynamic_analysis"],
     }, timeout=15)
     return [h["_source"] for h in resp.json().get("hits", {}).get("hits", [])]
+
+
+# Regex patterns for string-based technique detection
+STRING_TO_ATTACK = [
+    (r"wget.*\|.*bash|curl.*\|.*sh", ["T1059.004", "T1105"]),
+    (r"crontab|/etc/cron", ["T1053.003"]),
+    (r"authorized_keys|ssh-keygen", ["T1098.004"]),
+    (r"/etc/shadow|/etc/passwd", ["T1003.008"]),
+    (r"xmrig|stratum|pool\.|monero|cryptonight", ["T1496"]),
+    (r"chmod\s+\+s|setuid", ["T1548.001"]),
+    (r"iptables|ufw|firewall", ["T1562.004"]),
+    (r"history\s+-c|unset\s+HISTFILE", ["T1070.003"]),
+    (r"base64\s+-d|eval|exec", ["T1140"]),
+    (r"nc\s+-[le]|/dev/tcp|mkfifo", ["T1059.004", "T1095"]),
+    (r"useradd|adduser", ["T1136.001"]),
+    (r"systemctl\s+(stop|disable)", ["T1489"]),
+    (r"dd\s+.*of=/dev|mkfs", ["T1561"]),
+    (r"wget\s+http|curl\s+http|tftp", ["T1105"]),
+    (r"/dev/watchdog", ["T1496"]),
+    (r"\.ssh/|ssh\s+\S+@", ["T1021.004"]),
+    (r"python.*import|perl\s+-e", ["T1059"]),
+]
+
+
+def map_sample_techniques(sample: dict) -> list[dict]:
+    """Map a single sample's analysis results to ATT&CK techniques.
+
+    Returns list of {"technique_id": "TXXXX", "source": "reason"} dicts.
+    Can be imported by sample_analyzer.py for per-sample tagging.
+    """
+    techniques = {}  # tech_id -> source string
+
+    def add(tech_id, source):
+        if tech_id not in techniques:
+            techniques[tech_id] = source
+
+    # capa capabilities → ATT&CK
+    for cap in sample.get("capa_capabilities", []):
+        ns = cap.get("namespace", "").lower()
+        if ns in CAPA_TO_ATTACK:
+            add(CAPA_TO_ATTACK[ns], f"capa:{ns}")
+        else:
+            for capa_prefix, tech_id in CAPA_TO_ATTACK.items():
+                if ns.startswith(capa_prefix):
+                    add(tech_id, f"capa:{ns}")
+                    break
+
+    # YARA matches → ATT&CK
+    for yara in sample.get("yara_matches", []):
+        yara_lower = yara.lower()
+        for pattern, techs in YARA_TO_ATTACK.items():
+            if pattern in yara_lower:
+                for t in techs:
+                    add(t, f"yara:{yara}")
+
+    # Ghidra suspicious APIs → ATT&CK
+    ghidra = sample.get("ghidra")
+    if ghidra and isinstance(ghidra, dict):
+        for api in ghidra.get("suspicious_apis", []):
+            if api in API_TO_ATTACK:
+                add(API_TO_ATTACK[api], f"api:{api}")
+
+    # String-based technique detection
+    all_strings = " ".join(sample.get("interesting_strings", []))
+    llm = sample.get("llm_summary", "") or ""
+    combined = (all_strings + " " + llm).lower()
+
+    for pattern, techs in STRING_TO_ATTACK:
+        if re.search(pattern, combined, re.I):
+            for t in techs:
+                add(t, f"string:{pattern[:40]}")
+
+    # Strace syscalls → ATT&CK
+    dyn = sample.get("dynamic_analysis") or {}
+    strace = dyn.get("strace") or {}
+
+    for op in strace.get("file_operations", []):
+        syscall = op.get("syscall", "")
+        path = op.get("path", "")
+        if syscall in STRACE_TO_ATTACK:
+            add(STRACE_TO_ATTACK[syscall], f"strace:{syscall}({path[:30]})")
+        # Sensitive path detection
+        for sens_path, tech_id in SENSITIVE_PATHS.items():
+            if sens_path in path:
+                add(tech_id, f"strace:access({sens_path})")
+
+    for op in strace.get("network_operations", []):
+        syscall = op.get("syscall", "")
+        if syscall in STRACE_TO_ATTACK:
+            ip = op.get("ip", "")
+            port = op.get("port", "")
+            add(STRACE_TO_ATTACK[syscall], f"strace:{syscall}({ip}:{port})")
+
+    for op in strace.get("process_operations", []):
+        syscall = op.get("syscall", "")
+        if syscall in STRACE_TO_ATTACK:
+            add(STRACE_TO_ATTACK[syscall], f"strace:{syscall}")
+
+    # Dynamic analysis network → ATT&CK
+    if dyn.get("dns_queries"):
+        add("T1071.004", f"dns:{len(dyn['dns_queries'])} queries")
+    if dyn.get("outbound_connections"):
+        add("T1095", f"net:{len(dyn['outbound_connections'])} connections")
+    if dyn.get("tls_sni"):
+        add("T1071.001", f"tls:{len(dyn['tls_sni'])} SNI domains")
+    if dyn.get("http_requests"):
+        add("T1071.001", f"http:{len(dyn['http_requests'])} requests")
+
+    # Classification-based defaults
+    cls = sample.get("classification", "")
+    cls_map = {
+        "botnet": ["T1059", "T1071", "T1095", "T1496"],
+        "miner": ["T1496"],
+        "ransomware": ["T1486", "T1490"],
+        "backdoor": ["T1059", "T1095", "T1543"],
+        "trojan": ["T1059", "T1071", "T1105"],
+        "dropper": ["T1105", "T1059"],
+    }
+    for t in cls_map.get(cls, []):
+        add(t, f"classification:{cls}")
+
+    return [{"technique_id": tid, "source": src} for tid, src in techniques.items()]
 
 
 def generate_layer():
@@ -187,83 +337,14 @@ def generate_layer():
 
     for sample in samples:
         sha = sample.get("sha256", "?")[:16]
-        techniques_found = set()
+        sample_techniques = map_sample_techniques(sample)
 
-        # capa capabilities → ATT&CK
-        for cap in sample.get("capa_capabilities", []):
-            ns = cap.get("namespace", "").lower()
-            # Try exact match, then prefix matches
-            if ns in CAPA_TO_ATTACK:
-                techniques_found.add(CAPA_TO_ATTACK[ns])
-            else:
-                for capa_prefix, tech_id in CAPA_TO_ATTACK.items():
-                    if ns.startswith(capa_prefix):
-                        techniques_found.add(tech_id)
-                        break
-
-        # YARA matches → ATT&CK
-        for yara in sample.get("yara_matches", []):
-            yara_lower = yara.lower()
-            for pattern, techs in YARA_TO_ATTACK.items():
-                if pattern in yara_lower:
-                    techniques_found.update(techs)
-
-        # Ghidra suspicious APIs → ATT&CK
-        ghidra = sample.get("ghidra")
-        if ghidra and isinstance(ghidra, dict):
-            for api in ghidra.get("suspicious_apis", []):
-                if api in API_TO_ATTACK:
-                    techniques_found.add(API_TO_ATTACK[api])
-
-        # String-based technique detection
-        all_strings = " ".join(sample.get("interesting_strings", []))
-        llm = sample.get("llm_summary", "") or ""
-        combined = (all_strings + " " + llm).lower()
-
-        string_to_attack = [
-            (r"wget.*\|.*bash|curl.*\|.*sh", ["T1059.004", "T1105"]),  # download & execute
-            (r"crontab|/etc/cron", ["T1053.003"]),  # scheduled task
-            (r"authorized_keys|ssh-keygen", ["T1098.004"]),  # SSH persistence
-            (r"/etc/shadow|/etc/passwd", ["T1003.008"]),  # credential access
-            (r"xmrig|stratum|pool\.|monero|cryptonight", ["T1496"]),  # crypto mining
-            (r"chmod\s+\+s|setuid", ["T1548.001"]),  # SUID/SGID
-            (r"iptables|ufw|firewall", ["T1562.004"]),  # disable firewall
-            (r"history\s+-c|unset\s+HISTFILE", ["T1070.003"]),  # clear history
-            (r"base64\s+-d|eval|exec", ["T1140"]),  # deobfuscation
-            (r"nc\s+-[le]|/dev/tcp|mkfifo", ["T1059.004", "T1095"]),  # reverse shell
-            (r"useradd|adduser", ["T1136.001"]),  # create account
-            (r"systemctl\s+(stop|disable)", ["T1489"]),  # stop service
-            (r"dd\s+.*of=/dev|mkfs", ["T1561"]),  # disk wipe
-            (r"wget\s+http|curl\s+http|tftp", ["T1105"]),  # ingress tool transfer
-            (r"/dev/watchdog", ["T1496"]),  # resource hijacking indicator
-            (r"\.ssh/|ssh\s+\S+@", ["T1021.004"]),  # remote SSH
-            (r"python.*import|perl\s+-e", ["T1059"]),  # scripting
-        ]
-
-        for pattern, techs in string_to_attack:
-            if re.search(pattern, combined, re.I):
-                techniques_found.update(techs)
-
-        # Classification-based defaults
-        cls = sample.get("classification", "")
-        if cls == "botnet":
-            techniques_found.update(["T1059", "T1071", "T1095", "T1496"])
-        elif cls == "miner":
-            techniques_found.add("T1496")
-        elif cls == "ransomware":
-            techniques_found.update(["T1486", "T1490"])
-        elif cls == "backdoor":
-            techniques_found.update(["T1059", "T1095", "T1543"])
-        elif cls == "trojan":
-            techniques_found.update(["T1059", "T1071", "T1105"])
-        elif cls == "dropper":
-            techniques_found.update(["T1105", "T1059"])
-
-        for tech in techniques_found:
-            technique_counts[tech] += 1
-            if tech not in technique_samples:
-                technique_samples[tech] = []
-            technique_samples[tech].append(sha)
+        for tech in sample_techniques:
+            tid = tech["technique_id"]
+            technique_counts[tid] += 1
+            if tid not in technique_samples:
+                technique_samples[tid] = []
+            technique_samples[tid].append(sha)
 
     if not technique_counts:
         print("No ATT&CK techniques mapped")

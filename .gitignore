@@ -1,3 +1,6 @@
+# Claude Code context
+CLAUDE.md
+
 # System/user files
 .bash_history
 .bash_logout
@@ -17,10 +20,12 @@
 .npm/
 .lesshst
 
-# Sensitive files
+# Sensitive files / local config
 .env
 *.env
 .sample_analyzer_env
+authelia/
+.config/
 .sentinel_state.json
 .ml_sentinel_state.json
 .sample_analyzer_state.json

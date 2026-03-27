@@ -1,14 +1,16 @@
 # -*- coding: utf-8 -*-
-# Ghidra headless postscript -- DEEP extraction with decompiled C code
+# Ghidra headless postscript -- extract ALL non-thunk functions with metadata
 # Run via: analyzeHeadless ... -postscript ghidra_deep_extract.py
 #
-# Decompiles top 20 functions by size and outputs readable C code.
+# Two-tier output:
+#   - function_index: ALL functions with metadata (name, size, APIs called, xrefs) for LLM triage
+#   - decompiled_functions: decompiled C code for each function (LLM picks which to analyze)
 
 import json
 import os
 
 from ghidra.app.decompiler import DecompInterface
-from ghidra.program.model.symbol import SymbolType
+from ghidra.program.model.symbol import SymbolType, RefType
 
 def run():
     program = currentProgram
@@ -24,49 +26,14 @@ def run():
         "language": str(program.getLanguage().getLanguageID()),
         "executable_format": program.getExecutableFormat(),
         "num_functions": fm.getFunctionCount(),
-        "decompiled_functions": [],
+        "function_index": [],       # lightweight metadata for ALL functions (triage pass)
+        "decompiled_functions": [],  # full C code for all non-thunk functions
         "suspicious_apis": [],
         "sections": [],
     }
 
-    # --- Decompile top 20 functions by size ---
-    funcs = []
-    func_iter = fm.getFunctions(True)
-    while func_iter.hasNext():
-        f = func_iter.next()
-        body = f.getBody()
-        size = body.getNumAddresses() if body else 0
-        if not f.isThunk() and size > 10:
-            funcs.append((f, size))
-
-    funcs.sort(key=lambda x: -x[1])
-
-    for f, size in funcs[:20]:
-        try:
-            decomp_result = decomp.decompileFunction(f, 30, None)
-            if decomp_result and decomp_result.decompileCompleted():
-                c_code = decomp_result.getDecompiledFunction().getC()
-                # Truncate very long functions
-                if len(c_code) > 3000:
-                    c_code = c_code[:3000] + "\n// ... truncated ..."
-
-                result["decompiled_functions"].append({
-                    "name": f.getName(),
-                    "address": str(f.getEntryPoint()),
-                    "size": int(size),
-                    "param_count": f.getParameterCount(),
-                    "c_code": c_code,
-                })
-        except Exception as e:
-            result["decompiled_functions"].append({
-                "name": f.getName(),
-                "address": str(f.getEntryPoint()),
-                "size": int(size),
-                "c_code": "// decompilation failed: " + str(e),
-            })
-
-    # --- Suspicious APIs ---
-    suspicious_apis = [
+    # --- Suspicious API list ---
+    suspicious_api_names = {
         "CreateRemoteThread", "VirtualAllocEx", "WriteProcessMemory",
         "NtUnmapViewOfSection", "SetWindowsHookEx", "CreateProcess",
         "ShellExecute", "WinExec", "URLDownloadToFile", "InternetOpen",
@@ -75,17 +42,100 @@ def run():
         "IsDebuggerPresent", "GetProcAddress", "LoadLibrary", "VirtualProtect",
         "OpenProcess", "ReadProcessMemory", "TerminateProcess",
         "execve", "fork", "ptrace", "mprotect", "mmap", "dlopen", "system",
-        "popen", "unlink", "chmod", "chown", "setuid",
-    ]
+        "popen", "unlink", "chmod", "chown", "setuid", "setgid", "chroot",
+        "kill", "signal", "ioctl", "prctl", "mount", "umount",
+        "getenv", "setenv", "syslog", "openlog",
+    }
+    suspicious_lower = {a.lower() for a in suspicious_api_names}
 
+    # --- Collect ALL non-thunk functions ---
+    all_funcs = []
+    func_iter = fm.getFunctions(True)
+    while func_iter.hasNext():
+        f = func_iter.next()
+        if f.isThunk():
+            continue
+        body = f.getBody()
+        size = body.getNumAddresses() if body else 0
+        if size < 4:
+            continue  # skip trivial stubs
+        all_funcs.append((f, size))
+
+    all_funcs.sort(key=lambda x: -x[1])
+
+    # --- Build function index + decompile ---
+    for f, size in all_funcs:
+        entry = f.getEntryPoint()
+
+        # Get called functions (outgoing references)
+        called = []
+        called_refs = f.getCalledFunctions(None)
+        if called_refs:
+            for target in called_refs:
+                called.append(target.getName())
+
+        # Get callers (incoming references)
+        callers = []
+        calling_refs = f.getCallingFunctions(None)
+        if calling_refs:
+            for caller in calling_refs:
+                callers.append(caller.getName())
+
+        # Flag suspicious API calls within this function
+        suspicious_calls = [c for c in called if c.lower() in suspicious_lower]
+
+        # Build lightweight index entry (for triage pass — no C code)
+        index_entry = {
+            "name": f.getName(),
+            "address": str(entry),
+            "size": int(size),
+            "param_count": f.getParameterCount(),
+            "calls": called[:30],
+            "called_by": callers[:15],
+            "suspicious_calls": suspicious_calls,
+        }
+        result["function_index"].append(index_entry)
+
+        # Decompile (for deep pass)
+        try:
+            decomp_result = decomp.decompileFunction(f, 30, None)
+            if decomp_result and decomp_result.decompileCompleted():
+                c_code = decomp_result.getDecompiledFunction().getC()
+                # Truncate very long functions
+                if len(c_code) > 4000:
+                    c_code = c_code[:4000] + "\n// ... truncated ..."
+
+                result["decompiled_functions"].append({
+                    "name": f.getName(),
+                    "address": str(entry),
+                    "size": int(size),
+                    "param_count": f.getParameterCount(),
+                    "suspicious_calls": suspicious_calls,
+                    "c_code": c_code,
+                })
+            else:
+                result["decompiled_functions"].append({
+                    "name": f.getName(),
+                    "address": str(entry),
+                    "size": int(size),
+                    "c_code": "// decompilation failed",
+                })
+        except Exception as e:
+            result["decompiled_functions"].append({
+                "name": f.getName(),
+                "address": str(entry),
+                "size": int(size),
+                "c_code": "// decompilation error: " + str(e),
+            })
+
+    # --- Suspicious APIs (from external symbols) ---
     sym_table = program.getSymbolTable()
     found = set()
     sym_iter = sym_table.getExternalSymbols()
     while sym_iter.hasNext():
         sym = sym_iter.next()
-        for api in suspicious_apis:
-            if api.lower() == sym.getName().lower():
-                found.add(sym.getName())
+        if sym.getName().lower() in suspicious_lower:
+            found.add(sym.getName())
     result["suspicious_apis"] = list(found)
 
     # --- Sections ---
@@ -108,6 +158,8 @@ def run():
         json.dump(result, f, indent=2)
 
     print("Deep Ghidra extraction: %s" % output_path)
-    print("  Decompiled: %d functions" % len(result["decompiled_functions"]))
+    print("  Total functions (non-thunk): %d" % len(all_funcs))
+    print("  Decompiled: %d" % len(result["decompiled_functions"]))
+    print("  Function index entries: %d" % len(result["function_index"]))
 
 run()

@@ -32,8 +32,8 @@ from pathlib import Path
 STATE_FILE = "/var/lib/honeypot/auth_state.json"
 LOG_FILE = "/var/log/honeypot/auth.json"
 CRED_FILE = "/etc/honeypot/credentials.conf"
-MIN_FAILURES = 3       # Minimum failed attempts before allowing success
-MAX_FAILURES = 20      # Maximum failures before allowing (randomized between min-max)
+MIN_FAILURES = 1       # Minimum failed attempts before allowing success
+MAX_FAILURES = 3       # Most bots try 2-3 passwords then leave — let them in fast
 STATE_EXPIRY = 604800  # Forget IP state after 7 days
 
 # --- Default credentials if config file missing ---
@@ -122,9 +122,11 @@ def log_attempt(ip, username, password, success, reason):
 def check_auth(ip, username, password):
     """
     Check if credentials should be accepted.
+    Only accepts 'root' username. Rejects everything else.
+    After enough failures, accepts ANY password for root — simulates
+    a successful brute force regardless of what password the bot uses.
     Returns (accept: bool, reason: str)
     """
-    creds = load_credentials()
     state = load_state()
     now = time.time()
 
@@ -144,43 +146,34 @@ def check_auth(ip, username, password):
     ip_state["attempts"] += 1
     ip_state["last_seen"] = now
 
-    # Check if username exists in our credential list
-    if username not in creds:
+    # Only accept root — reject all other usernames (count as failure)
+    if username != "root":
         ip_state["failures"] += 1
         save_state(state)
-        log_attempt(ip, username, password, False, "unknown_user")
-        return False, "unknown_user"
+        log_attempt(ip, username, password, False, "not_root")
+        return False, "not_root"
 
-    # Check if password is in the allowed list for this user
-    valid_passwords = creds[username]
-    if password not in valid_passwords:
-        ip_state["failures"] += 1
-        save_state(state)
-        log_attempt(ip, username, password, False, "wrong_password")
-        return False, "wrong_password"
-
-    # Password is valid — but should we accept yet?
-
-    # If this IP previously logged in, only accept the SAME credentials
+    # If this IP previously logged in, only accept the SAME password
     if ip_state["accepted_user"] is not None:
-        if username != ip_state["accepted_user"] or password != ip_state["accepted_pass"]:
+        if password != ip_state["accepted_pass"]:
             ip_state["failures"] += 1
             save_state(state)
-            log_attempt(ip, username, password, False, "different_creds_same_ip")
-            return False, "different_creds_same_ip"
+            log_attempt(ip, username, password, False, "wrong_password")
+            return False, "wrong_password"
         # Same creds as before — accept immediately (returning attacker)
         save_state(state)
         log_attempt(ip, username, password, True, "returning_attacker")
         return True, "returning_attacker"
 
-    # First time this IP gets valid creds — enforce failure count
+    # Not enough failures yet — reject regardless of password
     if ip_state["failures"] < ip_state["required_failures"]:
         ip_state["failures"] += 1
         save_state(state)
         log_attempt(ip, username, password, False, f"need_more_failures ({ip_state['failures']}/{ip_state['required_failures']})")
         return False, "need_more_failures"
 
-    # Enough failures — accept and remember this credential pair
+    # Enough failures — accept ANY password for root
+    # The bot thinks it found the real password
     ip_state["accepted_user"] = username
     ip_state["accepted_pass"] = password
     save_state(state)
@@ -213,8 +206,8 @@ def main():
     if not username or not password:
         sys.exit(1)
 
-    # Add small delay for realism (real sshd takes 1-2s)
-    time.sleep(random.uniform(0.5, 2.0))
+    # Minimal delay — keep it fast so brute forcers don't time out and leave
+    time.sleep(random.uniform(0.1, 0.5))
 
     accepted, reason = check_auth(ip, username, password)
 

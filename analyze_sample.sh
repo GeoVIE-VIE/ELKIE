@@ -66,6 +66,51 @@ fi
 echo "Analyzing: $SHA256 (${FILE_SIZE} bytes)"
 
 # ---------------------------------------------------------------------------
+# Auto-decompression — detect compressed samples before UPX/analysis
+# ---------------------------------------------------------------------------
+
+DECOMPRESSED=false
+COMP_TYPE=$(file -b "$SAMPLE" 2>/dev/null || echo "")
+
+decompress_sample() {
+    local tool="$1" flags="$2"
+    cp "$SAMPLE" "${SAMPLE}.compressed"
+    if $tool $flags "${SAMPLE}.compressed" -c > "${SAMPLE}.decompressed" 2>/dev/null; then
+        local NEW_SIZE
+        NEW_SIZE=$(stat -c%s "${SAMPLE}.decompressed" 2>/dev/null || echo 0)
+        if [ "$NEW_SIZE" -gt 0 ]; then
+            mv "${SAMPLE}.decompressed" "$SAMPLE"
+            echo "Decompressed with $tool: ${FILE_SIZE} → ${NEW_SIZE} bytes"
+            FILE_SIZE="$NEW_SIZE"
+            DECOMPRESSED=true
+        else
+            rm -f "${SAMPLE}.decompressed"
+        fi
+    else
+        rm -f "${SAMPLE}.decompressed"
+    fi
+    rm -f "${SAMPLE}.compressed"
+}
+
+if echo "$COMP_TYPE" | grep -qi "Zstandard"; then
+    command -v zstd &>/dev/null && decompress_sample zstd "-d"
+elif echo "$COMP_TYPE" | grep -qi "gzip"; then
+    command -v gzip &>/dev/null && decompress_sample gzip "-d"
+elif echo "$COMP_TYPE" | grep -qi "bzip2"; then
+    command -v bzip2 &>/dev/null && decompress_sample bzip2 "-d"
+elif echo "$COMP_TYPE" | grep -qi "XZ"; then
+    command -v xz &>/dev/null && decompress_sample xz "-d"
+elif echo "$COMP_TYPE" | grep -qi "LZMA"; then
+    command -v lzma &>/dev/null && decompress_sample lzma "-d"
+fi
+
+# Re-detect file type after decompression
+if [ "$DECOMPRESSED" = "true" ]; then
+    FILE_TYPE_POST=$(file -b "$SAMPLE" 2>/dev/null || echo "unknown")
+    echo "Post-decompression file type: $FILE_TYPE_POST"
+fi
+
+# ---------------------------------------------------------------------------
 # Unpack (UPX, etc.) before analysis to reveal hidden strings/code
 # ---------------------------------------------------------------------------
 
@@ -74,8 +119,8 @@ UNPACKED=false
 for UPX_BIN in upx5 upx; do
     if command -v "$UPX_BIN" &>/dev/null; then
         cp "$SAMPLE" "${SAMPLE}.packed"
-        UPX_OUTPUT=$("$UPX_BIN" -d "$SAMPLE" 2>&1)
-        if [ $? -eq 0 ]; then
+        UPX_OUTPUT=$("$UPX_BIN" -d "$SAMPLE" 2>&1) || true
+        if echo "$UPX_OUTPUT" | grep -q "Unpacked 1 file"; then
             NEW_SIZE=$(stat -c%s "$SAMPLE" 2>/dev/null)
             echo "Unpacked with $UPX_BIN: ${FILE_SIZE} → ${NEW_SIZE} bytes"
             UNPACKED=true
@@ -169,7 +214,7 @@ fi
 
 FLOSS_STRINGS="[]"
 if command -v floss &>/dev/null; then
-    FLOSS_OUTPUT=$(timeout 120 floss --no static "$SAMPLE" 2>/dev/null || echo "")
+    FLOSS_OUTPUT=$(timeout 120 floss "$SAMPLE" 2>/dev/null || echo "")
     if [ -n "$FLOSS_OUTPUT" ]; then
         FLOSS_STRINGS=$(echo "$FLOSS_OUTPUT" | grep -v '^\s*$' | head -50 | json_array_from_lines) || FLOSS_STRINGS="[]"
     fi
@@ -263,6 +308,8 @@ export SA_FLOSS="$FLOSS_STRINGS"
 export SA_CAPA="$CAPA_CAPABILITIES"
 export SA_PEFRAME="$PEFRAME_JSON"
 export SA_GHIDRA="$GHIDRA_JSON"
+export SA_DECOMPRESSED="$DECOMPRESSED"
+export SA_UNPACKED="$UNPACKED"
 
 python3 << 'PYEOF'
 import json, os
@@ -293,6 +340,8 @@ floss_strings = read_json_or_default(os.environ.get("SA_FLOSS", "[]"), [])
 capa_capabilities = read_json_or_default(os.environ.get("SA_CAPA", "[]"), [])
 peframe = read_json_or_default(os.environ.get("SA_PEFRAME", "null"), None)
 ghidra = read_json_or_default(os.environ.get("SA_GHIDRA", "null"), None)
+decompressed = os.environ.get("SA_DECOMPRESSED", "false") == "true"
+unpacked = os.environ.get("SA_UNPACKED", "false") == "true"
 
 result = {
     "sha256": sha256,
@@ -312,7 +361,9 @@ result = {
     "llm_summary": llm_summary,
     "ghidra": ghidra,
     "generated_yara_rule": generated_yara,
-    "analysis_version": "1.2.0"
+    "decompressed": decompressed,
+    "unpacked": unpacked,
+    "analysis_version": "1.3.0"
 }
 
 with open(result_file, "w") as f:

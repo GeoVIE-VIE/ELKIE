@@ -89,12 +89,18 @@ class Config:
 STAGING_DIR = Path("/home/legs/sample_staging")
 ANALYSIS_SCRIPT_LOCAL = Path("/home/legs/analyze_sample.sh")
 
-# Sample directories on T-Pot (inside /data)
+# Sample directories on T-Pot (inside /data + quarantine)
 TPOT_SAMPLE_DIRS = [
     "/home/lepots/tpotce/data/cowrie/downloads",
     "/home/lepots/tpotce/data/dionaea/binaries",
     "/home/lepots/tpotce/data/honeytrap/downloads",
     "/home/lepots/tpotce/data/adbhoney/downloads",
+    "/opt/honeypot-quarantine/cowrie",
+    "/opt/honeypot-quarantine/dionaea",
+    "/opt/honeypot-quarantine/honeytrap",
+    "/opt/honeypot-quarantine/adbhoney",
+    "/opt/honeypot-quarantine/glutton",
+    "/opt/honeypot-quarantine/glutton_shared",
 ]
 
 SEVERITY_ORDER = {"low": 0, "medium": 1, "high": 2, "critical": 3}
@@ -178,17 +184,27 @@ class SampleAnalyzer:
 
     # -- SSH/SCP helpers ---------------------------------------------------
 
+    def _needs_jump(self, host: str) -> bool:
+        """Check if host is on honeypot subnet and needs T-Pot jump host."""
+        return host.startswith("192.168.40.") and host != self.cfg.tpot_host
+
+    def _jump_arg(self) -> str:
+        """Return the jump host argument for SSH."""
+        return f"{self.cfg.tpot_user}@{self.cfg.tpot_host}:{self.cfg.tpot_port}"
+
     def _ssh_cmd(self, host: str, port: int, user: str, cmd: str,
                  password: str = "", timeout: int = 60) -> tuple[int, str, str]:
-        """Execute command on remote host via SSH key auth (falls back to password)."""
+        """Execute command on remote host via SSH key auth (falls back to password).
+        Automatically routes through T-Pot jump host for honeypot subnet."""
         ssh_args = [
             "ssh", "-o", "StrictHostKeyChecking=no",
             "-o", "ConnectTimeout=10",
             "-o", "BatchMode=yes",
-            "-p", str(port),
-            f"{user}@{host}",
-            cmd,
         ]
+        if self._needs_jump(host):
+            ssh_args += ["-J", self._jump_arg()]
+        ssh_args += ["-p", str(port), f"{user}@{host}", cmd]
+
         try:
             result = subprocess.run(
                 ssh_args, capture_output=True, text=True, timeout=timeout
@@ -204,14 +220,13 @@ class SampleAnalyzer:
 
         # Key auth failed — fall back to password
         if password:
-            ssh_args_pw = [
-                "sshpass", "-p", password,
+            ssh_args_pw = ["sshpass", "-p", password,
                 "ssh", "-o", "StrictHostKeyChecking=no",
                 "-o", "ConnectTimeout=10",
-                "-p", str(port),
-                f"{user}@{host}",
-                cmd,
             ]
+            if self._needs_jump(host):
+                ssh_args_pw += ["-J", self._jump_arg()]
+            ssh_args_pw += ["-p", str(port), f"{user}@{host}", cmd]
             try:
                 result = subprocess.run(
                     ssh_args_pw, capture_output=True, text=True, timeout=timeout
@@ -227,14 +242,37 @@ class SampleAnalyzer:
 
     def _scp_from(self, host: str, port: int, user: str, password: str,
                   remote_path: str, local_path: str, timeout: int = 120) -> bool:
-        """Copy file from remote host via SSH key auth (falls back to password)."""
+        """Copy file from remote host. Routes through jump host for honeypot subnet.
+        Uses ssh+cat instead of scp for jump host compatibility."""
+        if self._needs_jump(host):
+            # Use ssh+cat through jump host (SCP subsystem may not work)
+            ssh_args = [
+                "ssh", "-o", "StrictHostKeyChecking=no",
+                "-o", "ConnectTimeout=15",
+                "-J", self._jump_arg(),
+                "-p", str(port), f"{user}@{host}",
+                f"cat {shlex.quote(remote_path)}",
+            ]
+            if password:
+                ssh_args = ["sshpass", "-p", password] + ssh_args
+            else:
+                ssh_args.insert(3, "-o")
+                ssh_args.insert(4, "BatchMode=yes")
+            try:
+                with open(local_path, "wb") as f:
+                    result = subprocess.run(ssh_args, stdout=f, stderr=subprocess.PIPE, timeout=timeout)
+                if result.returncode == 0 and Path(local_path).stat().st_size > 0:
+                    return True
+                Path(local_path).unlink(missing_ok=True)
+            except (subprocess.TimeoutExpired, Exception):
+                Path(local_path).unlink(missing_ok=True)
+            return False
+
+        # Direct SCP for non-honeypot hosts
         scp_args = [
             "scp", "-o", "StrictHostKeyChecking=no",
-            "-o", "ConnectTimeout=10",
-            "-o", "BatchMode=yes",
-            "-P", str(port),
-            f"{user}@{host}:{remote_path}",
-            local_path,
+            "-o", "ConnectTimeout=10", "-o", "BatchMode=yes",
+            "-P", str(port), f"{user}@{host}:{remote_path}", local_path,
         ]
         try:
             result = subprocess.run(scp_args, capture_output=True, text=True, timeout=timeout)
@@ -243,15 +281,12 @@ class SampleAnalyzer:
         except (subprocess.TimeoutExpired, Exception):
             pass
 
-        # Fall back to password
         if password:
             scp_args_pw = [
                 "sshpass", "-p", password,
                 "scp", "-o", "StrictHostKeyChecking=no",
                 "-o", "ConnectTimeout=10",
-                "-P", str(port),
-                f"{user}@{host}:{remote_path}",
-                local_path,
+                "-P", str(port), f"{user}@{host}:{remote_path}", local_path,
             ]
             try:
                 result = subprocess.run(scp_args_pw, capture_output=True, text=True, timeout=timeout)
@@ -263,14 +298,34 @@ class SampleAnalyzer:
 
     def _scp_to(self, host: str, port: int, user: str, password: str,
                 local_path: str, remote_path: str, timeout: int = 120) -> bool:
-        """Copy file to remote host via SSH key auth (falls back to password)."""
+        """Copy file to remote host. Routes through jump host for honeypot subnet.
+        Uses ssh+cat instead of scp for jump host compatibility."""
+        if self._needs_jump(host):
+            ssh_args = [
+                "ssh", "-o", "StrictHostKeyChecking=no",
+                "-o", "ConnectTimeout=15",
+                "-J", self._jump_arg(),
+                "-p", str(port), f"{user}@{host}",
+                f"cat > {shlex.quote(remote_path)}",
+            ]
+            if password:
+                ssh_args = ["sshpass", "-p", password] + ssh_args
+            else:
+                ssh_args.insert(3, "-o")
+                ssh_args.insert(4, "BatchMode=yes")
+            try:
+                with open(local_path, "rb") as f:
+                    result = subprocess.run(ssh_args, stdin=f, capture_output=True, timeout=timeout)
+                return result.returncode == 0
+            except (subprocess.TimeoutExpired, Exception):
+                pass
+            return False
+
+        # Direct SCP for non-honeypot hosts
         scp_args = [
             "scp", "-o", "StrictHostKeyChecking=no",
-            "-o", "ConnectTimeout=10",
-            "-o", "BatchMode=yes",
-            "-P", str(port),
-            local_path,
-            f"{user}@{host}:{remote_path}",
+            "-o", "ConnectTimeout=10", "-o", "BatchMode=yes",
+            "-P", str(port), local_path, f"{user}@{host}:{remote_path}",
         ]
         try:
             result = subprocess.run(scp_args, capture_output=True, text=True, timeout=timeout)
@@ -279,15 +334,12 @@ class SampleAnalyzer:
         except (subprocess.TimeoutExpired, Exception):
             pass
 
-        # Fall back to password
         if password:
             scp_args_pw = [
                 "sshpass", "-p", password,
                 "scp", "-o", "StrictHostKeyChecking=no",
                 "-o", "ConnectTimeout=10",
-                "-P", str(port),
-                local_path,
-                f"{user}@{host}:{remote_path}",
+                "-P", str(port), local_path, f"{user}@{host}:{remote_path}",
             ]
             try:
                 result = subprocess.run(scp_args_pw, capture_output=True, text=True, timeout=timeout)
@@ -343,6 +395,140 @@ class SampleAnalyzer:
             self.logger.warning("Sacrificial VM SCP failed: %s", e)
             Path(local_path).unlink(missing_ok=True)
             return False
+
+    # -- Attacker session correlation --------------------------------------
+
+    def _correlate_attacker_session(self, sample_info: dict):
+        """For sacrificial VM samples: find the attacker IP and download command.
+
+        Queries ES auditd logs for:
+        1. Recent wget/curl/tftp/scp/python downloads (the drop command)
+        2. The SSH session that was active at the time (the attacker IP)
+        """
+        captured_at = sample_info.get("captured_at", "")
+        sha256 = sample_info.get("sha256", "")
+        filepath = sample_info.get("filepath", "")
+
+        # Time window: look 5 minutes before the sample was captured
+        time_filter = {"range": {"@timestamp": {"gte": "now-10m"}}}
+        if captured_at:
+            time_filter = {"range": {"@timestamp": {
+                "gte": captured_at + "||-5m",
+                "lte": captured_at + "||+1m",
+            }}}
+
+        # Query 1: Find download commands (wget, curl, tftp, python -c, etc.)
+        try:
+            dl_query = {
+                "size": 10,
+                "sort": [{"@timestamp": "desc"}],
+                "query": {"bool": {"must": [
+                    {"term": {"service.type": "auditd"}},
+                    {"term": {"event.action": "execve"}},
+                    {"bool": {"should": [
+                        {"term": {"agent.name": "ds-prod-web01"}},
+                        {"term": {"agent.name": "prodction1"}},
+                    ], "minimum_should_match": 1}},
+                    time_filter,
+                    {"bool": {"should": [
+                        {"prefix": {"process.executable": "/usr/bin/wget"}},
+                        {"prefix": {"process.executable": "/usr/bin/curl"}},
+                        {"prefix": {"process.executable": "/usr/bin/tftp"}},
+                        {"prefix": {"process.executable": "/usr/bin/scp"}},
+                        {"prefix": {"process.executable": "/usr/bin/python"}},
+                        {"prefix": {"process.executable": "/usr/bin/lwp-download"}},
+                        {"prefix": {"process.executable": "/usr/bin/fetch"}},
+                    ], "minimum_should_match": 1}},
+                ]}},
+                "_source": ["@timestamp", "process.executable", "process.args",
+                            "process.pid", "process.ppid", "user.name"],
+            }
+
+            r = requests.post(
+                f"{self.cfg.es_url}/.ds-filebeat-*/_search",
+                json=dl_query, timeout=15,
+            )
+            if r.status_code == 200:
+                hits = r.json().get("hits", {}).get("hits", [])
+                if hits:
+                    best = hits[0]["_source"]
+                    proc = best.get("process", {})
+                    args = proc.get("args", [])
+                    exe = proc.get("executable", "")
+                    cmd = f"{exe} {' '.join(args)}" if args else exe
+                    sample_info["download_command"] = cmd[:500]
+                    sample_info["download_timestamp"] = best.get("@timestamp", "")
+                    sample_info["download_user"] = best.get("user", {}).get("name", "")
+                    sample_info["download_pid"] = proc.get("pid", "")
+                    self.logger.info("Correlated download command for %s: %s", sha256[:16], cmd[:100])
+        except Exception as e:
+            self.logger.debug("Download command correlation failed: %s", e)
+
+        # Query 2: Find the SSH session — PAM auth or sshd accepted connection
+        # Look for the attacker's source IP from auditd user_login or PAM events
+        try:
+            ssh_query = {
+                "size": 5,
+                "sort": [{"@timestamp": "desc"}],
+                "query": {"bool": {"must": [
+                    {"bool": {"should": [
+                        {"term": {"agent.name": "ds-prod-web01"}},
+                        {"term": {"agent.name": "prodction1"}},
+                    ], "minimum_should_match": 1}},
+                    time_filter,
+                    {"bool": {"should": [
+                        # PAM honeypot auth events
+                        {"term": {"event.action": "user_login"}},
+                        {"term": {"event.action": "accepted"}},
+                        # Auditd user_login records
+                        {"exists": {"field": "source.ip"}},
+                    ], "minimum_should_match": 1}},
+                ]}},
+                "_source": ["@timestamp", "source.ip", "source.geo",
+                            "user.name", "event.action", "process.pid"],
+            }
+
+            r = requests.post(
+                f"{self.cfg.es_url}/.ds-filebeat-*/_search",
+                json=ssh_query, timeout=15,
+            )
+            if r.status_code == 200:
+                hits = r.json().get("hits", {}).get("hits", [])
+                for hit in hits:
+                    src = hit["_source"]
+                    src_ip = src.get("source", {}).get("ip", "")
+                    if src_ip and not src_ip.startswith(("192.168.", "10.", "172.16.")):
+                        sample_info["src_ip"] = src_ip
+                        geo = src.get("source", {}).get("geo", {})
+                        if isinstance(geo, dict):
+                            sample_info["country"] = geo.get("country_name", "")
+                        sample_info["attacker_user"] = src.get("user", {}).get("name", "")
+                        self.logger.info("Correlated attacker IP for %s: %s (%s)",
+                                         sha256[:16], src_ip, sample_info.get("country", "?"))
+                        break
+        except Exception as e:
+            self.logger.debug("SSH session correlation failed: %s", e)
+
+        # Query 3: Fallback — check PAM log on the VM directly via SSH
+        if not sample_info.get("src_ip"):
+            try:
+                rc, pam_out, _ = self._sacrificial_ssh_cmd(
+                    "grep 'Accepted\\|pam_honeypot.*success' /var/log/auth.log 2>/dev/null | tail -5",
+                    timeout=10,
+                )
+                if rc == 0 and pam_out.strip():
+                    # Extract IP from auth.log lines like: "Accepted password for root from 1.2.3.4 port 12345"
+                    for line in reversed(pam_out.strip().splitlines()):
+                        ip_match = re.search(r'from\s+(\d+\.\d+\.\d+\.\d+)', line)
+                        if ip_match:
+                            ip = ip_match.group(1)
+                            if not ip.startswith(("192.168.", "10.", "172.16.")):
+                                sample_info["src_ip"] = ip
+                                self.logger.info("Correlated attacker IP from auth.log for %s: %s",
+                                                 sha256[:16], ip)
+                                break
+            except Exception as e:
+                self.logger.debug("Auth.log correlation failed: %s", e)
 
     # -- Elasticsearch helpers ---------------------------------------------
 
@@ -504,20 +690,48 @@ class SampleAnalyzer:
         """Query ES for file capture events. Returns list of {sha256, src_ip, country, honeypot, captured_at, session_id}."""
         samples = []
 
+        # Scan staging directory for new files (watchdog drops samples here)
+        staging_samples = self._scan_staging_dir()
+        samples.extend(staging_samples)
+
         # ES query for file events
         es_samples = self._poll_es_for_files()
         samples.extend(es_samples)
+
+        # Auditd-driven: find unknown binaries executed on sacrificial VM
+        auditd_samples = self._poll_auditd_execve()
+        samples.extend(auditd_samples)
 
         # Periodic directory scan as fallback (every 5 minutes)
         now = time.time()
         if now - self.last_dir_scan > 300:
             dir_samples = self._scan_tpot_dirs()
             samples.extend(dir_samples)
-            # Also scan sacrificial VM for attacker-dropped files
-            vm_samples = self._scan_sacrificial_vm()
-            samples.extend(vm_samples)
             self.last_dir_scan = now
 
+        return samples
+
+    def _scan_staging_dir(self) -> list[dict]:
+        """Scan local staging directory for samples dropped by watchdog."""
+        samples = []
+        for p in STAGING_DIR.iterdir():
+            if not p.is_file():
+                continue
+            if len(p.name) != 64:
+                continue
+            if p.name in self.known_hashes:
+                continue
+            if p.stat().st_size < 1024:  # Skip files under 1KB (system caches, text files)
+                continue
+            self.logger.info("Staging: found new sample %s (%d bytes)", p.name[:16], p.stat().st_size)
+            samples.append({
+                "sha256": p.name,
+                "src_ip": "",
+                "country": "",
+                "honeypot": "sacrificial-vm",
+                "captured_at": datetime.now(timezone.utc).isoformat(),
+                "session_id": "",
+            })
         return samples
 
     def _poll_es_for_files(self) -> list[dict]:
@@ -614,13 +828,129 @@ class SampleAnalyzer:
 
         return samples
 
+    def _poll_auditd_execve(self) -> list[dict]:
+        """Query ES for unknown binaries executed on sacrificial VM via auditd.
+        This catches malware that drops anywhere on the filesystem."""
+        # Standard system paths — anything executed outside these is suspicious
+        system_paths = [
+            '/usr/bin/', '/usr/sbin/', '/bin/', '/sbin/',
+            '/usr/lib/', '/lib/', '/snap/', '/usr/local/bin/',
+            '/usr/local/sbin/', '/usr/libexec/',
+        ]
+
+        try:
+            query = {
+                "size": 50,
+                "query": {"bool": {"must": [
+                    {"term": {"service.type": "auditd"}},
+                    {"term": {"event.action": "execve"}},
+                    {"bool": {"should": [
+                        {"term": {"agent.name": "ds-prod-web01"}},
+                        {"term": {"agent.name": "prodction1"}},
+                    ], "minimum_should_match": 1}},
+                    {"exists": {"field": "process.executable"}},
+                    {"range": {"@timestamp": {"gte": "now-30m"}}},
+                ], "must_not": [
+                    {"prefix": {"process.executable": "/usr/"}},
+                    {"prefix": {"process.executable": "/bin/"}},
+                    {"prefix": {"process.executable": "/sbin/"}},
+                    {"prefix": {"process.executable": "/lib/"}},
+                    {"prefix": {"process.executable": "/snap/"}},
+                    # Also exclude by name for auditd entries without full path
+                    {"terms": {"process.executable": [
+                        "bash", "sh", "dash", "ps", "tr", "head", "tail", "cat", "cut",
+                        "awk", "sed", "grep", "find", "ls", "readlink", "stat", "wc",
+                        "mkdir", "chmod", "chown", "rm", "cp", "mv", "touch", "sleep",
+                        "date", "echo", "env", "id", "whoami", "uname", "hostname",
+                        "ss", "netstat", "ip", "ping", "nc", "curl", "wget",
+                        "systemctl", "journalctl", "crontab", "iptables",
+                        "python3", "python", "perl", "ruby", "node",
+                        "sshd", "ssh", "scp", "sftp", "sudo", "su",
+                        "auditctl", "auditd", "filebeat", "chronyc",
+                        "dpkg", "apt", "apt-get",
+                        "honeypot_guard", "honeypot_pam",
+                    ]}},
+                ]}},
+                "_source": ["@timestamp", "process.executable", "process.args"],
+                "sort": [{"@timestamp": "desc"}],
+            }
+
+            r = requests.post(
+                f"{self.cfg.es_url}/.ds-filebeat-*/_search",
+                json=query, timeout=15,
+            )
+
+            if r.status_code != 200:
+                return []
+
+            hits = r.json().get("hits", {}).get("hits", [])
+            if not hits:
+                return []
+
+            # Deduplicate by executable path
+            seen_paths = set()
+            samples = []
+            for h in hits:
+                exe = h["_source"].get("process", {}).get("executable", "")
+                if not exe or exe in seen_paths:
+                    continue
+                seen_paths.add(exe)
+
+                # Skip if it's just a short name (system binary without path)
+                if '/' not in exe:
+                    continue
+                # Skip known system paths and our own tools
+                if any(exe.startswith(sp) for sp in system_paths):
+                    continue
+                if 'honeypot_guard' in exe or 'honeypot_pam' in exe or 'filebeat' in exe:
+                    continue
+
+                self.logger.info("Auditd: suspicious binary executed: %s", exe)
+
+                # SSH into the VM and hash the file
+                rc, stdout, _ = self._sacrificial_ssh_cmd(
+                    f"sha256sum {shlex.quote(exe)} 2>/dev/null",
+                    timeout=10,
+                )
+                if rc != 0 or not stdout.strip():
+                    continue
+
+                parts = stdout.strip().split(maxsplit=1)
+                if len(parts) != 2 or len(parts[0]) != 64:
+                    continue
+
+                sha256 = parts[0]
+                if sha256 in self.known_hashes:
+                    continue
+
+                self.logger.info("Auditd: new malware candidate %s from %s", sha256[:16], exe)
+                samples.append({
+                    "sha256": sha256,
+                    "src_ip": "",
+                    "country": "",
+                    "honeypot": "sacrificial-vm",
+                    "captured_at": h["_source"].get("@timestamp", ""),
+                    "session_id": "",
+                    "filepath": exe,
+                })
+
+            return samples
+
+        except Exception as e:
+            self.logger.warning("Auditd execve poll failed: %s", e)
+            return []
+
     def _scan_sacrificial_vm(self) -> list[dict]:
         """Scan sacrificial VM for files dropped by attackers (via T-Pot jump host)."""
         samples = []
-        scan_dirs = ["/tmp", "/dev/shm", "/var/tmp", "/root", "/home"]
+        # Scan entire filesystem — malware drops anywhere (e.g. /.hidden_binary)
         rc, stdout, _ = self._sacrificial_ssh_cmd(
-            f"find {' '.join(scan_dirs)} -type f -mmin -60 "
-            f"-not -name '*.log' -not -name '*.json' -not -name '.*' "
+            f"find / -type f -mmin -60 "
+            f"-not -path '/proc/*' -not -path '/sys/*' -not -path '/run/*' "
+            f"-not -path '/snap/*' -not -path '/usr/*' -not -path '/lib/*' "
+            f"-not -path '/boot/*' -not -path '/var/log/*' -not -path '/var/cache/*' "
+            f"-not -path '/var/lib/*' -not -path '/etc/*' "
+            f"-not -name '*.log' -not -name '*.json' "
             f"-size +100c -size -50M "
             f"-exec sha256sum {{}} \\; 2>/dev/null | head -50",
             timeout=30,
@@ -636,6 +966,8 @@ class SampleAnalyzer:
                         '.ssh/', '.env', '.kube/', '.aws/', '.my.cnf', '.pgpass',
                         '.bitcoin/', 'crypto-bot/', '.vault-token',
                         '/opt/webapp/', '/opt/ansible/', '/var/lib/jenkins/',
+                        '/var/lib/landscape/', '/var/lib/dpkg/', '/var/lib/apt/',
+                        '/var/lib/systemd/', '/var/lib/chrony/', '/etc/',
                     ]):
                         continue
                     samples.append({
@@ -710,6 +1042,52 @@ class SampleAnalyzer:
 
         self.logger.warning("Sample %s not found on T-Pot or sacrificial VM", sha256[:16])
         return None
+
+    def _pre_screen_sample(self, sha256: str, local_path: Path) -> bool:
+        """Quick local checks to reject obvious non-malware before full analysis.
+        Returns True if the sample should proceed, False to skip."""
+        try:
+            size = local_path.stat().st_size
+        except OSError:
+            return False
+
+        # Too small to be a real binary (< 512 bytes)
+        if size < 512:
+            self.logger.info("Pre-screen: skipping %s — too small (%d bytes)", sha256[:16], size)
+            return False
+
+        # Read magic bytes for file type detection
+        try:
+            with open(local_path, "rb") as f:
+                header = f.read(512)
+        except OSError:
+            return False
+
+        # Check if it's actually a text/script file masquerading as a binary
+        # Allow shell scripts through — attackers do drop malicious scripts
+        is_elf = header[:4] == b'\x7fELF'
+        is_pe = header[:2] == b'MZ'
+        is_script = header[:2] in (b'#!', b'#\n')
+
+        # Pure text files with no shebang — likely config fragments, not malware
+        if not is_elf and not is_pe and not is_script:
+            try:
+                # Check if entirely printable ASCII/UTF-8
+                text_sample = header[:256].decode("utf-8", errors="strict")
+                # If it decodes cleanly and has no binary chars, it's probably text
+                non_printable = sum(1 for c in text_sample if ord(c) < 32 and c not in '\n\r\t')
+                if non_printable == 0 and size < 10240:
+                    self.logger.info("Pre-screen: skipping %s — plain text file (%d bytes)", sha256[:16], size)
+                    return False
+            except UnicodeDecodeError:
+                pass  # Binary data — proceed
+
+        # Empty or near-empty ELF (corrupted/truncated downloads)
+        if is_elf and size < 1024:
+            self.logger.info("Pre-screen: skipping %s — truncated ELF (%d bytes)", sha256[:16], size)
+            return False
+
+        return True
 
     def _ensure_remnux_running(self) -> bool:
         """Start REMnux VM if not running, wait for SSH."""
@@ -1018,6 +1396,242 @@ class SampleAnalyzer:
         similar.sort(key=lambda x: -x["similarity"])
         return similar[:10]
 
+    # -- Sample clustering -------------------------------------------------
+
+    def cluster_samples(self, results: dict) -> dict:
+        """Assign sample to behavioral clusters using multiple similarity signals."""
+        sha256 = results.get("sha256", "")
+        if not sha256:
+            return {}
+
+        # Collect signals to match against
+        yara_matches = set(results.get("yara_matches", []))
+        dns_queries = set((results.get("dynamic_analysis") or {}).get("dns_queries", []))
+        c2_ips = set(ip["ip"] for ip in (results.get("c2_infrastructure") or {}).get("ips", []))
+        cap_namespaces = set(c.get("namespace", "").split("/")[0]
+                             for c in results.get("capa_capabilities", []) if c.get("namespace"))
+        attack_techs = set(t["technique_id"] for t in results.get("attack_techniques", []))
+        classification = results.get("classification", "unknown")
+
+        if not (yara_matches or dns_queries or c2_ips):
+            return {}
+
+        # Query ES for candidate samples (recent, with overlapping signals)
+        should_clauses = []
+        if yara_matches:
+            should_clauses.append({"terms": {"yara_matches": list(yara_matches)[:10]}})
+        if dns_queries:
+            should_clauses.append({"terms": {"dynamic_analysis.dns_queries": list(dns_queries)[:10]}})
+        if classification != "unknown":
+            should_clauses.append({"term": {"classification": classification}})
+
+        if not should_clauses:
+            return {}
+
+        resp = self._es_get(f"{self.cfg.result_index}/_search", {
+            "size": 200,
+            "query": {"bool": {
+                "should": should_clauses,
+                "minimum_should_match": 1,
+                "must_not": [{"term": {"sha256": sha256}}],
+            }},
+            "_source": ["sha256", "classification", "yara_matches", "capa_capabilities",
+                         "dynamic_analysis.dns_queries", "c2_infrastructure.ips",
+                         "attack_techniques", "ssdeep"],
+        })
+
+        if not resp:
+            return {}
+
+        candidates = resp.get("hits", {}).get("hits", [])
+        if not candidates:
+            return {}
+
+        # Score each candidate
+        members = []
+        for hit in candidates:
+            src = hit["_source"]
+            other_sha = src.get("sha256", "")
+            score = 0
+            shared = []
+
+            # Shared YARA matches
+            other_yara = set(src.get("yara_matches", []))
+            overlap = yara_matches & other_yara
+            if overlap:
+                score += len(overlap) * 25
+                shared.append(f"{len(overlap)} YARA")
+
+            # Shared C2 domains
+            other_dns = set(src.get("dynamic_analysis", {}).get("dns_queries", []) if isinstance(src.get("dynamic_analysis"), dict) else [])
+            dns_overlap = dns_queries & other_dns
+            if dns_overlap:
+                score += len(dns_overlap) * 30
+                shared.append(f"{len(dns_overlap)} C2 domains")
+
+            # Same classification
+            if classification != "unknown" and src.get("classification") == classification:
+                score += 10
+                shared.append(f"same class: {classification}")
+
+            # Shared capa namespaces
+            other_caps = set(c.get("namespace", "").split("/")[0]
+                             for c in src.get("capa_capabilities", []) if isinstance(c, dict) and c.get("namespace"))
+            cap_overlap = cap_namespaces & other_caps
+            if len(cap_overlap) > 2:
+                score += len(cap_overlap) * 5
+                shared.append(f"{len(cap_overlap)} capa")
+
+            if score >= 50:
+                members.append({
+                    "sha256": other_sha,
+                    "similarity_score": min(score, 100),
+                    "shared_signals": shared,
+                    "classification": src.get("classification", "unknown"),
+                })
+
+        if not members:
+            return {}
+
+        members.sort(key=lambda m: -m["similarity_score"])
+        members = members[:20]
+
+        # Determine cluster label from majority classification
+        class_counts = {}
+        for m in members:
+            c = m.get("classification", "unknown")
+            if c != "unknown":
+                class_counts[c] = class_counts.get(c, 0) + 1
+        if classification != "unknown":
+            class_counts[classification] = class_counts.get(classification, 0) + 1
+
+        label = max(class_counts, key=class_counts.get) if class_counts else "unknown"
+
+        # Check for specific family from YARA
+        family = None
+        for ym in yara_matches:
+            yl = ym.lower()
+            for fam in ["mirai", "gafgyt", "tsunami", "xmrig", "emotet", "trickbot", "redtail"]:
+                if fam in yl:
+                    family = fam
+                    break
+            if family:
+                break
+
+        cluster_label = f"{family.title()} Variant Cluster" if family else f"{label.title()} Cluster"
+
+        cluster = {
+            "cluster_id": f"cluster-{label}-{sha256[:12]}",
+            "cluster_label": cluster_label,
+            "cluster_size": len(members) + 1,
+            "cluster_members": members,
+        }
+
+        self.logger.info("Cluster: %s (%d members, top score %d)",
+                         cluster_label, len(members),
+                         members[0]["similarity_score"] if members else 0)
+        return cluster
+
+    # -- C2 infrastructure mapping -----------------------------------------
+
+    def map_c2_infrastructure(self, results: dict) -> dict:
+        """Build C2 infrastructure graph from dynamic analysis network data."""
+        dyn = results.get("dynamic_analysis") or {}
+        if not dyn:
+            return {}
+
+        # Collect all domains
+        domains = set()
+        for d in dyn.get("dns_queries", []):
+            if d and '.' in d:
+                domains.add(d)
+        for entry in dyn.get("tls_sni", []):
+            sni = entry.get("sni", "")
+            if sni and '.' in sni:
+                domains.add(sni)
+        for entry in dyn.get("http_requests", []):
+            host = entry.get("host", "")
+            if host and '.' in host:
+                domains.add(host)
+
+        # Collect all external IPs
+        ips = {}
+        for conn in dyn.get("outbound_connections", []):
+            ip = conn.get("ip", "")
+            if ip and not ip.startswith(("192.168.", "10.", "172.16.", "127.")):
+                if ip not in ips:
+                    ips[ip] = {"ip": ip, "ports": set(), "domains": set()}
+                ips[ip]["ports"].add(conn.get("port", ""))
+                if conn.get("hostname"):
+                    ips[ip]["domains"].add(conn["hostname"])
+                    domains.add(conn["hostname"])
+
+        # Correlate TLS SNI with IPs
+        for entry in dyn.get("tls_sni", []):
+            ip = entry.get("ip", "")
+            sni = entry.get("sni", "")
+            if ip and ip in ips and sni:
+                ips[ip]["domains"].add(sni)
+
+        if not domains and not ips:
+            return {}
+
+        # Query ES for other samples that share C2 infrastructure
+        shared_samples = set()
+        sha256 = results.get("sha256", "")
+        if domains:
+            domain_list = list(domains)[:20]
+            resp = self._es_get(f"{self.cfg.result_index}/_search", {
+                "size": 50,
+                "query": {"bool": {
+                    "should": [{"terms": {"dynamic_analysis.dns_queries": domain_list}}],
+                    "must_not": [{"term": {"sha256": sha256}}],
+                }},
+                "_source": ["sha256", "classification"],
+            })
+            if resp:
+                for hit in resp.get("hits", {}).get("hits", []):
+                    shared_samples.add(hit["_source"]["sha256"])
+
+        # Build output
+        domain_list = []
+        for d in sorted(domains)[:30]:
+            entry = {"domain": d}
+            # Find which IPs serve this domain
+            resolved = [ip for ip, info in ips.items() if d in info["domains"]]
+            if resolved:
+                entry["resolved_ips"] = resolved
+            domain_list.append(entry)
+
+        ip_list = []
+        for ip, info in sorted(ips.items())[:30]:
+            ip_list.append({
+                "ip": ip,
+                "ports": sorted(info["ports"]),
+                "domains": sorted(info["domains"]),
+            })
+
+        c2 = {
+            "domains": domain_list,
+            "ips": ip_list,
+            "shared_with_samples": sorted(shared_samples)[:20],
+        }
+
+        self.logger.info("C2 map: %d domains, %d IPs, %d shared samples",
+                         len(domain_list), len(ip_list), len(shared_samples))
+        return c2
+
+    # -- ATT&CK technique mapping ------------------------------------------
+
+    def map_attack_techniques(self, results: dict) -> list[dict]:
+        """Map sample analysis results to MITRE ATT&CK techniques."""
+        try:
+            from generate_attack_navigator import map_sample_techniques
+            return map_sample_techniques(results)
+        except Exception as e:
+            self.logger.warning("ATT&CK mapping failed: %s", e)
+            return []
+
     # -- Results indexing --------------------------------------------------
 
     def index_results(self, sha256: str, results: dict, metadata: dict):
@@ -1043,6 +1657,16 @@ class SampleAnalyzer:
         if src_ip:
             doc["source"]["src_ip"] = src_ip
 
+        # Attacker session correlation (how the file was dropped)
+        if metadata.get("download_command"):
+            doc["source"]["download_command"] = metadata["download_command"]
+        if metadata.get("download_timestamp"):
+            doc["source"]["download_timestamp"] = metadata["download_timestamp"]
+        if metadata.get("download_user"):
+            doc["source"]["download_user"] = metadata["download_user"]
+        if metadata.get("attacker_user"):
+            doc["source"]["attacker_user"] = metadata["attacker_user"]
+
         result = self._es_put(
             f"{self.cfg.result_index}/_doc/{sha256}",
             doc
@@ -1054,14 +1678,17 @@ class SampleAnalyzer:
             self.logger.error("Failed to index results for %s: %s", sha256[:16], result)
 
     def _extract_classification(self, results: dict) -> tuple[str, str]:
-        """Extract classification and severity from LLM summary or YARA matches."""
-        classification = "unknown"
-        severity = "medium"
+        """Extract classification, severity, and confidence from weighted signal scoring.
 
+        Returns (classification, severity). Also injects 'confidence' and
+        'confidence_signals' into `results` dict for indexing/alerting.
+        """
         llm_summary = (results.get("llm_summary") or "").lower()
         yara_matches = [m.lower() for m in results.get("yara_matches", [])]
+        combined_text = llm_summary + " " + " ".join(yara_matches)
 
-        # Classification from keywords
+        # --- Classification from keywords (unchanged logic) ---
+        classification = "unknown"
         class_keywords = {
             "botnet": ["botnet", "mirai", "gafgyt", "hajime", "mozi", "tsunami"],
             "trojan": ["trojan", "rat", "remote access"],
@@ -1071,28 +1698,120 @@ class SampleAnalyzer:
             "worm": ["worm", "self-propagat", "spreading"],
             "dropper": ["dropper", "downloader", "loader", "stager"],
         }
-
-        combined_text = llm_summary + " " + " ".join(yara_matches)
         for cls, keywords in class_keywords.items():
             if any(kw in combined_text for kw in keywords):
                 classification = cls
                 break
 
-        # Severity from keywords
+        # --- Weighted confidence scoring ---
+        confidence = 0
+        signals = []
+
+        # Packing / compression indicators
+        if results.get("unpacked") or results.get("decompressed"):
+            confidence += 20
+            signals.append("packed/compressed (+20)")
+
+        # Stripped binary (no symbols)
+        file_type = (results.get("file_type") or "").lower()
+        if "stripped" in file_type:
+            confidence += 10
+            signals.append("stripped binary (+10)")
+
+        # Statically linked
+        if "statically linked" in file_type:
+            confidence += 10
+            signals.append("statically linked (+10)")
+
+        # YARA matches
+        yara_count = len(results.get("yara_matches", []))
+        if yara_count > 0:
+            yara_score = min(yara_count * 25, 50)
+            confidence += yara_score
+            signals.append(f"{yara_count} YARA matches (+{yara_score})")
+
+        # VT detections
+        vt = results.get("virustotal", {})
+        if vt and vt.get("found"):
+            detections = vt.get("detections", 0)
+            if detections > 5:
+                confidence += 40
+                signals.append(f"VT {detections} detections (+40)")
+            elif detections > 0:
+                confidence += 20
+                signals.append(f"VT {detections} detections (+20)")
+        elif vt and not vt.get("found"):
+            confidence += 15
+            signals.append("not on VT — novel sample (+15)")
+
+        # Obfuscated / FLOSS strings
+        floss = results.get("floss_strings", [])
+        if len(floss) > 5:
+            confidence += 20
+            signals.append(f"{len(floss)} FLOSS strings (+20)")
+
+        # capa capabilities
+        capa_count = len(results.get("capa_capabilities", []))
+        if capa_count > 5:
+            capa_score = min(capa_count * 3, 30)
+            confidence += capa_score
+            signals.append(f"{capa_count} capa capabilities (+{capa_score})")
+
+        # Dynamic analysis signals
+        dyn = results.get("dynamic_analysis") or {}
+        if dyn:
+            outbound = len(dyn.get("outbound_connections", []))
+            if outbound > 0:
+                net_score = min(outbound * 10, 30)
+                confidence += net_score
+                signals.append(f"{outbound} outbound connections (+{net_score})")
+            new_files = len(dyn.get("new_files", []))
+            if new_files > 0:
+                file_score = min(new_files * 10, 20)
+                confidence += file_score
+                signals.append(f"{new_files} new files dropped (+{file_score})")
+            tls_sni = len(dyn.get("tls_sni", []))
+            if tls_sni > 0:
+                confidence += min(tls_sni * 5, 15)
+                signals.append(f"{tls_sni} TLS SNI domains (+{min(tls_sni * 5, 15)})")
+
+        # LLM classification adds confidence
+        if results.get("llm_summary"):
+            confidence += 10
+            signals.append("LLM analysis available (+10)")
+
+        # Cap at 100
+        confidence = min(confidence, 100)
+
+        # --- Severity from confidence + keyword severity boosters ---
         if any(w in combined_text for w in ["critical", "severe", "destructive", "ransomware", "wiper"]):
             severity = "critical"
-        elif any(w in combined_text for w in ["high", "dangerous", "backdoor", "rat", "botnet"]):
+        elif confidence >= 70 or any(w in combined_text for w in ["high", "dangerous", "backdoor", "rat", "botnet"]):
             severity = "high"
-        elif any(w in combined_text for w in ["medium", "moderate", "miner"]):
+        elif confidence >= 40 or any(w in combined_text for w in ["medium", "moderate", "miner"]):
             severity = "medium"
-        elif any(w in combined_text for w in ["low", "benign", "adware"]):
+        else:
             severity = "low"
 
         # Boost severity if many YARA matches or capa capabilities
-        if len(results.get("yara_matches", [])) > 3:
+        if yara_count > 3:
             severity = max(severity, "high", key=lambda s: SEVERITY_ORDER.get(s, 0))
-        if len(results.get("capa_capabilities", [])) > 10:
+        if capa_count > 10:
             severity = max(severity, "high", key=lambda s: SEVERITY_ORDER.get(s, 0))
+
+        # Inject confidence into results for indexing
+        results["confidence"] = confidence
+        results["confidence_signals"] = signals
+
+        # Build human-readable confidence label
+        if classification != "unknown":
+            results["confidence_label"] = f"{classification.title()} (confidence: {confidence}%)"
+        elif confidence >= 60:
+            results["confidence_label"] = f"Likely malware (confidence: {confidence}%)"
+        elif confidence >= 30:
+            results["confidence_label"] = f"Suspicious (confidence: {confidence}%)"
+        else:
+            results["confidence_label"] = f"Unknown (confidence: {confidence}%)"
 
         return classification, severity
 
@@ -1205,12 +1924,13 @@ class SampleAnalyzer:
             return None
 
         decompiled = deep_data.get("decompiled_functions", [])
-        if not decompiled:
+        func_index = deep_data.get("function_index", [])
+        if not decompiled and not func_index:
             return None
 
-        self.logger.info("Decompiled %d functions for %s — sending to Claude", len(decompiled), sha256[:16])
+        self.logger.info("Extracted %d functions (%d decompiled) for %s",
+                         len(func_index), len(decompiled), sha256[:16])
 
-        # Feed decompiled code to Claude for deep analysis
         api_key = os.environ.get("CLAUDE_API_KEY", "")
         if not api_key:
             return None
@@ -1220,48 +1940,142 @@ class SampleAnalyzer:
         except ImportError:
             return None
 
+        client = anthropic.Anthropic(api_key=api_key)
+        total_cost = 0.0
+
+        # ── PASS 1: Triage — send function index (metadata only, no C code) ──
+        # Ask the LLM which functions warrant deep review based on names, sizes,
+        # call graphs, and suspicious API usage.
+
+        index_text = json.dumps(func_index[:200], indent=1)  # cap at 200 functions
+        if len(index_text) > 15000:
+            index_text = index_text[:15000] + "\n... truncated ..."
+
+        triage_prompt = f"""You are triaging a binary captured from an SSH honeypot. Below is the function index — metadata for every non-thunk function extracted by Ghidra. NO decompiled code is included yet.
+
+Your job: identify which functions warrant deep code review, and which can be skipped.
+
+RULES:
+- Select functions based on evidence: suspicious API calls, large size, interesting names, call graph position (functions called by many others, or that call suspicious APIs)
+- Do NOT select compiler-generated functions (e.g. __libc_csu_init, _start, frame_dummy, register_tm_clones, deregister_tm_clones) unless they contain suspicious calls
+- Explain WHY each function was selected — cite the specific evidence from the index
+- If the binary has very few functions (<10 non-trivial), select all of them
+
+Binary: {results.get('file_type','')} | {results.get('file_size',0)} bytes
+Suspicious APIs found in binary: {deep_data.get('suspicious_apis', [])}
+Total functions: {len(func_index)}
+
+Respond as JSON:
+{{
+  "selected_functions": ["func_name_1", "func_name_2", ...],
+  "triage_reasoning": {{
+    "func_name_1": "why this function — e.g. calls connect+send, largest function, called by main",
+    "func_name_2": "why this function — e.g. calls execve+fork, name suggests persistence"
+  }},
+  "skipped_summary": "brief note on what was skipped and why (e.g. '45 compiler/init stubs, 12 string helpers')"
+}}
+
+FUNCTION INDEX:
+{index_text}"""
+
+        try:
+            triage_response = client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=1500,
+                messages=[{"role": "user", "content": triage_prompt}],
+            )
+            triage_text = triage_response.content[0].text
+            triage_cost = (triage_response.usage.input_tokens * 3 / 1_000_000) + (triage_response.usage.output_tokens * 15 / 1_000_000)
+            total_cost += triage_cost
+            self.logger.info("Pass 1 triage: %d in / %d out tokens ($%.4f) for %s",
+                             triage_response.usage.input_tokens, triage_response.usage.output_tokens,
+                             triage_cost, sha256[:16])
+
+            # Parse triage response
+            triage_match = re.search(r'\{[\s\S]*\}', triage_text)
+            if triage_match:
+                triage_data = json.loads(triage_match.group())
+            else:
+                triage_data = {"selected_functions": []}
+        except (json.JSONDecodeError, Exception) as e:
+            self.logger.warning("Pass 1 triage failed for %s: %s — falling back to top 15 by size", sha256[:16], e)
+            triage_data = {"selected_functions": [f["name"] for f in func_index[:15]],
+                           "triage_reasoning": {"fallback": "triage pass failed, using top 15 by size"}}
+
+        selected_names = set(triage_data.get("selected_functions", []))
+
+        # If triage selected nothing useful, fall back to top 15 by size
+        if not selected_names:
+            selected_names = {f["name"] for f in func_index[:15]}
+            triage_data["triage_reasoning"] = {"fallback": "no functions selected, using top 15 by size"}
+
+        # ── PASS 2: Deep analysis — send decompiled C for selected functions ──
+
+        # Build decompiled code for selected functions
+        selected_funcs = [f for f in decompiled if f["name"] in selected_names]
+
+        # If selected functions weren't found in decompiled (name mismatch), fall back
+        if not selected_funcs:
+            selected_funcs = decompiled[:15]
+
         functions_text = ""
-        for func in decompiled[:15]:
+        for func in selected_funcs[:25]:  # hard cap at 25 to stay within token budget
             functions_text += f"\n--- Function: {func['name']} ({func['size']} bytes) at {func['address']} ---\n"
+            if func.get("suspicious_calls"):
+                functions_text += f"// Suspicious API calls: {', '.join(func['suspicious_calls'])}\n"
             functions_text += func.get("c_code", "// no code") + "\n"
 
-        prompt = f"""You are an elite reverse engineer analyzing decompiled malware code. This binary was captured from a honeypot.
+        # Include triage reasoning so the LLM knows why these were selected
+        triage_reasoning_text = json.dumps(triage_data.get("triage_reasoning", {}), indent=1)[:2000]
 
-Analyze each decompiled function and provide:
+        deep_prompt = f"""You are analyzing decompiled malware code from a honeypot-captured binary. These functions were selected from {len(func_index)} total functions based on a triage pass.
 
-1. **Function-by-function breakdown** — what each function does in plain English
-2. **C2 Protocol** — how it communicates with command & control (ports, protocols, encryption)
-3. **Exploitation** — any CVEs being exploited, what vulnerabilities it targets
-4. **Evasion techniques** — anti-debug, sandbox detection, packing, string obfuscation
-5. **Persistence mechanisms** — how it survives reboot
-6. **IOCs extracted from code** — hardcoded IPs, domains, ports, file paths, registry keys, mutexes
-7. **MITRE ATT&CK techniques** with specific IDs
-8. **Detection opportunities** — behavioral signatures, YARA patterns based on code
+RULES:
+- Report ONLY what the code demonstrates — do not speculate about capabilities not present in the decompiled output
+- Cite specific code patterns, strings, constants, and API calls for every claim
+- If decompilation is incomplete or unclear, say so — do not guess what missing code does
+- Flag anything that warrants further investigation (obfuscated sections, encrypted data, indirect calls that couldn't be resolved)
+
+Triage reasoning (why these functions were selected):
+{triage_reasoning_text}
 
 Binary info: {results.get('file_type','')} | {results.get('file_size',0)} bytes | Suspicious APIs: {deep_data.get('suspicious_apis',[])}
 
-DECOMPILED FUNCTIONS:
+Provide your analysis as structured text covering:
+1. **Function-by-function findings** — what each function does, citing specific code evidence
+2. **Observed IOCs** — hardcoded IPs, domains, ports, paths, keys found IN the code
+3. **MITRE ATT&CK techniques** — only those demonstrated by the code, with evidence
+4. **Warrants further investigation** — what couldn't be determined from decompilation alone (encrypted configs, indirect jumps, packed sections, functions that failed to decompile)
+
+SELECTED FUNCTIONS ({len(selected_funcs)} of {len(func_index)} total):
 {functions_text}"""
 
-        client = anthropic.Anthropic(api_key=api_key)
-        response = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=4000,
-            messages=[{"role": "user", "content": prompt}],
-        )
-
-        analysis = response.content[0].text
-        cost = (response.usage.input_tokens * 3 / 1_000_000) + (response.usage.output_tokens * 15 / 1_000_000)
-        self.logger.info("Deep Claude analysis: %d in / %d out tokens ($%.4f) for %s",
-                         response.usage.input_tokens, response.usage.output_tokens, cost, sha256[:16])
+        try:
+            deep_response = client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=4000,
+                messages=[{"role": "user", "content": deep_prompt}],
+            )
+            analysis = deep_response.content[0].text
+            deep_cost = (deep_response.usage.input_tokens * 3 / 1_000_000) + (deep_response.usage.output_tokens * 15 / 1_000_000)
+            total_cost += deep_cost
+            self.logger.info("Pass 2 deep analysis: %d in / %d out tokens ($%.4f) for %s",
+                             deep_response.usage.input_tokens, deep_response.usage.output_tokens,
+                             deep_cost, sha256[:16])
+        except Exception as e:
+            self.logger.error("Pass 2 deep analysis failed for %s: %s", sha256[:16], e)
+            analysis = ""
 
         self._mark_deep_analyzed(sha256)
 
         return {
             "deep_analysis": analysis,
+            "triage": triage_data,
+            "functions_analyzed": len(selected_funcs),
+            "functions_total": len(func_index),
             "decompiled_function_count": len(decompiled),
             "score": score,
-            "cost": round(cost, 4),
+            "cost": round(total_cost, 4),
         }
 
     def claude_analyze(self, results: dict) -> Optional[dict]:
@@ -1279,7 +2093,7 @@ DECOMPILED FUNCTIONS:
         sha256 = results.get("sha256", "?")
         self.logger.info("Calling Claude API for %s...", sha256[:16])
 
-        # Build analysis prompt with all available data
+        # Build analysis prompt with ALL available evidence
         strings_text = "\n".join(results.get("interesting_strings", [])[:30])
         floss_text = "\n".join(results.get("floss_strings", [])[:20])
         capa_text = json.dumps(results.get("capa_capabilities", [])[:20], indent=2)
@@ -1288,26 +2102,61 @@ DECOMPILED FUNCTIONS:
         dyn = results.get("dynamic_analysis", {})
         dyn_text = ""
         if dyn:
+            strace = dyn.get("strace") or {}
             dyn_text = f"""
-Dynamic Analysis (Sandbox Detonation):
-  DNS Queries: {dyn.get('dns_queries', [])}
-  Outbound Connections: {dyn.get('outbound_connections', [])}
-  New Files Created: {dyn.get('new_files', [])}
-  Detonation Duration: {dyn.get('detonation_duration', '?')}s
+Dynamic Analysis (Sandbox Detonation — {dyn.get('detonation_duration', '?')}s):
+  DNS Queries: {json.dumps(dyn.get('dns_queries', [])[:20])}
+  Outbound Connections: {json.dumps(dyn.get('outbound_connections', [])[:20])}
+  TLS SNI (Server Name Indication): {json.dumps(dyn.get('tls_sni', [])[:15])}
+  HTTP Requests: {json.dumps(dyn.get('http_requests', [])[:15])}
+  JA3 TLS Fingerprints: {json.dumps(dyn.get('ja3_fingerprints', [])[:10])}
+  New Files Created: {json.dumps(dyn.get('new_files', [])[:15])}
+  Filesystem Changes: {json.dumps(dyn.get('filesystem_changes', [])[:15])}
+  Process Tree (auditd): {json.dumps(dyn.get('process_tree', [])[:15], indent=2)[:2000]}
+  Strace File Operations: {json.dumps(strace.get('file_operations', [])[:20])[:1000]}
+  Strace Network Operations: {json.dumps(strace.get('network_operations', [])[:15])[:800]}
+  Strace Process Operations: {json.dumps(strace.get('process_operations', [])[:15])[:800]}
+  PCAP Size: {dyn.get('pcap_size', 0)} bytes
+"""
+        # VirusTotal / MalwareBazaar context if available
+        vt = results.get("virustotal", {})
+        vt_text = ""
+        if vt:
+            vt_text = f"""
+VirusTotal:
+  Detections: {vt.get('positives', '?')}/{vt.get('total', '?')}
+  Detection Names: {json.dumps(vt.get('detection_names', [])[:10])}
+"""
+        mb = results.get("malwarebazaar", {})
+        mb_text = ""
+        if mb:
+            mb_text = f"""
+MalwareBazaar:
+  Signature: {mb.get('signature', 'N/A')}
+  Tags: {mb.get('tags', [])}
 """
 
-        prompt = f"""You are an elite malware analyst at ELKIE SOC. Analyze these results from a sample captured by our honeypot. Be specific, technical, and actionable.
+        prompt = f"""You are a malware analyst. Analyze the evidence below from a honeypot-captured sample. Your job is to report ONLY what the evidence supports — do not speculate or assume capabilities that are not demonstrated by the data.
+
+RULES:
+- Every claim MUST cite the specific evidence that supports it (e.g. "Classification: miner — strace shows connect() to port 3333, strings contain 'xmrig', capa identifies mining capability")
+- If evidence is ambiguous or missing, say so explicitly — do not fill gaps with assumptions
+- If the 90-second detonation window may have been too short to capture full behavior, note this
+- Distinguish between what the sample DID (observed) vs what it COULD do (static capabilities)
 
 Provide your response as JSON with these exact keys:
 {{
   "classification": "one of: botnet, trojan, miner, ransomware, backdoor, worm, dropper, RAT, exploit-kit, unknown",
+  "confidence": "one of: high, medium, low — with a brief reason (e.g. 'high — VT 45/70, YARA match, observed C2 traffic')",
   "severity": "one of: critical, high, medium, low",
-  "malware_family": "specific family name or unknown",
-  "summary": "detailed 3-4 paragraph threat assessment covering what it does, how it works, TTPs, IOCs, and recommendations",
-  "yara_rule": "a complete YARA rule to detect this sample (rule name, meta, strings, condition)"
+  "malware_family": "specific family name if identifiable from VT/MB/strings/YARA, otherwise 'unknown'",
+  "summary": "evidence-based assessment structured as: 1) What was observed (behavioral evidence), 2) Static capabilities (from capa/strings/Ghidra), 3) Network activity (DNS/connections/TLS/HTTP), 4) IOCs extracted from evidence",
+  "warrants_investigation": "list of specific things that need further analysis — e.g. encrypted strings that could not be decoded, C2 domains needing reputation lookup, functions that were not decompiled, behaviors that may emerge after longer execution, unpacked layers not yet analyzed",
+  "mitre_attack": ["Txx.xxx — technique name — citing evidence"],
+  "yara_rule": "a YARA rule based on concrete strings/bytes observed in this sample, not speculative patterns"
 }}
 
---- SAMPLE DATA ---
+--- EVIDENCE ---
 SHA256: {results.get('sha256', '')}
 MD5: {results.get('md5', '')}
 File Type: {results.get('file_type', '')}
@@ -1330,13 +2179,13 @@ capa Capabilities:
 
 Ghidra Analysis:
 {ghidra_text}
-{dyn_text}"""
+{dyn_text}{vt_text}{mb_text}"""
 
         try:
             client = anthropic.Anthropic(api_key=api_key)
             response = client.messages.create(
                 model="claude-sonnet-4-20250514",
-                max_tokens=2000,
+                max_tokens=3000,
                 messages=[{"role": "user", "content": prompt}],
             )
 
@@ -1357,10 +2206,93 @@ Ghidra Analysis:
                 pass
 
             # Fallback: use raw text as summary
-            return {"summary": text, "classification": None, "severity": None, "yara_rule": ""}
+            return {"summary": text, "classification": None, "confidence": None,
+                    "severity": None, "yara_rule": "", "warrants_investigation": ""}
 
         except Exception as e:
             self.logger.error("Claude API failed for %s: %s", sha256[:16], e)
+            return None
+
+    def claude_generate_sigma(self, results: dict) -> Optional[str]:
+        """Generate a behavioral Sigma rule from dynamic analysis via Claude API."""
+        dyn = results.get("dynamic_analysis")
+        if not dyn:
+            return None
+
+        api_key = self._anthropic_key
+        if not api_key:
+            return None
+
+        sha256 = results.get("sha256", "?")
+        classification = results.get("classification", "unknown")
+        yara_matches = results.get("yara_matches", [])[:5]
+
+        # Build behavioral context
+        process_tree = json.dumps(dyn.get("process_tree", [])[:15], indent=2)[:2000]
+        strace = dyn.get("strace") or {}
+        file_ops = json.dumps(strace.get("file_operations", [])[:20])[:1000]
+        net_ops = json.dumps(strace.get("network_operations", [])[:15])[:800]
+        proc_ops = json.dumps(strace.get("process_operations", [])[:15])[:800]
+        dns = ", ".join(dyn.get("dns_queries", [])[:10])
+        new_files = ", ".join(dyn.get("new_files", [])[:10])
+
+        prompt = f"""You are a Sigma rule author. Generate a Sigma detection rule in YAML that detects the BEHAVIORAL pattern of this Linux malware. Focus on process chains, file operations, and network patterns — not just IOCs.
+
+Classification: {classification}
+YARA matches: {', '.join(yara_matches)}
+
+Process Tree:
+{process_tree}
+
+Strace File Operations:
+{file_ops}
+
+Strace Network Operations:
+{net_ops}
+
+Strace Process Operations:
+{proc_ops}
+
+DNS Queries: {dns}
+Files Created: {new_files}
+
+Requirements:
+- Use logsource categories: process_creation, file_event, network_connection, or dns_query
+- Include: title, status (experimental), description, logsource, detection, level, tags (MITRE ATT&CK)
+- The rule should detect the BEHAVIOR, not specific hashes or IPs
+- Output ONLY valid YAML, no explanation"""
+
+        try:
+            import anthropic
+            client = anthropic.Anthropic(api_key=api_key)
+            response = client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=1500,
+                messages=[{"role": "user", "content": prompt}],
+            )
+
+            text = response.content[0].text.strip()
+            cost = (response.usage.input_tokens * 3 / 1_000_000) + (response.usage.output_tokens * 15 / 1_000_000)
+            self.logger.info("Sigma generation: %d in / %d out tokens ($%.4f)",
+                             response.usage.input_tokens, response.usage.output_tokens, cost)
+
+            # Strip markdown fences if present
+            if text.startswith("```"):
+                text = "\n".join(text.split("\n")[1:])
+            if text.endswith("```"):
+                text = "\n".join(text.split("\n")[:-1])
+
+            # Validate YAML
+            import yaml
+            parsed = yaml.safe_load(text)
+            if isinstance(parsed, dict) and "title" in parsed and "detection" in parsed:
+                return text
+            else:
+                self.logger.warning("Sigma rule missing required fields")
+                return None
+
+        except Exception as e:
+            self.logger.warning("Sigma generation failed: %s", e)
             return None
 
     # -- VirusTotal --------------------------------------------------------
@@ -1723,6 +2655,20 @@ Ghidra Analysis:
                 attrs.append({"type": "text", "category": "Other", "value": f"[{ns}] {name}",
                                "to_ids": False, "comment": "capa capability (MITRE ATT&CK)"})
 
+        # --- C2 infrastructure as domain|ip composite attributes ---
+        for entry in (results.get("c2_infrastructure") or {}).get("domains", [])[:10]:
+            domain = entry.get("domain", "")
+            for ip in entry.get("resolved_ips", [])[:3]:
+                attrs.append({"type": "domain|ip", "category": "Network activity",
+                               "value": f"{domain}|{ip}", "to_ids": True,
+                               "comment": "C2 infrastructure mapping"})
+
+        # --- ATT&CK technique tags (MISP galaxy format) ---
+        for tech in results.get("attack_techniques", [])[:20]:
+            tid = tech["technique_id"]
+            src = tech.get("source", "")
+            tags.append({"name": f"misp-galaxy:mitre-attack-pattern=\"{tid}\""})
+
         # --- LLM threat assessment ---
         if results.get("llm_summary"):
             attrs.append({"type": "comment", "category": "External analysis",
@@ -1819,54 +2765,19 @@ Ghidra Analysis:
         return enriched
 
     def _sandbox_ssh(self, cmd: str, timeout: int = 30) -> tuple[int, str, str]:
-        """Run command on sandbox VM via SSH key auth."""
-        ssh_args = [
-            "ssh", "-o", "StrictHostKeyChecking=no",
-            "-o", "ConnectTimeout=10",
-            "-o", "BatchMode=yes",
-            "-p", str(self.cfg.sandbox_port),
-            f"{self.cfg.sandbox_user}@{self.cfg.sandbox_host}",
-            cmd,
-        ]
-        try:
-            result = subprocess.run(ssh_args, capture_output=True, text=True, timeout=timeout)
-            return result.returncode, result.stdout, result.stderr
-        except subprocess.TimeoutExpired:
-            return -1, "", "timeout"
-        except Exception as e:
-            return -1, "", str(e)
+        """Run command on sandbox VM via T-Pot jump host."""
+        return self._ssh_cmd(self.cfg.sandbox_host, self.cfg.sandbox_port,
+                             self.cfg.sandbox_user, cmd, timeout=timeout)
 
     def _sandbox_scp_to(self, local_path: str, remote_path: str, timeout: int = 60) -> bool:
-        """SCP file to sandbox via key auth."""
-        scp_args = [
-            "scp", "-o", "StrictHostKeyChecking=no",
-            "-o", "ConnectTimeout=10",
-            "-o", "BatchMode=yes",
-            "-P", str(self.cfg.sandbox_port),
-            local_path,
-            f"{self.cfg.sandbox_user}@{self.cfg.sandbox_host}:{remote_path}",
-        ]
-        try:
-            result = subprocess.run(scp_args, capture_output=True, text=True, timeout=timeout)
-            return result.returncode == 0
-        except Exception:
-            return False
+        """Copy file to sandbox via T-Pot jump host."""
+        return self._scp_to(self.cfg.sandbox_host, self.cfg.sandbox_port,
+                            self.cfg.sandbox_user, "", local_path, remote_path, timeout=timeout)
 
     def _sandbox_scp_from(self, remote_path: str, local_path: str, timeout: int = 60) -> bool:
-        """SCP file from sandbox via key auth."""
-        scp_args = [
-            "scp", "-o", "StrictHostKeyChecking=no",
-            "-o", "ConnectTimeout=10",
-            "-o", "BatchMode=yes",
-            "-P", str(self.cfg.sandbox_port),
-            f"{self.cfg.sandbox_user}@{self.cfg.sandbox_host}:{remote_path}",
-            local_path,
-        ]
-        try:
-            result = subprocess.run(scp_args, capture_output=True, text=True, timeout=timeout)
-            return result.returncode == 0
-        except Exception:
-            return False
+        """Copy file from sandbox via T-Pot jump host."""
+        return self._scp_from(self.cfg.sandbox_host, self.cfg.sandbox_port,
+                              self.cfg.sandbox_user, "", remote_path, local_path, timeout=timeout)
 
     def _sandbox_restore_snapshot(self) -> bool:
         """Restore sandbox VM to clean snapshot via Proxmox API."""
@@ -1907,6 +2818,222 @@ Ghidra Analysis:
 
         self.logger.error("Sandbox VM not reachable after snapshot restore")
         return False
+
+    def _parse_strace_log(self, strace_path: Path) -> dict:
+        """Parse strace output for file, network, and process operations."""
+        if not strace_path.exists():
+            return {}
+
+        try:
+            content = strace_path.read_text(errors="replace")
+        except OSError:
+            return {}
+
+        file_ops = []     # open, openat, creat, unlink, rename
+        net_ops = []      # connect, bind, sendto
+        proc_ops = []     # execve, clone, fork, kill
+        seen_files = set()
+        seen_nets = set()
+
+        for line in content.splitlines():
+            # File operations: openat(AT_FDCWD, "/etc/passwd", ...)
+            m = re.match(r'(\d+)\s+(openat?|creat|unlink|rename)\(.*?"([^"]+)"', line)
+            if m:
+                pid, syscall, path = m.group(1), m.group(2), m.group(3)
+                if path not in seen_files and not path.startswith(("/usr/lib", "/lib/x86_64", "/etc/ld")):
+                    seen_files.add(path)
+                    file_ops.append({"pid": pid, "syscall": syscall, "path": path})
+                continue
+
+            # Network: connect(3, {sa_family=AF_INET, sin_port=htons(443), sin_addr=inet_addr("1.2.3.4")}, ...)
+            m = re.match(r'(\d+)\s+(connect|bind|sendto)\(.*?sin_port=htons\((\d+)\).*?inet_addr\("([^"]+)"\)', line)
+            if m:
+                pid, syscall, port, ip = m.group(1), m.group(2), m.group(3), m.group(4)
+                key = f"{ip}:{port}"
+                if key not in seen_nets:
+                    seen_nets.add(key)
+                    net_ops.append({"pid": pid, "syscall": syscall, "ip": ip, "port": port})
+                continue
+
+            # Process: execve("/bin/sh", ["sh", "-c", "..."], ...)
+            m = re.match(r'(\d+)\s+(execve|clone|fork)\(.*?"?([^",\s]+)"?', line)
+            if m:
+                pid, syscall, target = m.group(1), m.group(2), m.group(3)
+                proc_ops.append({"pid": pid, "syscall": syscall, "target": target[:200]})
+                continue
+
+        return {
+            "file_operations": file_ops[:100],
+            "network_operations": net_ops[:50],
+            "process_operations": proc_ops[:50],
+            "total_syscalls": len(content.splitlines()),
+        }
+
+    def _run_volatility(self, memdump_path: Path, sha256: str) -> dict:
+        """Run volatility3 on REMnux to analyze a memory dump.
+
+        Uploads dump to REMnux, runs pslist + netscan + malfind, returns parsed results.
+        """
+        if not memdump_path.exists() or memdump_path.stat().st_size < 1048576:
+            return {}
+
+        remote_dump = f"/home/{self.cfg.remnux_user}/inbox/{sha256}_memdump.lime"
+
+        # Upload dump to REMnux
+        if not self._scp_to(
+            self.cfg.remnux_host, self.cfg.remnux_port, self.cfg.remnux_user,
+            self._remnux_pass, str(memdump_path), remote_dump
+        ):
+            self.logger.warning("Failed to upload memory dump to REMnux")
+            return {}
+
+        vol_results = {}
+
+        # Run volatility3 plugins
+        plugins = {
+            "pslist": "linux.pslist.PsList",
+            "sockstat": "linux.sockstat.Sockstat",
+            "malfind": "linux.malware.malfind.Malfind",
+        }
+
+        for name, plugin in plugins.items():
+            rc, output, err = self._ssh_cmd(
+                self.cfg.remnux_host, self.cfg.remnux_port, self.cfg.remnux_user,
+                f"vol3 -q -f {remote_dump} -r json {plugin} 2>/dev/null",
+                password=self._remnux_pass, timeout=180,
+            )
+            if rc == 0 and output.strip():
+                try:
+                    vol_results[name] = json.loads(output)
+                except json.JSONDecodeError:
+                    vol_results[name] = output[:3000]
+            else:
+                self.logger.debug("vol3 %s returned rc=%d: %s", name, rc, (err or "")[:200])
+
+        # Cleanup dump on REMnux
+        self._ssh_cmd(
+            self.cfg.remnux_host, self.cfg.remnux_port, self.cfg.remnux_user,
+            f"rm -f {remote_dump}",
+            password=self._remnux_pass, timeout=10,
+        )
+
+        # Cleanup local dump (large file)
+        try:
+            memdump_path.unlink()
+        except OSError:
+            pass
+
+        return vol_results
+
+    def _parse_audit_process_tree(self, audit_log_path: Path) -> list:
+        """Parse auditd log into a process execution tree.
+
+        Returns a list of process entries with parent/child relationships and
+        the commands each process executed.
+        """
+        if not audit_log_path.exists():
+            return []
+
+        try:
+            content = audit_log_path.read_text(errors="replace")
+        except OSError:
+            return []
+
+        processes = {}  # pid -> {ppid, exe, args, children, files}
+
+        for line in content.splitlines():
+            # Parse EXECVE syscall records from auditd
+            # Format: type=SYSCALL ... pid=X ppid=Y exe="..." ...
+            if "type=SYSCALL" in line and "EXECVE" in line:
+                pid_m = re.search(r'\bpid=(\d+)', line)
+                ppid_m = re.search(r'\bppid=(\d+)', line)
+                exe_m = re.search(r'\bexe="([^"]*)"', line)
+                comm_m = re.search(r'\bcomm="([^"]*)"', line)
+
+                if pid_m:
+                    pid = pid_m.group(1)
+                    ppid = ppid_m.group(1) if ppid_m else "0"
+                    exe = exe_m.group(1) if exe_m else (comm_m.group(1) if comm_m else "unknown")
+
+                    if pid not in processes:
+                        processes[pid] = {
+                            "pid": pid,
+                            "ppid": ppid,
+                            "exe": exe,
+                            "children": [],
+                        }
+                    else:
+                        processes[pid]["exe"] = exe
+                        processes[pid]["ppid"] = ppid
+
+            # Parse EXECVE argument records for full command lines
+            # Format: type=EXECVE ... a0="cmd" a1="arg1" ...
+            elif "type=EXECVE" in line:
+                args = []
+                for arg_m in re.finditer(r'a\d+="([^"]*)"', line):
+                    args.append(arg_m.group(1))
+                # Also handle hex-encoded args: a0=2F62696E2F7368
+                for arg_m in re.finditer(r'a\d+=([0-9A-Fa-f]+)(?:\s|$)', line):
+                    try:
+                        decoded = bytes.fromhex(arg_m.group(1)).decode("utf-8", errors="replace")
+                        args.append(decoded)
+                    except (ValueError, UnicodeDecodeError):
+                        pass
+                if args:
+                    # Associate with the most recent PID we saw
+                    # auditd groups related records by audit event ID
+                    event_m = re.search(r'msg=audit\(\d+\.\d+:(\d+)\)', line)
+                    if event_m:
+                        event_id = event_m.group(1)
+                        # Find the SYSCALL record with same event ID
+                        for pid, proc in processes.items():
+                            if proc.get("_event_id") == event_id:
+                                proc["cmdline"] = " ".join(args)
+                                break
+
+            # Track event IDs for correlation
+            if "type=SYSCALL" in line:
+                event_m = re.search(r'msg=audit\(\d+\.\d+:(\d+)\)', line)
+                pid_m = re.search(r'\bpid=(\d+)', line)
+                if event_m and pid_m:
+                    pid = pid_m.group(1)
+                    if pid in processes:
+                        processes[pid]["_event_id"] = event_m.group(1)
+
+            # Track file creation/modification
+            if "type=SYSCALL" in line and any(s in line for s in ["openat", "creat", "rename", "unlink"]):
+                pid_m = re.search(r'\bpid=(\d+)', line)
+                if pid_m:
+                    pid = pid_m.group(1)
+                    name_m = re.search(r'\bname="([^"]*)"', line)
+                    if name_m and pid in processes:
+                        if "files_touched" not in processes[pid]:
+                            processes[pid]["files_touched"] = []
+                        processes[pid]["files_touched"].append(name_m.group(1))
+
+        # Build parent-child relationships
+        for pid, proc in processes.items():
+            ppid = proc.get("ppid", "0")
+            if ppid in processes and ppid != pid:
+                processes[ppid]["children"].append(pid)
+
+        # Convert to list, clean up internal fields, limit size
+        result = []
+        for pid, proc in list(processes.items())[:100]:
+            entry = {
+                "pid": proc["pid"],
+                "ppid": proc.get("ppid", "0"),
+                "exe": proc.get("exe", "unknown"),
+            }
+            if proc.get("cmdline"):
+                entry["cmdline"] = proc["cmdline"][:500]
+            if proc.get("children"):
+                entry["children"] = proc["children"]
+            if proc.get("files_touched"):
+                entry["files_touched"] = proc["files_touched"][:20]
+            result.append(entry)
+
+        return result
 
     def detonate_sample(self, sha256: str, local_path: Path) -> Optional[dict]:
         """Detonate a sample in the sandbox VM and collect behavioral data."""
@@ -1953,14 +3080,29 @@ Ghidra Analysis:
             timeout=5,
         )
 
+        # Step 2.5: Snapshot filesystem state before detonation for diffing
+        rc_snap, fs_before, _ = self._sandbox_ssh(
+            "sudo find / -xdev -not -path '/proc/*' -not -path '/sys/*' -not -path '/run/*' "
+            "-not -path '/dev/*' -not -path '/tmp/ghidra*' "
+            "-type f -printf '%T@ %m %s %p\\n' 2>/dev/null | sort",
+            timeout=30,
+        )
+        fs_before_lines = set(fs_before.strip().splitlines()) if rc_snap == 0 and fs_before else set()
+
         # Step 3: Upload sample
         remote_sample = f"/home/{self.cfg.sandbox_user}/detonation/{sha256}"
         if not self._sandbox_scp_to(str(local_path), remote_sample):
             self.logger.error("Failed to upload sample to sandbox")
             return None
 
-        # Step 4: Make executable and detonate (backgrounded, don't wait for it)
-        self._sandbox_ssh(f"chmod +x {remote_sample} 2>/dev/null; nohup {remote_sample} > /dev/null 2>&1 &", timeout=10)
+        # Step 4: Make executable and detonate under strace (backgrounded)
+        self._sandbox_ssh(
+            f"chmod +x {remote_sample} 2>/dev/null; "
+            f"nohup strace -f -e trace=network,file,process "
+            f"-o /home/{self.cfg.sandbox_user}/detonation/strace.log "
+            f"timeout {self.cfg.sandbox_timeout} {remote_sample} > /dev/null 2>&1 &",
+            timeout=10,
+        )
 
         # Step 5: Wait for detonation period
         self.logger.info("Detonating %s — waiting %ds", sha256[:16], self.cfg.sandbox_timeout)
@@ -1981,6 +3123,28 @@ Ghidra Analysis:
             str(results_dir / "capture.pcap"),
         )
 
+        # Step 6.5: Grab strace log
+        self._sandbox_scp_from(
+            f"/home/{self.cfg.sandbox_user}/detonation/strace.log",
+            str(results_dir / "strace.log"),
+        )
+
+        # Step 6.6: Memory dump with LiME
+        memdump_path = results_dir / "memdump.lime"
+        rc_lime, lime_out, lime_err = self._sandbox_ssh(
+            f"sudo insmod /opt/lime.ko 'path=/home/{self.cfg.sandbox_user}/detonation/memdump.lime format=lime' 2>&1",
+            timeout=30,
+        )
+        if rc_lime == 0:
+            time.sleep(5)  # give LiME time to write
+            self._sandbox_ssh("sudo rmmod lime 2>/dev/null", timeout=10)
+            self._sandbox_scp_from(f"/home/{self.cfg.sandbox_user}/detonation/memdump.lime", str(memdump_path))
+            self._sandbox_ssh(f"sudo rm -f /home/{self.cfg.sandbox_user}/detonation/memdump.lime", timeout=5)
+            if memdump_path.exists():
+                self.logger.info("Memory dump captured: %d MB", memdump_path.stat().st_size // 1048576)
+        else:
+            self.logger.warning("LiME load failed: %s", lime_err or lime_out)
+
         # Step 7: Collect process list, network connections, filesystem changes
         rc, ps_out, _ = self._sandbox_ssh("ps auxf", timeout=5)
         rc2, net_out, _ = self._sandbox_ssh("sudo ss -tulnp && echo '---' && sudo ss -anp", timeout=5)
@@ -1988,6 +3152,61 @@ Ghidra Analysis:
             f"find /tmp /dev/shm /var/tmp /home/{self.cfg.sandbox_user} -newer {remote_sample} -type f 2>/dev/null",
             timeout=10,
         )
+
+        # Step 7.5: Comprehensive filesystem diff — new, modified, deleted files
+        fs_changes = {"new": [], "modified": [], "deleted": []}
+        if fs_before_lines:
+            rc_after, fs_after, _ = self._sandbox_ssh(
+                "sudo find / -xdev -not -path '/proc/*' -not -path '/sys/*' -not -path '/run/*' "
+                "-not -path '/dev/*' -not -path '/tmp/ghidra*' "
+                "-type f -printf '%T@ %m %s %p\\n' 2>/dev/null | sort",
+                timeout=30,
+            )
+            if rc_after == 0 and fs_after:
+                fs_after_lines = set(fs_after.strip().splitlines())
+
+                # Build path->metadata maps for comparison
+                def parse_fs_line(line):
+                    parts = line.split(" ", 3)
+                    if len(parts) == 4:
+                        return parts[3], line  # path -> full line
+                    return None, None
+
+                before_map = {}
+                for line in fs_before_lines:
+                    path, full = parse_fs_line(line)
+                    if path:
+                        before_map[path] = full
+
+                after_map = {}
+                for line in fs_after_lines:
+                    path, full = parse_fs_line(line)
+                    if path:
+                        after_map[path] = full
+
+                # New files (in after but not before)
+                for path in after_map:
+                    if path not in before_map:
+                        fs_changes["new"].append(path)
+
+                # Deleted files (in before but not after)
+                for path in before_map:
+                    if path not in after_map:
+                        fs_changes["deleted"].append(path)
+
+                # Modified files (same path, different metadata)
+                for path in after_map:
+                    if path in before_map and after_map[path] != before_map[path]:
+                        fs_changes["modified"].append(path)
+
+                # Limit each category
+                fs_changes["new"] = fs_changes["new"][:50]
+                fs_changes["modified"] = fs_changes["modified"][:50]
+                fs_changes["deleted"] = fs_changes["deleted"][:50]
+
+                self.logger.info("Filesystem diff: %d new, %d modified, %d deleted",
+                                 len(fs_changes["new"]), len(fs_changes["modified"]),
+                                 len(fs_changes["deleted"]))
 
         # Step 8: Parse auditd for executed commands
         rc4, audit_out, _ = self._sandbox_ssh(
@@ -2027,6 +3246,69 @@ Ghidra Analysis:
             except (subprocess.TimeoutExpired, FileNotFoundError):
                 pass
 
+            # Extract TLS SNI (Server Name Indication) — reveals actual C2 domains
+            tls_sni = []
+            try:
+                sni_result = subprocess.run(
+                    ["tshark", "-r", str(pcap_path), "-Y", "tls.handshake.type == 1",
+                     "-T", "fields", "-e", "tls.handshake.extensions_server_name",
+                     "-e", "ip.dst", "-e", "tcp.dstport"],
+                    capture_output=True, text=True, timeout=15,
+                )
+                if sni_result.returncode == 0:
+                    seen_sni = set()
+                    for line in sni_result.stdout.strip().splitlines():
+                        parts = line.split("\t")
+                        if len(parts) >= 1 and parts[0] and parts[0] not in seen_sni:
+                            seen_sni.add(parts[0])
+                            entry = {"sni": parts[0]}
+                            if len(parts) >= 2:
+                                entry["ip"] = parts[1]
+                            if len(parts) >= 3:
+                                entry["port"] = parts[2]
+                            tls_sni.append(entry)
+                    tls_sni = tls_sni[:50]
+            except (subprocess.TimeoutExpired, FileNotFoundError):
+                pass
+
+            # Extract HTTP requests — host + URI
+            http_requests = []
+            try:
+                http_result = subprocess.run(
+                    ["tshark", "-r", str(pcap_path), "-Y", "http.request",
+                     "-T", "fields", "-e", "http.host", "-e", "http.request.uri",
+                     "-e", "http.request.method", "-e", "ip.dst"],
+                    capture_output=True, text=True, timeout=15,
+                )
+                if http_result.returncode == 0:
+                    for line in http_result.stdout.strip().splitlines():
+                        parts = line.split("\t")
+                        if len(parts) >= 2 and parts[0]:
+                            entry = {"host": parts[0], "uri": parts[1]}
+                            if len(parts) >= 3:
+                                entry["method"] = parts[2]
+                            if len(parts) >= 4:
+                                entry["ip"] = parts[3]
+                            http_requests.append(entry)
+                    http_requests = http_requests[:50]
+            except (subprocess.TimeoutExpired, FileNotFoundError):
+                pass
+
+            # Extract JA3 TLS fingerprints (requires tshark with JA3 plugin)
+            ja3_fingerprints = []
+            try:
+                ja3_result = subprocess.run(
+                    ["tshark", "-r", str(pcap_path), "-Y", "tls.handshake.type == 1",
+                     "-T", "fields", "-e", "tls.handshake.ja3"],
+                    capture_output=True, text=True, timeout=15,
+                )
+                if ja3_result.returncode == 0:
+                    ja3_fingerprints = list(set(
+                        h.strip() for h in ja3_result.stdout.strip().splitlines() if h.strip()
+                    ))[:20]
+            except (subprocess.TimeoutExpired, FileNotFoundError):
+                pass
+
         # Step 10: Memory forensics — disabled (needs LiME kernel module for proper dumps)
         # /dev/mem only gives 1MB on modern kernels, producing garbage Volatility results.
         # TODO: Install LiME on sandbox, enable when GPU available for faster analysis.
@@ -2055,6 +3337,17 @@ Ghidra Analysis:
                 if '.' in p and not p[0].isdigit() and len(p) > 4 and p not in all_dns:
                     all_dns.append(p)
 
+        # Parse auditd into process execution tree
+        process_tree = self._parse_audit_process_tree(results_dir / "audit.log")
+
+        # Parse strace log for syscall-level IOCs
+        strace_results = self._parse_strace_log(results_dir / "strace.log")
+
+        # Run volatility3 on memory dump (sends to REMnux for analysis)
+        vol_results = {}
+        if memdump_path.exists() and memdump_path.stat().st_size > 1048576:
+            vol_results = self._run_volatility(memdump_path, sha256)
+
         # Assemble dynamic analysis results
         dynamic_results = {
             "detonation_duration": self.cfg.sandbox_timeout,
@@ -2065,13 +3358,21 @@ Ghidra Analysis:
             "dns_queries": all_dns,
             "inetsim_dns_log": inetsim_dns[:30],
             "outbound_connections": self._enrich_connections(connections),
+            "tls_sni": tls_sni,
+            "http_requests": http_requests,
+            "ja3_fingerprints": ja3_fingerprints,
+            "process_tree": process_tree,
+            "filesystem_changes": fs_changes,
+            "strace": strace_results,
+            "memory_forensics": vol_results,
             "pcap_size": pcap_path.stat().st_size if pcap_path.exists() else 0,
             "audit_log_size": (results_dir / "audit.log").stat().st_size if (results_dir / "audit.log").exists() else 0,
         }
 
-        self.logger.info("Dynamic analysis complete for %s — %d DNS queries, %d connections, %d new files",
-                         sha256[:16], len(dns_queries), len(connections),
-                         len(dynamic_results["new_files"]))
+        self.logger.info("Dynamic analysis complete for %s — %d DNS, %d connections, %d TLS SNI, %d HTTP, %d new files, %d processes",
+                         sha256[:16], len(all_dns), len(connections),
+                         len(tls_sni), len(http_requests),
+                         len(dynamic_results["new_files"]), len(process_tree))
 
         # Step 11: Restore clean snapshot (cleanup)
         self._sandbox_restore_snapshot()
@@ -2123,8 +3424,12 @@ Ghidra Analysis:
         else:
             size_str = f"{file_size} B"
 
-        # Description
-        desc = f"{icon} **{classification.title()}** captured by **{honeypot.title()}**"
+        # Description — include confidence label
+        confidence_label = results.get("confidence_label", "")
+        if confidence_label:
+            desc = f"{icon} **{confidence_label}** captured by **{honeypot.title()}**"
+        else:
+            desc = f"{icon} **{classification.title()}** captured by **{honeypot.title()}**"
         if src_ip:
             desc += f" from `{src_ip}` ({flag} {country or 'Unknown'})"
 
@@ -2135,6 +3440,16 @@ Ghidra Analysis:
             {"name": "Size", "value": f"`{size_str}`", "inline": True},
             {"name": "Severity", "value": f"{sev_icon} **{severity.upper()}**", "inline": True},
         ]
+
+        # Attacker drop context (how the file got there)
+        dl_cmd = metadata.get("download_command", "")
+        if dl_cmd:
+            drop_parts = [f"**Command:** `{dl_cmd[:200]}`"]
+            if metadata.get("download_user"):
+                drop_parts.append(f"**User:** `{metadata['download_user']}`")
+            if metadata.get("download_timestamp"):
+                drop_parts.append(f"**Time:** {metadata['download_timestamp']}")
+            fields.append({"name": "Drop Method", "value": "\n".join(drop_parts), "inline": False})
 
         # YARA matches
         yara_matches = results.get("yara_matches", [])
@@ -2276,14 +3591,37 @@ Ghidra Analysis:
                 yara_display += "\n..."
             fields.append({"name": "Auto-Generated YARA Rule", "value": f"```yara\n{yara_display}\n```", "inline": False})
 
-        # Deep analysis (decompiled code review)
+        # Auto-Generated Sigma Rule
+        gen_sigma = results.get("generated_sigma_rule", "")
+        if gen_sigma:
+            sigma_display = gen_sigma[:800]
+            if len(gen_sigma) > 800:
+                sigma_display += "\n..."
+            fields.append({"name": "Auto-Generated Sigma Rule", "value": f"```yaml\n{sigma_display}\n```", "inline": False})
+
+        # Deep analysis (two-pass decompiled code review)
         deep = results.get("deep_analysis", "")
         if deep:
+            funcs_analyzed = results.get("deep_analysis_functions_analyzed", 0)
+            funcs_total = results.get("deep_analysis_functions_total", 0)
+            deep_header = f"Deep Code Analysis ({funcs_analyzed}/{funcs_total} functions, score={results.get('deep_analysis_score',0)})"
             deep_display = deep[:900]
             if len(deep) > 900:
                 deep_display += "\n..."
-            fields.append({"name": f"Deep Code Analysis (score={results.get('deep_analysis_score',0)})",
-                           "value": deep_display, "inline": False})
+            fields.append({"name": deep_header, "value": deep_display, "inline": False})
+
+        # Confidence and warrants investigation (from evidence-based assessment)
+        warrants = results.get("warrants_investigation", "")
+        if warrants:
+            if isinstance(warrants, list):
+                warrants_text = "\n".join(f"- {w}" for w in warrants[:8])
+            else:
+                warrants_text = str(warrants)[:600]
+            fields.append({"name": "Warrants Further Investigation", "value": warrants_text, "inline": False})
+
+        confidence = results.get("confidence", "")
+        if confidence:
+            fields.append({"name": "Confidence", "value": str(confidence)[:200], "inline": True})
 
         # Notable strings
         interesting = results.get("interesting_strings", [])
@@ -2390,9 +3728,19 @@ Ghidra Analysis:
             self.logger.error("REMnux not available, skipping %s", sha256[:16])
             return False
 
+        # Step 0.5: Correlate attacker session (IP + download command) for sacrificial VM samples
+        if sample_info.get("honeypot") == "sacrificial-vm" and not sample_info.get("src_ip"):
+            self._correlate_attacker_session(sample_info)
+
         # Step 1: Fetch from T-Pot
         local_path = self.fetch_sample(sha256)
         if not local_path:
+            self._stop_remnux()
+            return False
+
+        # Step 1.5: Pre-screen — reject obvious non-malware before burning resources
+        if not self._pre_screen_sample(sha256, local_path):
+            self.known_hashes.add(sha256)
             self._stop_remnux()
             return False
 
@@ -2416,6 +3764,14 @@ Ghidra Analysis:
                 results["classification"] = claude_result["classification"]
             if claude_result.get("severity"):
                 results["severity"] = claude_result["severity"]
+            if claude_result.get("confidence"):
+                results["confidence"] = claude_result["confidence"]
+            if claude_result.get("warrants_investigation"):
+                results["warrants_investigation"] = claude_result["warrants_investigation"]
+            if claude_result.get("malware_family"):
+                results["malware_family"] = claude_result["malware_family"]
+            if claude_result.get("mitre_attack"):
+                results["mitre_attack"] = claude_result["mitre_attack"]
 
         # Step 5: Dynamic analysis (sandbox detonation)
         dynamic = self.detonate_sample(sha256, local_path)
@@ -2438,24 +3794,43 @@ Ghidra Analysis:
             results["deep_analysis"] = deep.get("deep_analysis", "")
             results["deep_analysis_score"] = deep.get("score", 0)
             results["deep_analysis_cost"] = deep.get("cost", 0)
-            self.logger.info("Deep analysis complete for %s — score=%d, cost=$%.4f",
-                             sha256[:16], deep["score"], deep["cost"])
+            results["deep_analysis_triage"] = deep.get("triage", {})
+            results["deep_analysis_functions_analyzed"] = deep.get("functions_analyzed", 0)
+            results["deep_analysis_functions_total"] = deep.get("functions_total", 0)
+            self.logger.info("Deep analysis complete for %s — %d/%d functions analyzed, score=%d, cost=$%.4f",
+                             sha256[:16], deep.get("functions_analyzed", 0),
+                             deep.get("functions_total", 0), deep["score"], deep["cost"])
 
-        # Step 8: MISP — check known IOCs and create event
+        # Step 8: C2 infrastructure mapping
+        c2_map = self.map_c2_infrastructure(results)
+        if c2_map:
+            results["c2_infrastructure"] = c2_map
+
+        # Step 8.5: ATT&CK technique mapping
+        attack_techniques = self.map_attack_techniques(results)
+        if attack_techniques:
+            results["attack_techniques"] = attack_techniques
+            self.logger.info("Mapped %d ATT&CK techniques for %s", len(attack_techniques), sha256[:16])
+
+        # Step 9: MISP — check known IOCs and create event
         misp_iocs = self.misp_check_iocs(results)
         if misp_iocs:
             results["misp"] = misp_iocs
         self.misp_create_event(results, sample_info)
 
-        # Step 8: Index in Elasticsearch
+        # Step 10: Index in Elasticsearch
         self.index_results(sha256, results, sample_info)
 
-        # Step 9: Sample similarity check (must be after indexing)
+        # Step 10.5: Sample similarity + clustering (must be after indexing)
         similar = self.find_similar_samples(results)
         if similar:
             results["similar_samples"] = similar
             self.logger.info("Found %d similar samples for %s (top: %d%% match)",
                              len(similar), sha256[:16], similar[0]["similarity"])
+
+        cluster = self.cluster_samples(results)
+        if cluster:
+            results["cluster"] = cluster
 
         # Step 10: Generate PDF report
         try:
@@ -2468,13 +3843,23 @@ Ghidra Analysis:
         except Exception as e:
             self.logger.warning("PDF report generation failed: %s", e)
 
-        # Step 11: Generate Sigma detection rules
+        # Step 11: Generate Sigma detection rules (template + LLM behavioral)
         try:
             from generate_sigma_rules import generate_sigma_rules, save_rules
             sigma_rules = generate_sigma_rules(results)
+
+            # LLM-generated behavioral Sigma rule
+            if results.get("dynamic_analysis"):
+                llm_sigma = self.claude_generate_sigma(results)
+                if llm_sigma:
+                    sigma_rules.append(llm_sigma)
+                    results["generated_sigma_rule"] = llm_sigma
+
             if sigma_rules:
                 save_rules(sigma_rules, sha256)
-                self.logger.info("Generated %d Sigma rules for %s", len(sigma_rules), sha256[:16])
+                self.logger.info("Generated %d Sigma rules for %s (%s LLM)",
+                                 len(sigma_rules), sha256[:16],
+                                 "incl." if results.get("generated_sigma_rule") else "no")
         except Exception as e:
             self.logger.warning("Sigma rule generation failed: %s", e)
 
@@ -2489,8 +3874,13 @@ Ghidra Analysis:
         except Exception as e:
             self.logger.warning("ATT&CK Navigator update failed: %s", e)
 
-        # Step 13: Discord alert
-        self.fire_discord_alert(results, sample_info)
+        # Step 13: Discord alert (suppress low-confidence noise)
+        conf = results.get("confidence", 0)
+        classification = results.get("classification", "unknown")
+        if conf < 20 and classification == "unknown":
+            self.logger.info("Suppressing alert for %s — low confidence (%d%%) and unclassified", sha256[:16], conf)
+        else:
+            self.fire_discord_alert(results, sample_info)
 
         self.known_hashes.add(sha256)
         self.logger.info("Pipeline complete for %s", sha256[:16])
