@@ -1,0 +1,58 @@
+#!/usr/bin/env python3
+# {{ ansible_managed }}
+# Ghidra headless postscript -- extracts function names, strings, imports
+# Output: {{ remnux_results }}/<sha256>_ghidra.json
+
+import json
+import os
+
+# Ghidra Java/Python bridge imports (available when run via analyzeHeadless)
+try:
+    from ghidra.program.flatapi import FlatProgramAPI
+    from ghidra.program.model.symbol import SymbolType
+    api = FlatProgramAPI(currentProgram)
+
+    sha256 = os.environ.get("SA_SHA256", "unknown")
+    results_dir = "{{ remnux_results }}"
+
+    # Extract function names
+    functions = []
+    func = api.getFirstFunction()
+    while func is not None:
+        functions.append({
+            "name": func.getName(),
+            "entry": str(func.getEntryPoint()),
+            "size": func.getBody().getNumAddresses(),
+        })
+        func = api.getFunctionAfter(func)
+
+    # Extract imports
+    imports = []
+    sym_table = currentProgram.getSymbolTable()
+    for sym in sym_table.getExternalSymbols():
+        imports.append(sym.getName())
+
+    # Extract defined strings
+    strings = []
+    for s in api.findStrings(None, 6, 1, True, True):
+        strings.append(str(s))
+        if len(strings) >= 200:
+            break
+
+    result = {
+        "functions_count": len(functions),
+        "functions": functions[:100],
+        "imports": imports[:200],
+        "strings_count": len(strings),
+        "entry_point": str(currentProgram.getImageBase()),
+        "language": str(currentProgram.getLanguage()),
+        "compiler": str(currentProgram.getCompiler()),
+    }
+
+    output_path = os.path.join(results_dir, f"{sha256}_ghidra.json")
+    with open(output_path, "w") as f:
+        json.dump(result, f, indent=2)
+
+except ImportError:
+    # Not running inside Ghidra
+    print("ERROR: Must be run as Ghidra postscript")

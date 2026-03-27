@@ -4,15 +4,17 @@ import json, os, requests, urllib3
 urllib3.disable_warnings()
 
 TOKEN = os.environ.get("GRAFANA_TOKEN", "")
-BASE = "https://localhost:3000"
+BASE = os.environ.get("GRAFANA_URL", "https://localhost:3000")
 H = {"Authorization": f"Bearer {TOKEN}", "Content-Type": "application/json"}
 
-HP = {"type": "elasticsearch", "uid": "ffffy3uxl7ri8b"}  # filebeat-*
-MA = {"type": "elasticsearch", "uid": "efgoujb13qarkd"}  # malware-analysis
+HP = {"type": "elasticsearch", "uid": os.environ.get("GRAFANA_DS_FILEBEAT_UID", "ffffy3uxl7ri8b")}  # filebeat-*
+MA = {"type": "elasticsearch", "uid": os.environ.get("GRAFANA_DS_MALWARE_UID", "efgoujb13qarkd")}  # malware-analysis
 
-# Verified queries
+# Verified queries — agent names from env
+_agent = os.environ.get("SACRIFICIAL_AGENT_NAME", "ds-prod-web01")
+_agent_alt = os.environ.get("SACRIFICIAL_AGENT_ALT", "prodction1")
 SV = "log_type:honeypot_auth"
-AQ = "service.type:auditd AND (agent.name:ds-prod-web01 OR agent.name:prodction1)"
+AQ = f"service.type:auditd AND (agent.name:{_agent} OR agent.name:{_agent_alt})"
 EXT = "NOT src_ip:192.168.* AND NOT src_ip:10.* AND NOT src_ip:172.*"
 CONTAINERS = "(container.name:cowrie OR container.name:dionaea OR container.name:tanner OR container.name:h0neytr4p)"
 

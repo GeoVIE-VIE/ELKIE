@@ -1,0 +1,46 @@
+#!/bin/bash
+# {{ ansible_managed }}
+# Block known scanner infrastructure (Shodan, Censys, BinaryEdge, etc.)
+# These scanners fingerprint honeypots and tag them publicly
+
+set -euo pipefail
+
+IPSET_NAME="scanner_block"
+
+# Create ipset if it doesn't exist
+ipset list "$IPSET_NAME" &>/dev/null || ipset create "$IPSET_NAME" hash:net maxelem 65536
+
+# Known scanner CIDR ranges
+SCANNER_RANGES=(
+    # Shodan
+    "66.240.192.0/18"
+    "71.6.128.0/17"
+    "80.82.77.0/24"
+    "93.120.27.0/24"
+    "94.102.49.0/24"
+    "185.142.236.0/24"
+    "198.20.69.0/24"
+    "198.20.70.0/24"
+    "198.20.99.0/24"
+    # Censys
+    "162.142.125.0/24"
+    "167.94.138.0/23"
+    "167.94.145.0/24"
+    "167.94.146.0/24"
+    "167.248.133.0/24"
+    # BinaryEdge
+    "37.9.18.0/24"
+    # Stretchoid
+    "198.235.24.0/24"
+)
+
+for range in "${SCANNER_RANGES[@]}"; do
+    ipset add "$IPSET_NAME" "$range" 2>/dev/null || true
+done
+
+# Apply iptables rule if not already present
+if ! iptables -C INPUT -m set --match-set "$IPSET_NAME" src -j DROP 2>/dev/null; then
+    iptables -I INPUT -m set --match-set "$IPSET_NAME" src -j DROP
+fi
+
+echo "$(date) - Scanner block list updated: ${#SCANNER_RANGES[@]} ranges"

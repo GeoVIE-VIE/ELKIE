@@ -1,0 +1,11 @@
+# {{ ansible_managed }}
+# {{ cover_company }} -- Production Environment
+DATABASE_URL=postgresql://admin:Dirig0Pr0d2024!@db.internal.{{ cover_domain }}:5432/production
+REDIS_URL=redis://:R3d1sP@ss!@cache.internal.{{ cover_domain }}:6379/0
+SECRET_KEY=dj-insecure-{{ '%032x' | format(range(0, 2**128) | random) }}
+AWS_ACCESS_KEY_ID=AKIA{{ '%016x' | format(range(0, 2**64) | random) | upper }}
+AWS_SECRET_ACCESS_KEY={{ '%040x' | format(range(0, 2**160) | random) }}
+STRIPE_SECRET_KEY=sk_live_{{ '%024x' | format(range(0, 2**96) | random) }}
+SMTP_PASSWORD=M@ilGun2024!
+JENKINS_TOKEN={{ '%032x' | format(range(0, 2**128) | random) }}
+VAULT_TOKEN=hvs.{{ '%026x' | format(range(0, 2**104) | random) }}

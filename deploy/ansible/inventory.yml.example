@@ -1,0 +1,115 @@
+# =============================================================================
+# ELKIE SOC — Ansible Inventory
+# =============================================================================
+# Copy to inventory.yml and adjust values for your environment:
+#   cp inventory.yml.example inventory.yml
+#
+# All honeypot subnet hosts (192.168.40.x) are accessed via the T-Pot jump host.
+# NEVER SSH directly to 192.168.40.x from outside the honeypot VLAN.
+# =============================================================================
+
+all:
+  vars:
+    # -- Network --
+    elk_ip: "192.168.50.3"
+    honeypot_subnet: "192.168.40.0/24"
+    proxmox_ip: "192.168.99.160"
+
+    # -- Jump host (T-Pot) --
+    jump_host: "192.168.40.3"
+    jump_port: 64295
+    jump_user: "lepots"
+
+    # -- Proxmox API --
+    proxmox_api_url: "https://192.168.99.160:8006"
+    proxmox_node: "flexiserve"
+    pve_token_id: "root@pam!ApiKeyForElkie"
+    pve_api_token: "PVEAPIToken=root@pam!ApiKeyForElkie=CHANGEME"
+
+    # -- VM IDs --
+    vmid_remnux: 106
+    vmid_sacrificial: 107
+    vmid_sandbox: 109
+
+    # -- Cover story for sacrificial VM --
+    cover_company: "Dirigo Systems LLC"
+    cover_domain: "dirigosystems.net"
+    cover_hostname: "ds-prod-web01"
+    cover_city: "Auburn"
+    cover_state: "Maine"
+    cover_country: "US"
+    cover_ssl_cn: "portal.dirigosystems.net"
+
+    # -- API keys (override in vault or env) --
+    abuseipdb_api_key: ""
+    vt_api_key: ""
+    mb_api_key: ""
+    claude_api_key: ""
+    misp_api_key: ""
+    discord_webhook_url: ""
+    grafana_token: ""
+    shodan_api_key: ""
+
+    # -- Elasticsearch --
+    es_url: "http://localhost:9200"
+    es_result_index: "malware-analysis"
+
+    # -- Analysis tuning --
+    poll_interval: 60
+    sandbox_timeout: 90
+    analysis_timeout: 300
+    max_sample_size: 52428800
+    sample_retention_days: 30
+
+  children:
+    # =========================================================================
+    # ELK stack — direct SSH
+    # =========================================================================
+    elk_hosts:
+      hosts:
+        elk:
+          ansible_host: "192.168.50.3"
+          ansible_user: legs
+          ansible_ssh_private_key_file: ~/.ssh/id_ed25519
+
+    # =========================================================================
+    # T-Pot — direct SSH on non-standard port
+    # =========================================================================
+    tpot_hosts:
+      hosts:
+        tpot:
+          ansible_host: "192.168.40.3"
+          ansible_port: 64295
+          ansible_user: lepots
+          ansible_ssh_private_key_file: ~/.ssh/id_ed25519
+
+    # =========================================================================
+    # Honeypot subnet hosts — ALL go through T-Pot jump host
+    # =========================================================================
+    honeypot_hosts:
+      vars:
+        ansible_ssh_common_args: >-
+          -o ProxyJump=lepots@192.168.40.3:64295
+          -o StrictHostKeyChecking=no
+      hosts:
+        sacrificial:
+          ansible_host: "192.168.40.99"
+          ansible_user: root
+          ansible_ssh_private_key_file: ~/.ssh/id_ed25519
+        remnux:
+          ansible_host: "192.168.40.5"
+          ansible_user: nalyzer
+          ansible_ssh_pass: "CHANGEME"
+        sandbox:
+          ansible_host: "192.168.40.6"
+          ansible_user: dettony
+          ansible_ssh_private_key_file: ~/.ssh/id_ed25519
+
+    # =========================================================================
+    # Proxmox — API only, no SSH tasks
+    # =========================================================================
+    proxmox_hosts:
+      hosts:
+        proxmox:
+          ansible_host: "192.168.99.160"
+          ansible_connection: local  # API calls run from controller

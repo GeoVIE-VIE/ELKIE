@@ -1,0 +1,73 @@
+#!/bin/bash
+# {{ ansible_managed }}
+# Honeypot Guard Daemon -- protects SSH keys, kills rogue sshd, monitors ld.so.preload
+#
+# IMPORTANT: This script must NOT use exec commands (ps, ss, etc.) directly
+# because that pollutes auditd logs and drowns out attacker commands.
+# Instead it reads from /proc directly.
+
+INTERVAL={{ guard_check_interval }}
+LOG="{{ honeypot_log_dir }}/guard.log"
+
+log_alert() {
+    local msg="$1"
+    echo "$(date -u +%Y-%m-%dT%H:%M:%S+00:00) GUARD_ALERT: $msg" >> "$LOG"
+
+    # Also log as JSON for Filebeat
+    python3 -c "
+import json, datetime
+entry = {
+    '@timestamp': datetime.datetime.now(datetime.timezone.utc).isoformat(),
+    'honeypot_event': 'guard_alert',
+    'message': '''$msg''',
+    'container': {'name': 'cowrie'}
+}
+with open('{{ honeypot_log_dir }}/auth.json', 'a') as f:
+    f.write(json.dumps(entry) + '\n')
+" 2>/dev/null
+}
+
+check_ld_preload() {
+    # Attackers inject libprocesshider.so into ld.so.preload
+    if [ -s /etc/ld.so.preload ]; then
+        local content
+        content=$(cat /etc/ld.so.preload 2>/dev/null)
+        if [ -n "$content" ]; then
+            log_alert "ld.so.preload modified: $content"
+            # Clear it (file is immutable, but log the attempt)
+            : > /etc/ld.so.preload 2>/dev/null || true
+        fi
+    fi
+}
+
+check_rogue_sshd() {
+    # Scan /proc for sshd processes not on port 22
+    for pid_dir in /proc/[0-9]*/; do
+        pid=$(basename "$pid_dir")
+        comm=$(cat "$pid_dir/comm" 2>/dev/null) || continue
+        [ "$comm" = "sshd" ] || continue
+
+        # Check if this sshd is listening on a non-standard port
+        # Read from /proc/net/tcp to avoid exec commands
+        cmdline=$(tr '\0' ' ' < "$pid_dir/cmdline" 2>/dev/null) || continue
+        if echo "$cmdline" | grep -qE '\-p\s*[0-9]' && ! echo "$cmdline" | grep -qE '\-p\s*22\b'; then
+            log_alert "Rogue sshd PID=$pid cmdline=$cmdline -- killing"
+            kill -9 "$pid" 2>/dev/null
+        fi
+    done
+}
+
+check_authorized_keys() {
+    # Verify authorized_keys hasn't been tampered with
+    if [ ! -f /root/.ssh/authorized_keys ]; then
+        log_alert "authorized_keys missing!"
+    fi
+}
+
+# Main loop
+while true; do
+    check_ld_preload
+    check_rogue_sshd
+    check_authorized_keys
+    sleep "$INTERVAL"
+done

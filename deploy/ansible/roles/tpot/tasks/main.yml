@@ -1,0 +1,97 @@
+# =============================================================================
+# T-Pot Hardening — reduced ports, cert replacement, cron fix
+# =============================================================================
+# Anti-fingerprinting: Shodan tags default Dionaea certs as honeypots
+# Cron fix: Docker volume prune was deleting captured samples
+# Port reduction: Only expose 8 ports to reduce scanner noise
+# =============================================================================
+---
+
+# ---- Generate realistic SSL cert for Dionaea ----
+
+- name: Create Dionaea cert directory
+  ansible.builtin.file:
+    path: "{{ tpot_base }}/data/dionaea/certs"
+    state: directory
+    owner: "{{ tpot_user }}"
+    mode: "0755"
+
+- name: Generate realistic SSL cert for Dionaea
+  ansible.builtin.command: >
+    openssl req -x509 -nodes -days 3650
+    -newkey rsa:2048
+    -keyout {{ tpot_base }}/data/dionaea/certs/dionaea.key
+    -out {{ tpot_base }}/data/dionaea/certs/dionaea.crt
+    -subj "/C={{ cover_country }}/ST={{ cover_state }}/L={{ cover_city }}/O={{ cover_company }}/CN={{ cover_domain }}"
+  args:
+    creates: "{{ tpot_base }}/data/dionaea/certs/dionaea.crt"
+
+# ---- Fix Docker volume prune cron (was deleting captured samples) ----
+
+- name: Check for Docker volume prune in crontab
+  ansible.builtin.command: crontab -l -u {{ tpot_user }}
+  register: crontab_content
+  changed_when: false
+  ignore_errors: true
+
+- name: Remove Docker volume prune from crontab
+  ansible.builtin.command: >
+    bash -c "crontab -l -u {{ tpot_user }} | grep -v 'docker volume prune' | crontab -u {{ tpot_user }} -"
+  when: crontab_content.rc == 0 and 'docker volume prune' in crontab_content.stdout
+
+# ---- Deploy scanner block list ----
+
+- name: Deploy Shodan/Censys scanner block script
+  ansible.builtin.template:
+    src: block_scanners.sh.j2
+    dest: "{{ tpot_home }}/block_scanners.sh"
+    owner: "{{ tpot_user }}"
+    mode: "0755"
+
+- name: Add cron to refresh scanner blocks daily
+  ansible.builtin.cron:
+    name: "Block known scanners"
+    minute: "0"
+    hour: "6"
+    job: "{{ tpot_home }}/block_scanners.sh >> /var/log/scanner_blocks.log 2>&1"
+    user: root
+
+# ---- Cowrie realism improvements ----
+
+- name: Deploy realistic Cowrie filesystem
+  ansible.builtin.template:
+    src: cowrie_userdb.txt.j2
+    dest: "{{ tpot_base }}/data/cowrie/etc/userdb.txt"
+    owner: "{{ tpot_user }}"
+    mode: "0644"
+  ignore_errors: true
+
+# ---- Ensure sample directories exist and are not pruned ----
+
+- name: Create sample download directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ tpot_user }}"
+    mode: "0755"
+  loop:
+    - "{{ tpot_base }}/data/cowrie/downloads"
+    - "{{ tpot_base }}/data/dionaea/binaries"
+    - "{{ tpot_base }}/data/honeytrap/downloads"
+    - "{{ tpot_base }}/data/adbhoney/downloads"
+
+# ---- Filebeat config for T-Pot logs ----
+
+- name: Check if Filebeat is installed on T-Pot
+  ansible.builtin.stat:
+    path: /etc/filebeat/filebeat.yml
+  register: tpot_filebeat
+
+- name: Deploy T-Pot Filebeat config
+  ansible.builtin.template:
+    src: filebeat_tpot.yml.j2
+    dest: /etc/filebeat/filebeat.yml
+    owner: root
+    mode: "0600"
+  notify: restart filebeat
+  when: tpot_filebeat.stat.exists

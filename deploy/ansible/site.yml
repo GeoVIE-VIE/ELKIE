@@ -1,0 +1,64 @@
+# =============================================================================
+# ELKIE SOC — Main Playbook
+# =============================================================================
+# Usage:
+#   ansible-playbook -i inventory.yml site.yml
+#   ansible-playbook -i inventory.yml site.yml --tags sacrificial
+#   ansible-playbook -i inventory.yml site.yml --limit elk
+# =============================================================================
+---
+
+# -- Base setup on all SSH-accessible hosts --
+- name: Common base setup
+  hosts: elk_hosts,tpot_hosts,honeypot_hosts
+  become: true
+  tags: [common]
+  roles:
+    - common
+
+# -- Proxmox VM provisioning (API calls from controller) --
+- name: Proxmox VM provisioning
+  hosts: proxmox_hosts
+  tags: [proxmox]
+  roles:
+    - proxmox
+
+# -- ELK stack: ES templates, Filebeat, sample-analyzer service --
+- name: ELK stack configuration
+  hosts: elk_hosts
+  become: true
+  tags: [elk]
+  roles:
+    - elk
+
+# -- T-Pot hardening --
+- name: T-Pot hardening
+  hosts: tpot_hosts
+  become: true
+  tags: [tpot]
+  roles:
+    - tpot
+
+# -- Sacrificial VM: PAM honeypot, guard daemon, decoys --
+- name: Sacrificial VM provisioning
+  hosts: sacrificial
+  become: true
+  tags: [sacrificial]
+  roles:
+    - sacrificial-vm
+
+# -- REMnux: static analysis tools --
+- name: REMnux analysis environment
+  hosts: remnux
+  become: true
+  tags: [remnux]
+  roles:
+    - remnux
+
+# -- Sandbox: dynamic analysis / detonation --
+- name: Sandbox detonation environment
+  hosts: sandbox
+  become: true
+  tags: [sandbox]
+  roles:
+    - sandbox

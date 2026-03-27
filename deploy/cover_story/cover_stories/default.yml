@@ -1,0 +1,176 @@
+# Dirigo Systems LLC — Default cover story for ELKIE sacrificial VM
+# This is the identity currently deployed on ds-prod-web01 (192.168.40.99)
+# Maine-based "software company" with a sloppy production server
+
+company:
+  name: "Dirigo Systems LLC"
+  domain: "dirigosystems.net"
+  hostname: "ds-prod-web01"
+  city: "Auburn"
+  state: "Maine"
+  country: "US"
+  industry: "software"
+  internal_domain: "dirigo-internal.com"
+  tagline: "Secure Cloud Infrastructure for Northern New England"
+  contact_email: "ops@dirigosystems.net"
+  team_name: "Platform Team"
+
+ssl:
+  cn: "portal.dirigosystems.net"
+  org: "Dirigo Systems LLC"
+  days: 365
+
+users:
+  - name: jchen
+    full_name: "Jason Chen"
+    role: "devops"
+  - name: srao
+    full_name: "Sunita Rao"
+    role: "sre"
+  - name: mkovacs
+    full_name: "Milan Kovacs"
+    role: "developer"
+    crypto_user: true
+  - name: deploy
+    full_name: "Deploy Bot"
+    role: "service"
+  - name: jenkins
+    full_name: "Jenkins CI"
+    role: "service"
+  - name: gitlab-runner
+    full_name: "GitLab Runner"
+    role: "service"
+  - name: nagios
+    full_name: "Nagios Monitoring"
+    role: "service"
+  - name: backup
+    full_name: "Backup Service"
+    role: "service"
+  - name: webadmin
+    full_name: "Web Administrator"
+    role: "admin"
+  - name: dbadmin
+    full_name: "Database Admin"
+    role: "admin"
+  - name: appuser
+    full_name: "Application Service"
+    role: "service"
+  - name: devops
+    full_name: "DevOps Team"
+    role: "devops"
+  - name: ftpuser
+    full_name: "FTP Upload"
+    role: "service"
+  - name: redis
+    full_name: "Redis Service"
+    role: "service"
+  - name: mongodb
+    full_name: "MongoDB Service"
+    role: "service"
+  - name: elastic
+    full_name: "Elasticsearch"
+    role: "service"
+  - name: docker
+    full_name: "Docker Service"
+    role: "service"
+  - name: ansible
+    full_name: "Ansible Automation"
+    role: "devops"
+  - name: prometheus
+    full_name: "Prometheus Monitoring"
+    role: "service"
+  - name: www-data
+    full_name: "Web Server"
+    role: "service"
+
+services:
+  - name: webapp-api
+    description: "Production Web Application API"
+    port: 3000
+    user: appuser
+    type: node
+    exec: "/usr/bin/node /opt/webapp/server.js"
+    after: "network.target mysql.service redis-server.service"
+  - name: backup-agent
+    description: "Backup Agent — S3 sync"
+    type: oneshot
+    user: root
+    exec: "/root/scripts/backup.sh"
+  - name: monitoring-agent
+    description: "Prometheus Node Exporter + Custom Metrics"
+    port: 9100
+    user: prometheus
+    type: simple
+    exec: "/usr/local/bin/node_exporter --web.listen-address=:9100"
+
+network:
+  internal_hosts:
+    - ip: "10.0.1.50"
+      names: ["prod-db-01.internal", "db-master"]
+    - ip: "10.0.1.51"
+      names: ["prod-web-02.internal", "web-02"]
+    - ip: "10.0.1.52"
+      names: ["redis-01.internal", "cache"]
+    - ip: "10.0.1.53"
+      names: ["mongo-01.internal", "nosql"]
+    - ip: "10.0.1.55"
+      names: ["backup-srv.internal", "backups"]
+    - ip: "10.0.1.60"
+      names: ["staging-db-01.internal", "staging-db"]
+    - ip: "10.0.1.61"
+      names: ["staging-web-01.internal", "staging-web"]
+    - ip: "10.0.1.100"
+      names: ["bastion.dirigo-internal.com", "bastion"]
+    - ip: "10.0.1.200"
+      names: ["jenkins.internal", "ci"]
+    - ip: "10.0.1.201"
+      names: ["gitlab.internal", "git"]
+    - ip: "10.0.1.202"
+      names: ["grafana.internal", "monitoring"]
+    - ip: "10.0.1.203"
+      names: ["vault.internal", "secrets"]
+
+credentials:
+  aws:
+    profiles:
+      - name: default
+        access_key: "AKIAIOSFODNN7EXAMPLE"
+        secret_key: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+      - name: production
+        access_key: "AKIA2OGYBAH6EXAMPLE"
+        secret_key: "7pQr5tUv8wXy1zA3bC6dE9fG2hI5jK8lMnOpQr"
+        region: "us-east-1"
+      - name: backup
+        access_key: "AKIA3XYZABC1EXAMPLE"
+        secret_key: "mN0pQ1rS2tU3vW4xY5zA6bC7dE8fG9hI0jK1lM"
+  databases:
+    mysql_root: "r00t_MySQL_2025!!"
+    postgres_prod: "P0stgr3s_Pr0d_2025!"
+    redis: "R3dis_Pr0d_Pass!"
+    mongo: "M0ng0_Adm1n_2025"
+    webapp_db: "xK9#mP2$vL5nQ8wR"
+  crypto:
+    binance_key: "vM3xR7kLp9Qw2nJ5tY8uB4cF6hA0dE1"
+    binance_secret: "zX9wV7uT5sR3qP1oN8mL6kJ4hG2fD0c"
+    btc_wallet: "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh"
+    eth_wallet: "0x742d35Cc6634C0532925a3b844Bc9e7595f2bD68"
+    eth_private_key: "0x4c0883a69102937d6231471b5dbb6204fe512961708279f23efb56e3b2e4d30d"
+    btc_rpc_pass: "5xyZ9k3mP7qW2nR8vL4jT6hB0cF1aD"
+    seed_phrase: "abandon ability able about above absent absorb abstract absurd abuse access accident"
+  jenkins:
+    deploy_pass: "D3pl0y_Pr0d_2025!!"
+    github_token: "ghp_FakeGitHubTokenForHoneypot1234567890"
+    master_key: "7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b"
+  vault:
+    token: "hvs.CAESIFakeVaultTokenHereForHoneypotPurposes12345678"
+    addr: "https://vault.internal:8200"
+  app:
+    jwt_secret: "super_secret_jwt_key_do_not_share_2025"
+    api_key: "sk-proj-aBcDeFgHiJkLmNoPqRsTuVwXyZ123456789"
+    stripe_key: "FAKE_HONEYPOT_STRIPE_KEY_NOT_REAL"
+    stripe_webhook: "whsec_1234567890abcdefghijklmnop"
+    sendgrid_key: "SG.aBcDeFgHiJkLmNoPqRsT.UvWxYz1234567890abcdefghij"
+    sentry_dsn: "https://abc123@o456.ingest.sentry.io/789"
+    grafana_pass: "Gr4fana_Adm1n!"
+    ansible_sudo: "Ans1ble_Sud0_2025!"
+    vault_master: "V4ult_M4ster_Key_2025!"

@@ -1,0 +1,9 @@
+---
+sandbox_user: dettony
+sandbox_home: "/home/{{ sandbox_user }}"
+sandbox_detonation_dir: "{{ sandbox_home }}/detonation"
+sandbox_pcap_dir: "{{ sandbox_home }}/pcaps"
+sandbox_strace_dir: "{{ sandbox_home }}/strace"
+sandbox_timeout: 90
+# INetSim runs on REMnux, not sandbox -- sandbox DNS points to REMnux
+inetsim_host: "192.168.40.5"

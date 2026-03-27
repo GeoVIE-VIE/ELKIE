@@ -1,0 +1,211 @@
+# =============================================================================
+# REMnux — Static malware analysis environment
+# =============================================================================
+# Tools: Ghidra (headless), YARA, capa, FLOSS, UPX, strings, ssdeep, peframe
+# Directories: inbox (samples in), results (JSON out), yara-rules (custom)
+# =============================================================================
+---
+
+# ---- Packages ----
+
+- name: Install analysis tool dependencies
+  ansible.builtin.apt:
+    name:
+      - python3
+      - python3-pip
+      - python3-venv
+      - yara
+      - ssdeep
+      - libfuzzy-dev
+      - upx-ucl
+      - binutils
+      - file
+      - unzip
+      - wget
+      - curl
+      - jq
+      - openjdk-17-jdk-headless
+      - libssl-dev
+      - zstd
+    state: present
+    update_cache: true
+
+- name: Install Python analysis packages
+  ansible.builtin.pip:
+    name:
+      - pefile
+      - yara-python
+      - ssdeep
+      - peframe
+    state: present
+    executable: pip3
+
+# ---- Directory structure ----
+
+- name: Create analysis directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ remnux_user }}"
+    mode: "0755"
+  loop:
+    - "{{ remnux_inbox }}"
+    - "{{ remnux_results }}"
+    - "{{ remnux_yara_dir }}"
+
+# ---- Ghidra headless ----
+
+- name: Check if Ghidra is installed
+  ansible.builtin.stat:
+    path: /opt/ghidra/support/analyzeHeadless
+  register: ghidra_installed
+
+- name: Download Ghidra
+  ansible.builtin.get_url:
+    url: "https://github.com/NationalSecurityAgency/ghidra/releases/download/Ghidra_{{ remnux_ghidra_version }}_build/ghidra_{{ remnux_ghidra_version }}_PUBLIC_{{ remnux_ghidra_date }}.zip"
+    dest: /tmp/ghidra.zip
+    mode: "0644"
+  when: not ghidra_installed.stat.exists
+
+- name: Extract Ghidra
+  ansible.builtin.unarchive:
+    src: /tmp/ghidra.zip
+    dest: /opt/
+    remote_src: true
+    creates: "/opt/ghidra_{{ remnux_ghidra_version }}_PUBLIC"
+  when: not ghidra_installed.stat.exists
+
+- name: Symlink Ghidra to /opt/ghidra
+  ansible.builtin.file:
+    src: "/opt/ghidra_{{ remnux_ghidra_version }}_PUBLIC"
+    dest: /opt/ghidra
+    state: link
+  when: not ghidra_installed.stat.exists
+
+- name: Clean up Ghidra zip
+  ansible.builtin.file:
+    path: /tmp/ghidra.zip
+    state: absent
+
+# ---- capa ----
+
+- name: Check if capa is installed
+  ansible.builtin.stat:
+    path: /usr/local/bin/capa
+  register: capa_installed
+
+- name: Download capa
+  ansible.builtin.get_url:
+    url: "https://github.com/mandiant/capa/releases/download/v{{ remnux_capa_version }}/capa-v{{ remnux_capa_version }}-linux.zip"
+    dest: /tmp/capa.zip
+    mode: "0644"
+  when: not capa_installed.stat.exists
+
+- name: Extract capa
+  ansible.builtin.unarchive:
+    src: /tmp/capa.zip
+    dest: /usr/local/bin/
+    remote_src: true
+    mode: "0755"
+  when: not capa_installed.stat.exists
+
+- name: Clean up capa zip
+  ansible.builtin.file:
+    path: /tmp/capa.zip
+    state: absent
+
+# ---- FLOSS ----
+
+- name: Check if FLOSS is installed
+  ansible.builtin.stat:
+    path: /usr/local/bin/floss
+  register: floss_installed
+
+- name: Download FLOSS
+  ansible.builtin.get_url:
+    url: "https://github.com/mandiant/flare-floss/releases/download/v{{ remnux_floss_version }}/floss-v{{ remnux_floss_version }}-linux.zip"
+    dest: /tmp/floss.zip
+    mode: "0644"
+  when: not floss_installed.stat.exists
+
+- name: Extract FLOSS
+  ansible.builtin.unarchive:
+    src: /tmp/floss.zip
+    dest: /usr/local/bin/
+    remote_src: true
+    mode: "0755"
+  when: not floss_installed.stat.exists
+
+- name: Clean up FLOSS zip
+  ansible.builtin.file:
+    path: /tmp/floss.zip
+    state: absent
+
+# ---- UPX 5 (handles newer packer versions) ----
+
+- name: Check if UPX 5 is installed
+  ansible.builtin.stat:
+    path: /usr/local/bin/upx5
+  register: upx5_installed
+
+- name: Download UPX 5
+  ansible.builtin.get_url:
+    url: "https://github.com/upx/upx/releases/download/v5.0.0/upx-5.0.0-amd64_linux.tar.xz"
+    dest: /tmp/upx5.tar.xz
+    mode: "0644"
+  when: not upx5_installed.stat.exists
+  ignore_errors: true
+
+- name: Extract UPX 5
+  ansible.builtin.unarchive:
+    src: /tmp/upx5.tar.xz
+    dest: /tmp/
+    remote_src: true
+  when: not upx5_installed.stat.exists
+  ignore_errors: true
+
+- name: Install UPX 5 binary
+  ansible.builtin.copy:
+    src: /tmp/upx-5.0.0-amd64_linux/upx
+    dest: /usr/local/bin/upx5
+    remote_src: true
+    mode: "0755"
+  when: not upx5_installed.stat.exists
+  ignore_errors: true
+
+# ---- Deploy analysis script ----
+
+- name: Deploy analyze_sample.sh
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/../../analyze_sample.sh"
+    dest: "{{ remnux_home }}/analyze_sample.sh"
+    owner: "{{ remnux_user }}"
+    mode: "0755"
+
+# ---- Deploy Ghidra extraction script ----
+
+- name: Deploy Ghidra extraction postscript
+  ansible.builtin.template:
+    src: ghidra_extract.py.j2
+    dest: "{{ remnux_home }}/ghidra_extract.py"
+    owner: "{{ remnux_user }}"
+    mode: "0755"
+
+# ---- Seed YARA rules ----
+
+- name: Deploy base YARA rules
+  ansible.builtin.template:
+    src: base_yara.yar.j2
+    dest: "{{ remnux_yara_dir }}/base_rules.yar"
+    owner: "{{ remnux_user }}"
+    mode: "0644"
+
+# ---- Cleanup cron for old results ----
+
+- name: Add cron to clean old results
+  ansible.builtin.cron:
+    name: "Clean old analysis results"
+    minute: "0"
+    hour: "3"
+    job: "find {{ remnux_results }} -type f -mtime +{{ sample_retention_days | default(30) }} -delete"
+    user: "{{ remnux_user }}"

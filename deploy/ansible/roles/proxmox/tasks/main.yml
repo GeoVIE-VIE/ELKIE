@@ -1,0 +1,116 @@
+# =============================================================================
+# Proxmox — VM creation and snapshot management via API
+# =============================================================================
+# Runs from the Ansible controller (connection: local)
+# Uses Proxmox REST API for all operations
+#
+# IMPORTANT: Always revert to clean snapshot BEFORE making changes and
+# taking a new snapshot. Attackers install process hiders that make
+# compromised VMs appear clean.
+# =============================================================================
+---
+
+- name: Verify Proxmox API is reachable
+  ansible.builtin.uri:
+    url: "{{ proxmox_api_url }}/api2/json/version"
+    method: GET
+    headers:
+      Authorization: "{{ pve_api_token }}"
+    validate_certs: false
+    status_code: [200]
+  register: pve_version
+
+- name: Show Proxmox version
+  ansible.builtin.debug:
+    msg: "Proxmox VE {{ pve_version.json.data.version }} ({{ pve_version.json.data.release }})"
+
+# ---- Check existing VMs ----
+
+- name: List existing VMs
+  ansible.builtin.uri:
+    url: "{{ proxmox_api_url }}/api2/json/nodes/{{ proxmox_node }}/qemu"
+    method: GET
+    headers:
+      Authorization: "{{ pve_api_token }}"
+    validate_certs: false
+  register: existing_vms
+
+- name: Build list of existing VMIDs
+  ansible.builtin.set_fact:
+    existing_vmids: "{{ existing_vms.json.data | map(attribute='vmid') | map('int') | list }}"
+
+# ---- Ensure VMs exist ----
+
+- name: Create VMs that don't exist yet
+  ansible.builtin.uri:
+    url: "{{ proxmox_api_url }}/api2/json/nodes/{{ proxmox_node }}/qemu"
+    method: POST
+    headers:
+      Authorization: "{{ pve_api_token }}"
+    validate_certs: false
+    body_format: form-urlencoded
+    body:
+      vmid: "{{ item.vmid }}"
+      name: "{{ item.name }}"
+      memory: "{{ item.memory }}"
+      cores: "{{ item.cores }}"
+      ostype: "{{ item.ostype }}"
+      net0: "{{ item.net }}"
+      scsihw: "virtio-scsi-pci"
+    status_code: [200]
+  loop: "{{ proxmox_vms }}"
+  when: item.vmid not in existing_vmids
+  ignore_errors: true
+
+# ---- Snapshot management ----
+
+- name: Check for existing clean snapshots
+  ansible.builtin.uri:
+    url: "{{ proxmox_api_url }}/api2/json/nodes/{{ proxmox_node }}/qemu/{{ item.vmid }}/snapshot"
+    method: GET
+    headers:
+      Authorization: "{{ pve_api_token }}"
+    validate_certs: false
+  loop: "{{ proxmox_vms }}"
+  register: vm_snapshots
+
+- name: Create clean snapshot for VMs that don't have one
+  ansible.builtin.uri:
+    url: "{{ proxmox_api_url }}/api2/json/nodes/{{ proxmox_node }}/qemu/{{ item.item.vmid }}/snapshot"
+    method: POST
+    headers:
+      Authorization: "{{ pve_api_token }}"
+    validate_certs: false
+    body_format: form-urlencoded
+    body:
+      snapname: "{{ item.item.snapshot }}"
+      description: "Clean baseline snapshot created by Ansible"
+    status_code: [200]
+  loop: "{{ vm_snapshots.results }}"
+  when: >
+    item.json.data | selectattr('name', 'equalto', item.item.snapshot) | list | length == 0
+  ignore_errors: true
+
+# ---- Ensure VMs are running ----
+
+- name: Get VM status
+  ansible.builtin.uri:
+    url: "{{ proxmox_api_url }}/api2/json/nodes/{{ proxmox_node }}/qemu/{{ item.vmid }}/status/current"
+    method: GET
+    headers:
+      Authorization: "{{ pve_api_token }}"
+    validate_certs: false
+  loop: "{{ proxmox_vms }}"
+  register: vm_status
+
+- name: Start VMs that are stopped
+  ansible.builtin.uri:
+    url: "{{ proxmox_api_url }}/api2/json/nodes/{{ proxmox_node }}/qemu/{{ item.item.vmid }}/status/start"
+    method: POST
+    headers:
+      Authorization: "{{ pve_api_token }}"
+    validate_certs: false
+    status_code: [200]
+  loop: "{{ vm_status.results }}"
+  when: item.json.data.status != "running"
+  ignore_errors: true

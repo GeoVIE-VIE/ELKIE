@@ -1,0 +1,38 @@
+# {{ ansible_managed }}
+# Filebeat config for T-Pot -- ships honeypot logs to ELK ingest proxy
+
+filebeat.inputs:
+  - type: log
+    enabled: true
+    paths:
+      - {{ tpot_base }}/data/cowrie/log/cowrie.json
+    json.keys_under_root: true
+    json.add_error_key: true
+    fields:
+      container.name: cowrie
+    fields_under_root: true
+
+  - type: log
+    enabled: true
+    paths:
+      - {{ tpot_base }}/data/dionaea/log/dionaea.json
+    json.keys_under_root: true
+    json.add_error_key: true
+    fields:
+      container.name: dionaea
+    fields_under_root: true
+
+output.elasticsearch:
+  hosts: ["{{ elk_ip }}:5044"]
+  protocol: "http"
+
+processors:
+  - add_host_metadata:
+      when.not.contains.tags: forwarded
+
+logging.level: warning
+logging.to_files: true
+logging.files:
+  path: /var/log/filebeat
+  name: filebeat
+  keepfiles: 3

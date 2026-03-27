@@ -25,9 +25,10 @@ from pathlib import Path
 
 import requests
 
-ES_URL = "http://localhost:9200"
-RESULT_INDEX = "malware-analysis"
-OUTPUT_DIR = Path("/home/legs/reports")
+import os
+ES_URL = os.environ.get("ES_URL", "http://localhost:9200")
+RESULT_INDEX = os.environ.get("ES_RESULT_INDEX", "malware-analysis")
+OUTPUT_DIR = Path(os.environ.get("REPORTS_DIR", os.environ.get("ELKIE_HOME", "/home/legs") + "/reports"))
 
 # Map capa namespaces to ATT&CK technique IDs
 CAPA_TO_ATTACK = {

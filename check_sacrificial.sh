@@ -1,12 +1,28 @@
 #!/bin/bash
 # Watchdog: scan for malware drops, check access, restore if locked out
-LOG="/home/legs/sacrificial_watchdog.log"
-STAGING="/home/legs/sample_staging"
-SSH_OPTS="-o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=10"
-JUMP="-J lepots@192.168.40.3:64295"
-TARGET="root@192.168.40.99"
-source /home/legs/.sample_analyzer_env 2>/dev/null
+# Config: source .env or .sample_analyzer_env for variables
+
+# Source environment
+ELKIE_HOME="${ELKIE_HOME:-/home/legs}"
+source "$ELKIE_HOME/.sample_analyzer_env" 2>/dev/null
+source "$ELKIE_HOME/.env" 2>/dev/null
+
+# Config — all from env with sane defaults
+LOG="${ELKIE_HOME}/sacrificial_watchdog.log"
+STAGING="${STAGING_DIR:-$ELKIE_HOME/sample_staging}"
+TPOT_USER="${TPOT_SSH_USER:-lepots}"
+TPOT_HOST="${TPOT_IP:-192.168.40.3}"
+TPOT_PORT="${TPOT_SSH_PORT:-64295}"
+SACRIFICIAL_USER="${SACRIFICIAL_SSH_USER:-root}"
+SACRIFICIAL_HOST="${SACRIFICIAL_IP:-192.168.40.99}"
+PVE_URL="${PROXMOX_API_URL:-https://192.168.99.160:8006}"
+PVE_NODE="${PROXMOX_NODE:-flexiserve}"
+PVE_VMID="${VMID_SACRIFICIAL:-107}"
 PVE_TOKEN="${PVE_API_TOKEN:-}"
+
+SSH_OPTS="-o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=10"
+JUMP="-J ${TPOT_USER}@${TPOT_HOST}:${TPOT_PORT}"
+TARGET="${SACRIFICIAL_USER}@${SACRIFICIAL_HOST}"
 
 mkdir -p "$STAGING"
 
@@ -57,7 +73,7 @@ else
 
     # Restore snapshot via Proxmox API
     curl -sk -X POST -H "Authorization: $PVE_TOKEN" \
-      "https://192.168.99.160:8006/api2/json/nodes/flexiserve/qemu/107/snapshot/clean/rollback" > /dev/null 2>&1
+      "${PVE_URL}/api2/json/nodes/${PVE_NODE}/qemu/${PVE_VMID}/snapshot/clean/rollback" > /dev/null 2>&1
 
     sleep 30
 

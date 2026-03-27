@@ -4,8 +4,8 @@ import json, os, requests
 from datetime import datetime
 from pathlib import Path
 
-reports_dir = Path("/home/legs/reports")
-es = "http://localhost:9200"
+reports_dir = Path(os.environ.get("REPORTS_DIR", os.environ.get("ELKIE_HOME", "/home/legs") + "/reports"))
+es = os.environ.get("ES_URL", "http://localhost:9200")
 pdfs = sorted(reports_dir.glob("*_report.pdf"), key=lambda p: p.stat().st_mtime, reverse=True)
 
 samples = {}

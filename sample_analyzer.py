@@ -36,72 +36,110 @@ import requests
 # Configuration
 # ---------------------------------------------------------------------------
 
+def _env(key: str, default: str = "") -> str:
+    """Get env var with fallback default."""
+    return os.environ.get(key, default)
+
+def _env_int(key: str, default: int) -> int:
+    """Get env var as int with fallback default."""
+    v = os.environ.get(key, "")
+    return int(v) if v else default
+
+def _env_bool(key: str, default: bool) -> bool:
+    """Get env var as bool with fallback default."""
+    v = os.environ.get(key, "")
+    if not v:
+        return default
+    return v.lower() in ("1", "true", "yes")
+
+# Base directory — all relative paths derive from this
+ELKIE_HOME = Path(_env("ELKIE_HOME", "/home/legs"))
+
 @dataclass
 class Config:
-    es_url: str = "http://localhost:9200"
-    es_index: str = ".ds-filebeat-8.19.8-*"
-    result_index: str = "malware-analysis"
-    poll_interval: int = 60
-    webhook_url: Optional[str] = None
-    log_file: str = "/home/legs/sample_analyzer.log"
-    state_file: str = "/home/legs/.sample_analyzer_state.json"
-    grafana_url: Optional[str] = "https://192.168.50.3:3000"
-    grafana_dashboard_uid: Optional[str] = "tpot-attack-overview"
-    dry_run: bool = False
-    backfill_hours: int = 0
-    verbosity: str = "normal"
-    # T-Pot SSH
-    tpot_host: str = "192.168.40.3"
-    tpot_port: int = 64295
-    tpot_user: str = "lepots"
-    # REMnux SSH
-    remnux_host: str = "192.168.40.5"
-    remnux_port: int = 22
-    remnux_user: str = "nalyzer"
-    remnux_inbox: str = "/home/nalyzer/inbox"
-    remnux_results: str = "/home/nalyzer/results"
-    remnux_script: str = "/home/nalyzer/analyze_sample.sh"
-    remnux_vmid: int = 106
-    remnux_auto_start: bool = True       # auto-start/stop REMnux VM
-    # Sandbox (dynamic analysis)
-    sandbox_host: str = "192.168.40.6"
-    sandbox_port: int = 22
-    sandbox_user: str = "dettony"
-    sandbox_vmid: int = 109
-    sandbox_snapshot: str = "clean"
-    sandbox_enabled: bool = True
-    sandbox_timeout: int = 90          # detonation duration in seconds
+    # Elasticsearch
+    es_url: str = _env("ES_URL", "http://localhost:9200")
+    es_index: str = _env("ES_FILEBEAT_INDEX", ".ds-filebeat-*")
+    result_index: str = _env("ES_RESULT_INDEX", "malware-analysis")
+    poll_interval: int = _env_int("POLL_INTERVAL", 60)
+    webhook_url: Optional[str] = _env("DISCORD_WEBHOOK_URL") or None
+    log_file: str = _env("LOG_FILE", str(ELKIE_HOME / "sample_analyzer.log"))
+    state_file: str = _env("STATE_FILE", str(ELKIE_HOME / ".sample_analyzer_state.json"))
+    grafana_url: Optional[str] = _env("GRAFANA_URL", "") or None
+    grafana_dashboard_uid: Optional[str] = _env("GRAFANA_DASHBOARD_UID", "tpot-attack-overview")
+    dry_run: bool = _env_bool("DRY_RUN", False)
+    backfill_hours: int = _env_int("BACKFILL_HOURS", 0)
+    verbosity: str = _env("VERBOSITY", "normal")
+    # T-Pot SSH (jump host for honeypot subnet)
+    tpot_host: str = _env("TPOT_IP", "192.168.40.3")
+    tpot_port: int = _env_int("TPOT_SSH_PORT", 64295)
+    tpot_user: str = _env("TPOT_SSH_USER", "lepots")
+    # REMnux SSH (static malware analysis)
+    remnux_host: str = _env("REMNUX_IP", "192.168.40.5")
+    remnux_port: int = _env_int("REMNUX_SSH_PORT", 22)
+    remnux_user: str = _env("REMNUX_SSH_USER", "nalyzer")
+    remnux_inbox: str = _env("REMNUX_INBOX", f"/home/{_env('REMNUX_SSH_USER', 'nalyzer')}/inbox")
+    remnux_results: str = _env("REMNUX_RESULTS", f"/home/{_env('REMNUX_SSH_USER', 'nalyzer')}/results")
+    remnux_script: str = _env("REMNUX_SCRIPT", f"/home/{_env('REMNUX_SSH_USER', 'nalyzer')}/analyze_sample.sh")
+    remnux_vmid: int = _env_int("VMID_REMNUX", 106)
+    remnux_auto_start: bool = _env_bool("REMNUX_AUTO_START", True)
+    # Sandbox (dynamic analysis / detonation)
+    sandbox_host: str = _env("SANDBOX_IP", "192.168.40.6")
+    sandbox_port: int = _env_int("SANDBOX_SSH_PORT", 22)
+    sandbox_user: str = _env("SANDBOX_SSH_USER", "dettony")
+    sandbox_vmid: int = _env_int("VMID_SANDBOX", 109)
+    sandbox_snapshot: str = _env("SANDBOX_SNAPSHOT", "clean")
+    sandbox_enabled: bool = _env_bool("SANDBOX_ENABLED", True)
+    sandbox_timeout: int = _env_int("SANDBOX_TIMEOUT", 90)
     # Sacrificial VM (via T-Pot jump host)
-    sacrificial_host: str = "192.168.40.99"
-    sacrificial_port: int = 22
-    sacrificial_user: str = "root"
-    pve_api_url: str = "https://192.168.99.160:8006"
-    pve_token_id: str = ""
-    pve_token_secret: str = ""
+    sacrificial_host: str = _env("SACRIFICIAL_IP", "192.168.40.99")
+    sacrificial_port: int = _env_int("SACRIFICIAL_SSH_PORT", 22)
+    sacrificial_user: str = _env("SACRIFICIAL_SSH_USER", "root")
+    # Proxmox API
+    pve_api_url: str = _env("PROXMOX_API_URL", "https://192.168.99.160:8006")
+    pve_node: str = _env("PROXMOX_NODE", "flexiserve")
+    pve_token_id: str = _env("PVE_TOKEN_ID", "")
+    pve_token_secret: str = _env("PVE_API_TOKEN", "")
     # MISP
-    misp_url: str = "https://localhost"
-    misp_api_key: str = ""
+    misp_url: str = _env("MISP_URL", "https://localhost")
+    misp_api_key: str = _env("MISP_API_KEY", "")
+    # Sacrificial VM agent names (as they appear in ES auditd logs)
+    sacrificial_agent_name: str = _env("SACRIFICIAL_AGENT_NAME", "ds-prod-web01")
+    sacrificial_agent_alt: str = _env("SACRIFICIAL_AGENT_ALT", "prodction1")
+    # LLM configuration
+    llm_mode: str = _env("LLM_MODE", "api")           # api | local | none
+    llm_api_model: str = _env("LLM_API_MODEL", "claude-sonnet-4-20250514")
+    llm_local_url: str = _env("LLM_LOCAL_URL", "http://localhost:11434")
+    llm_local_model: str = _env("LLM_LOCAL_MODEL", "llama3:8b")
+    # Cover story (for DNS interception on sandbox)
+    remnux_dns_ip: str = _env("REMNUX_IP", "192.168.40.5")
     # Limits
-    sample_retention_days: int = 30
-    analysis_timeout: int = 300
-    max_sample_size: int = 52428800  # 50MB
+    sample_retention_days: int = _env_int("SAMPLE_RETENTION_DAYS", 30)
+    analysis_timeout: int = _env_int("ANALYSIS_TIMEOUT", 300)
+    max_sample_size: int = _env_int("MAX_SAMPLE_SIZE", 52428800)
+    alert_confidence_threshold: int = _env_int("ALERT_CONFIDENCE_THRESHOLD", 20)
 
-STAGING_DIR = Path("/home/legs/sample_staging")
-ANALYSIS_SCRIPT_LOCAL = Path("/home/legs/analyze_sample.sh")
+STAGING_DIR = Path(_env("STAGING_DIR", str(ELKIE_HOME / "sample_staging")))
+ANALYSIS_SCRIPT_LOCAL = Path(str(ELKIE_HOME / "analyze_sample.sh"))
 
 # Sample directories on T-Pot (inside /data + quarantine)
-TPOT_SAMPLE_DIRS = [
-    "/home/lepots/tpotce/data/cowrie/downloads",
-    "/home/lepots/tpotce/data/dionaea/binaries",
-    "/home/lepots/tpotce/data/honeytrap/downloads",
-    "/home/lepots/tpotce/data/adbhoney/downloads",
-    "/opt/honeypot-quarantine/cowrie",
-    "/opt/honeypot-quarantine/dionaea",
-    "/opt/honeypot-quarantine/honeytrap",
-    "/opt/honeypot-quarantine/adbhoney",
-    "/opt/honeypot-quarantine/glutton",
-    "/opt/honeypot-quarantine/glutton_shared",
-]
+_tpot_user = _env("TPOT_SSH_USER", "lepots")
+_tpot_dirs_env = _env("TPOT_SAMPLE_DIRS", "")
+if _tpot_dirs_env:
+    TPOT_SAMPLE_DIRS = [d.strip() for d in _tpot_dirs_env.split(",") if d.strip()]
+else:
+    TPOT_SAMPLE_DIRS = [
+        f"/home/{_tpot_user}/tpotce/data/cowrie/downloads",
+        f"/home/{_tpot_user}/tpotce/data/dionaea/binaries",
+        f"/home/{_tpot_user}/tpotce/data/honeytrap/downloads",
+        f"/home/{_tpot_user}/tpotce/data/adbhoney/downloads",
+        "/opt/honeypot-quarantine/cowrie",
+        "/opt/honeypot-quarantine/dionaea",
+        "/opt/honeypot-quarantine/honeytrap",
+        "/opt/honeypot-quarantine/adbhoney",
+        "/opt/honeypot-quarantine/glutton",
+        "/opt/honeypot-quarantine/glutton_shared",
+    ]
 
 SEVERITY_ORDER = {"low": 0, "medium": 1, "high": 2, "critical": 3}
 
@@ -119,25 +157,14 @@ class SampleAnalyzer:
         self.last_cleanup: float = 0
         self.running = True
         self.logger = self._setup_logging()
-        self._tpot_pass = os.environ.get("TPOT_PASS", "")
-        self._remnux_pass = os.environ.get("REMNUX_PASS", "")
+        self._tpot_pass = os.environ.get("TPOT_SSH_PASS", os.environ.get("TPOT_PASS", ""))
+        self._remnux_pass = os.environ.get("REMNUX_SSH_PASS", os.environ.get("REMNUX_PASS", ""))
         self._vt_api_key = os.environ.get("VT_API_KEY", "")
         self._mb_api_key = os.environ.get("MB_API_KEY", "")
-        self._pve_token_id = os.environ.get("PVE_TOKEN_ID", self.cfg.pve_token_id)
-        self._pve_token_secret = os.environ.get("PVE_TOKEN_SECRET", self.cfg.pve_token_secret)
-        if os.environ.get("PVE_API_URL"):
-            self.cfg.pve_api_url = os.environ["PVE_API_URL"]
-        if os.environ.get("SANDBOX_HOST"):
-            self.cfg.sandbox_host = os.environ["SANDBOX_HOST"]
-        if os.environ.get("SANDBOX_USER"):
-            self.cfg.sandbox_user = os.environ["SANDBOX_USER"]
-        if os.environ.get("SANDBOX_VMID"):
-            self.cfg.sandbox_vmid = int(os.environ["SANDBOX_VMID"])
-        if os.environ.get("SANDBOX_SNAPSHOT"):
-            self.cfg.sandbox_snapshot = os.environ["SANDBOX_SNAPSHOT"]
-        if os.environ.get("MISP_URL"):
-            self.cfg.misp_url = os.environ["MISP_URL"]
-        self._misp_api_key = os.environ.get("MISP_API_KEY", self.cfg.misp_api_key)
+        self._anthropic_key = os.environ.get("CLAUDE_API_KEY", "")
+        self._pve_token_id = self.cfg.pve_token_id
+        self._pve_token_secret = self.cfg.pve_token_secret
+        self._misp_api_key = self.cfg.misp_api_key
 
     # -- logging -----------------------------------------------------------
 
@@ -426,8 +453,8 @@ class SampleAnalyzer:
                     {"term": {"service.type": "auditd"}},
                     {"term": {"event.action": "execve"}},
                     {"bool": {"should": [
-                        {"term": {"agent.name": "ds-prod-web01"}},
-                        {"term": {"agent.name": "prodction1"}},
+                        {"term": {"agent.name": self.cfg.sacrificial_agent_name}},
+                        {"term": {"agent.name": self.cfg.sacrificial_agent_alt}},
                     ], "minimum_should_match": 1}},
                     time_filter,
                     {"bool": {"should": [
@@ -472,8 +499,8 @@ class SampleAnalyzer:
                 "sort": [{"@timestamp": "desc"}],
                 "query": {"bool": {"must": [
                     {"bool": {"should": [
-                        {"term": {"agent.name": "ds-prod-web01"}},
-                        {"term": {"agent.name": "prodction1"}},
+                        {"term": {"agent.name": self.cfg.sacrificial_agent_name}},
+                        {"term": {"agent.name": self.cfg.sacrificial_agent_alt}},
                     ], "minimum_should_match": 1}},
                     time_filter,
                     {"bool": {"should": [
@@ -845,8 +872,8 @@ class SampleAnalyzer:
                     {"term": {"service.type": "auditd"}},
                     {"term": {"event.action": "execve"}},
                     {"bool": {"should": [
-                        {"term": {"agent.name": "ds-prod-web01"}},
-                        {"term": {"agent.name": "prodction1"}},
+                        {"term": {"agent.name": self.cfg.sacrificial_agent_name}},
+                        {"term": {"agent.name": self.cfg.sacrificial_agent_alt}},
                     ], "minimum_should_match": 1}},
                     {"exists": {"field": "process.executable"}},
                     {"range": {"@timestamp": {"gte": "now-30m"}}},
@@ -1094,7 +1121,7 @@ class SampleAnalyzer:
         if not self.cfg.remnux_auto_start or not self._pve_token_id:
             return True
 
-        node = "flexiserve"
+        node = self.cfg.pve_node
         vmid = self.cfg.remnux_vmid
 
         # Check if already reachable via SSH
@@ -1134,7 +1161,7 @@ class SampleAnalyzer:
         if not self.cfg.remnux_auto_start or not self._pve_token_id:
             return
 
-        node = "flexiserve"
+        node = self.cfg.pve_node
         vmid = self.cfg.remnux_vmid
 
         self.logger.info("Shutting down REMnux VM to save resources")
@@ -1215,7 +1242,7 @@ class SampleAnalyzer:
 
     def _add_pending(self, sha256: str):
         """Track samples that timed out but are still being analyzed."""
-        pending_file = Path("/home/legs/.pending_analysis.json")
+        pending_file = ELKIE_HOME / ".pending_analysis.json"
         pending = []
         try:
             with open(pending_file) as f:
@@ -1230,7 +1257,7 @@ class SampleAnalyzer:
 
     def check_pending_results(self):
         """Check for results from samples that timed out — runs every poll cycle."""
-        pending_file = Path("/home/legs/.pending_analysis.json")
+        pending_file = ELKIE_HOME / ".pending_analysis.json"
         try:
             with open(pending_file) as f:
                 pending = json.load(f)
@@ -1304,7 +1331,7 @@ class SampleAnalyzer:
                 # PDF
                 try:
                     from generate_report import generate_report as gen_pdf, build_styles
-                    report_dir = Path("/home/legs/reports")
+                    report_dir = Path(_env("REPORTS_DIR", str(ELKIE_HOME / "reports")))
                     report_dir.mkdir(parents=True, exist_ok=True)
                     gen_pdf(results, report_dir / f"{sha256[:16]}_report.pdf", build_styles())
                 except Exception:
@@ -1821,7 +1848,7 @@ class SampleAnalyzer:
 
     # -- Deep analysis scoring + Ghidra decompilation ---------------------
 
-    DEEP_ANALYSIS_STATE = Path("/home/legs/.deep_analysis_today.json")
+    DEEP_ANALYSIS_STATE = ELKIE_HOME / ".deep_analysis_today.json"
 
     def _score_sample(self, results: dict) -> int:
         """Score a sample to determine if it deserves deep Ghidra decompilation."""
@@ -1893,7 +1920,8 @@ class SampleAnalyzer:
         # Also deploy the deep extract script
         self._scp_to(
             self.cfg.remnux_host, self.cfg.remnux_port, self.cfg.remnux_user,
-            self._remnux_pass, "/home/legs/ghidra_deep_extract.py", "/home/nalyzer/ghidra_deep_extract.py"
+            self._remnux_pass, str(ELKIE_HOME / "ghidra_deep_extract.py"),
+            f"/home/{self.cfg.remnux_user}/ghidra_deep_extract.py"
         )
         rc, _, _ = self._ssh_cmd(
             self.cfg.remnux_host, self.cfg.remnux_port, self.cfg.remnux_user,
@@ -1931,14 +1959,18 @@ class SampleAnalyzer:
         self.logger.info("Extracted %d functions (%d decompiled) for %s",
                          len(func_index), len(decompiled), sha256[:16])
 
-        api_key = os.environ.get("CLAUDE_API_KEY", "")
-        if not api_key:
+        if self.cfg.llm_mode == "none":
+            return None
+
+        api_key = self._anthropic_key
+        if self.cfg.llm_mode == "api" and not api_key:
             return None
 
         try:
             import anthropic
         except ImportError:
-            return None
+            if self.cfg.llm_mode == "api":
+                return None
 
         client = anthropic.Anthropic(api_key=api_key)
         total_cost = 0.0
@@ -1980,7 +2012,7 @@ FUNCTION INDEX:
 
         try:
             triage_response = client.messages.create(
-                model="claude-sonnet-4-20250514",
+                model=self.cfg.llm_api_model,
                 max_tokens=1500,
                 messages=[{"role": "user", "content": triage_prompt}],
             )
@@ -2052,7 +2084,7 @@ SELECTED FUNCTIONS ({len(selected_funcs)} of {len(func_index)} total):
 
         try:
             deep_response = client.messages.create(
-                model="claude-sonnet-4-20250514",
+                model=self.cfg.llm_api_model,
                 max_tokens=4000,
                 messages=[{"role": "user", "content": deep_prompt}],
             )
@@ -2079,15 +2111,21 @@ SELECTED FUNCTIONS ({len(selected_funcs)} of {len(func_index)} total):
         }
 
     def claude_analyze(self, results: dict) -> Optional[dict]:
-        """Call Claude API for threat assessment and YARA rule generation."""
-        api_key = os.environ.get("CLAUDE_API_KEY", "")
+        """Call LLM for threat assessment and YARA rule generation."""
+        if self.cfg.llm_mode == "none":
+            return None
+
+        if self.cfg.llm_mode == "local":
+            return self._llm_analyze_local(results)
+
+        api_key = self._anthropic_key
         if not api_key:
             return None
 
         try:
             import anthropic
         except ImportError:
-            self.logger.warning("anthropic package not installed — skipping Claude analysis")
+            self.logger.warning("anthropic package not installed — skipping LLM analysis")
             return None
 
         sha256 = results.get("sha256", "?")
@@ -2184,7 +2222,7 @@ Ghidra Analysis:
         try:
             client = anthropic.Anthropic(api_key=api_key)
             response = client.messages.create(
-                model="claude-sonnet-4-20250514",
+                model=self.cfg.llm_api_model,
                 max_tokens=3000,
                 messages=[{"role": "user", "content": prompt}],
             )
@@ -2213,14 +2251,59 @@ Ghidra Analysis:
             self.logger.error("Claude API failed for %s: %s", sha256[:16], e)
             return None
 
+    def _llm_analyze_local(self, results: dict) -> Optional[dict]:
+        """Use local Ollama endpoint for threat assessment (no API key needed)."""
+        try:
+            # Build the same prompt as claude_analyze but send to local endpoint
+            sha256 = results.get("sha256", "?")
+            strings_text = "\n".join(results.get("interesting_strings", [])[:20])
+            capa_text = json.dumps(results.get("capa_capabilities", [])[:15], indent=2)
+            yara_text = json.dumps(results.get("yara_matches", []))
+            dyn = results.get("dynamic_analysis", {})
+            dyn_summary = ""
+            if dyn:
+                dyn_summary = f"DNS: {dyn.get('dns_queries', [])[:10]}, Connections: {dyn.get('outbound_connections', [])[:10]}, New files: {dyn.get('new_files', [])[:10]}"
+
+            prompt = f"""Analyze this honeypot-captured sample. Report ONLY what evidence supports. Respond as JSON with keys: classification, confidence, severity, malware_family, summary, warrants_investigation, yara_rule.
+
+SHA256: {sha256}
+File Type: {results.get('file_type', '')}
+Size: {results.get('file_size', 0)} bytes
+YARA: {yara_text}
+Strings: {strings_text[:2000]}
+capa: {capa_text[:1500]}
+Dynamic: {dyn_summary[:1500]}"""
+
+            resp = requests.post(
+                f"{self.cfg.llm_local_url}/api/generate",
+                json={"model": self.cfg.llm_local_model, "prompt": prompt, "stream": False},
+                timeout=120,
+            )
+            if resp.status_code != 200:
+                self.logger.warning("Local LLM returned %d", resp.status_code)
+                return None
+
+            text = resp.json().get("response", "")
+            json_match = re.search(r'\{[\s\S]*\}', text)
+            if json_match:
+                return json.loads(json_match.group())
+            return {"summary": text, "classification": None, "confidence": None,
+                    "severity": None, "yara_rule": "", "warrants_investigation": ""}
+        except Exception as e:
+            self.logger.warning("Local LLM analysis failed: %s", e)
+            return None
+
     def claude_generate_sigma(self, results: dict) -> Optional[str]:
-        """Generate a behavioral Sigma rule from dynamic analysis via Claude API."""
+        """Generate a behavioral Sigma rule from dynamic analysis via LLM."""
+        if self.cfg.llm_mode == "none":
+            return None
+
         dyn = results.get("dynamic_analysis")
         if not dyn:
             return None
 
         api_key = self._anthropic_key
-        if not api_key:
+        if self.cfg.llm_mode == "api" and not api_key:
             return None
 
         sha256 = results.get("sha256", "?")
@@ -2266,7 +2349,7 @@ Requirements:
             import anthropic
             client = anthropic.Anthropic(api_key=api_key)
             response = client.messages.create(
-                model="claude-sonnet-4-20250514",
+                model=self.cfg.llm_api_model,
                 max_tokens=1500,
                 messages=[{"role": "user", "content": prompt}],
             )
@@ -2783,7 +2866,7 @@ Requirements:
         """Restore sandbox VM to clean snapshot via Proxmox API."""
         vmid = self.cfg.sandbox_vmid
         snap = self.cfg.sandbox_snapshot
-        node = "flexiserve"
+        node = self.cfg.pve_node
 
         self.logger.info("Restoring sandbox VM %d to snapshot '%s'", vmid, snap)
 
@@ -3047,8 +3130,9 @@ Requirements:
             return None
 
         # Step 2: Point DNS to INetSim on REMnux, set up DoT interception
+        dns_ip = self.cfg.remnux_dns_ip
         self._sandbox_ssh(
-            "sudo bash -c 'rm -f /etc/resolv.conf && echo nameserver 192.168.40.5 > /etc/resolv.conf'",
+            f"sudo bash -c 'rm -f /etc/resolv.conf && echo nameserver {dns_ip} > /etc/resolv.conf'",
             timeout=5,
         )
         # Intercept DNS-over-TLS (port 853) — socat strips TLS, forwards to INetSim plain DNS
@@ -3056,16 +3140,16 @@ Requirements:
             "sudo bash -c '"
             "if command -v socat >/dev/null 2>&1; then "
             "  openssl req -x509 -newkey rsa:2048 -keyout /tmp/dot.key -out /tmp/dot.crt -days 1 -nodes -subj \"/CN=dns\" 2>/dev/null && "
-            "  nohup socat OPENSSL-LISTEN:853,reuseaddr,fork,cert=/tmp/dot.crt,key=/tmp/dot.key,verify=0 TCP:192.168.40.5:53 > /tmp/dot.log 2>&1 & "
+            f"  nohup socat OPENSSL-LISTEN:853,reuseaddr,fork,cert=/tmp/dot.crt,key=/tmp/dot.key,verify=0 TCP:{dns_ip}:53 > /tmp/dot.log 2>&1 & "
             "fi'",
             timeout=10,
         )
         # Redirect DoT/DoH attempts to local interceptors
         self._sandbox_ssh(
             "sudo iptables -t nat -A OUTPUT -p tcp --dport 853 -j REDIRECT --to-port 853 2>/dev/null; "
-            "sudo iptables -t nat -A OUTPUT -p tcp --dport 443 -d 1.1.1.1 -j DNAT --to-destination 192.168.40.5:80 2>/dev/null; "
-            "sudo iptables -t nat -A OUTPUT -p tcp --dport 443 -d 8.8.8.8 -j DNAT --to-destination 192.168.40.5:80 2>/dev/null; "
-            "sudo iptables -t nat -A OUTPUT -p tcp --dport 443 -d 9.9.9.9 -j DNAT --to-destination 192.168.40.5:80 2>/dev/null",
+            f"sudo iptables -t nat -A OUTPUT -p tcp --dport 443 -d 1.1.1.1 -j DNAT --to-destination {dns_ip}:80 2>/dev/null; "
+            f"sudo iptables -t nat -A OUTPUT -p tcp --dport 443 -d 8.8.8.8 -j DNAT --to-destination {dns_ip}:80 2>/dev/null; "
+            f"sudo iptables -t nat -A OUTPUT -p tcp --dport 443 -d 9.9.9.9 -j DNAT --to-destination {dns_ip}:80 2>/dev/null",
             timeout=5,
         )
         # Clear INetSim DNS log on REMnux so we only capture this detonation's queries
@@ -3835,7 +3919,7 @@ Requirements:
         # Step 10: Generate PDF report
         try:
             from generate_report import generate_report as gen_pdf, build_styles
-            report_dir = Path("/home/legs/reports")
+            report_dir = Path(_env("REPORTS_DIR", str(ELKIE_HOME / "reports")))
             report_dir.mkdir(parents=True, exist_ok=True)
             report_path = report_dir / f"{sha256[:16]}_report.pdf"
             gen_pdf(results, report_path, build_styles())
@@ -3868,7 +3952,7 @@ Requirements:
             from generate_attack_navigator import generate_layer
             layer = generate_layer()
             if layer:
-                layer_path = Path("/home/legs/reports/attack_navigator_layer.json")
+                layer_path = Path(_env("REPORTS_DIR", str(ELKIE_HOME / "reports"))) / "attack_navigator_layer.json"
                 with open(layer_path, "w") as f:
                     json.dump(layer, f, indent=2)
         except Exception as e:
@@ -3877,7 +3961,7 @@ Requirements:
         # Step 13: Discord alert (suppress low-confidence noise)
         conf = results.get("confidence", 0)
         classification = results.get("classification", "unknown")
-        if conf < 20 and classification == "unknown":
+        if conf < self.cfg.alert_confidence_threshold and classification == "unknown":
             self.logger.info("Suppressing alert for %s — low confidence (%d%%) and unclassified", sha256[:16], conf)
         else:
             self.fire_discord_alert(results, sample_info)
@@ -3957,52 +4041,61 @@ Requirements:
 # ---------------------------------------------------------------------------
 
 def parse_args() -> Config:
-    p = argparse.ArgumentParser(description="Sample Analyzer — Automated Malware Analysis Pipeline")
-    p.add_argument("--es-url", default="http://localhost:9200")
-    p.add_argument("--es-index", default=".ds-filebeat-8.19.8-*")
-    p.add_argument("--result-index", default="malware-analysis")
-    p.add_argument("--poll-interval", type=int, default=60)
-    p.add_argument("--webhook-url", default=None, help="Discord webhook URL")
-    p.add_argument("--log-file", default="/home/legs/sample_analyzer.log")
-    p.add_argument("--grafana-url", default="https://192.168.50.3:3000")
-    p.add_argument("--grafana-dashboard-uid", default="tpot-attack-overview")
-    p.add_argument("--backfill", type=int, default=0, dest="backfill_hours", help="Backfill N hours on startup")
-    p.add_argument("--dry-run", action="store_true", help="Process events but skip actual analysis/alerts")
-    p.add_argument("--verbosity", default="normal", choices=["compact", "normal", "verbose"])
-    # SSH targets
-    p.add_argument("--tpot-host", default="192.168.40.3")
-    p.add_argument("--tpot-port", type=int, default=64295)
-    p.add_argument("--tpot-user", default="lepots")
-    p.add_argument("--remnux-host", default="192.168.40.5")
-    p.add_argument("--remnux-port", type=int, default=22)
-    p.add_argument("--remnux-user", default="nalyzer")
+    """Parse CLI args. All values default from env vars (via Config dataclass), then CLI overrides."""
+    cfg = Config()  # picks up env vars automatically
+    p = argparse.ArgumentParser(description="ELKIE SOC — Automated Malware Analysis Pipeline")
+    p.add_argument("--es-url", default=cfg.es_url)
+    p.add_argument("--es-index", default=cfg.es_index)
+    p.add_argument("--result-index", default=cfg.result_index)
+    p.add_argument("--poll-interval", type=int, default=cfg.poll_interval)
+    p.add_argument("--webhook-url", default=cfg.webhook_url, help="Discord webhook URL")
+    p.add_argument("--log-file", default=cfg.log_file)
+    p.add_argument("--grafana-url", default=cfg.grafana_url)
+    p.add_argument("--grafana-dashboard-uid", default=cfg.grafana_dashboard_uid)
+    p.add_argument("--backfill", type=int, default=cfg.backfill_hours, dest="backfill_hours",
+                   help="Backfill N hours on startup")
+    p.add_argument("--dry-run", action="store_true", default=cfg.dry_run,
+                   help="Process events but skip actual analysis/alerts")
+    p.add_argument("--verbosity", default=cfg.verbosity, choices=["compact", "normal", "verbose"])
+    # SSH targets (override env)
+    p.add_argument("--tpot-host", default=cfg.tpot_host)
+    p.add_argument("--tpot-port", type=int, default=cfg.tpot_port)
+    p.add_argument("--tpot-user", default=cfg.tpot_user)
+    p.add_argument("--remnux-host", default=cfg.remnux_host)
+    p.add_argument("--remnux-port", type=int, default=cfg.remnux_port)
+    p.add_argument("--remnux-user", default=cfg.remnux_user)
+    p.add_argument("--sandbox-timeout", type=int, default=cfg.sandbox_timeout)
+    p.add_argument("--llm-mode", default=cfg.llm_mode, choices=["api", "local", "none"])
     # Limits
-    p.add_argument("--analysis-timeout", type=int, default=300)
-    p.add_argument("--retention-days", type=int, default=30)
+    p.add_argument("--analysis-timeout", type=int, default=cfg.analysis_timeout)
+    p.add_argument("--retention-days", type=int, default=cfg.sample_retention_days)
 
     args = p.parse_args()
 
-    return Config(
-        es_url=args.es_url,
-        es_index=args.es_index,
-        result_index=args.result_index,
-        poll_interval=args.poll_interval,
-        webhook_url=args.webhook_url,
-        log_file=args.log_file,
-        grafana_url=args.grafana_url,
-        grafana_dashboard_uid=args.grafana_dashboard_uid,
-        backfill_hours=args.backfill_hours,
-        dry_run=args.dry_run,
-        verbosity=args.verbosity,
-        tpot_host=args.tpot_host,
-        tpot_port=args.tpot_port,
-        tpot_user=args.tpot_user,
-        remnux_host=args.remnux_host,
-        remnux_port=args.remnux_port,
-        remnux_user=args.remnux_user,
-        analysis_timeout=args.analysis_timeout,
-        sample_retention_days=args.retention_days,
-    )
+    # CLI args override the env-populated Config
+    cfg.es_url = args.es_url
+    cfg.es_index = args.es_index
+    cfg.result_index = args.result_index
+    cfg.poll_interval = args.poll_interval
+    cfg.webhook_url = args.webhook_url
+    cfg.log_file = args.log_file
+    cfg.grafana_url = args.grafana_url
+    cfg.grafana_dashboard_uid = args.grafana_dashboard_uid
+    cfg.backfill_hours = args.backfill_hours
+    cfg.dry_run = args.dry_run
+    cfg.verbosity = args.verbosity
+    cfg.tpot_host = args.tpot_host
+    cfg.tpot_port = args.tpot_port
+    cfg.tpot_user = args.tpot_user
+    cfg.remnux_host = args.remnux_host
+    cfg.remnux_port = args.remnux_port
+    cfg.remnux_user = args.remnux_user
+    cfg.sandbox_timeout = args.sandbox_timeout
+    cfg.llm_mode = args.llm_mode
+    cfg.analysis_timeout = args.analysis_timeout
+    cfg.sample_retention_days = args.retention_days
+
+    return cfg
 
 def main():
     config = parse_args()

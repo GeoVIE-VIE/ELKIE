@@ -1,0 +1,14 @@
+kubectl get pods -n production
+docker ps
+ssh deploy@10.0.1.50
+mysql -u root -pDirig0Pr0d2024! -h db.internal.{{ cover_domain }}
+aws s3 ls s3://{{ cover_domain | replace('.', '-') }}-backups/
+cat /etc/kubernetes/admin.conf
+scp backup.tar.gz admin@10.0.1.100:/backups/
+redis-cli -h cache.internal.{{ cover_domain }} -a R3d1sP@ss!
+curl -H "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.fake.token" https://api.{{ cover_domain }}/v1/users
+pg_dump -U postgres -h db.internal.{{ cover_domain }} production > /tmp/prod_dump.sql
+vault kv get secret/production/database
+ansible-playbook -i inventory deploy.yml --extra-vars "env=production"
+journalctl -u {{ cover_hostname }}-app -f
+git pull origin main && make deploy-prod

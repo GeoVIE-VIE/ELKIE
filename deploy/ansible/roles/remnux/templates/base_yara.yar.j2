@@ -1,0 +1,127 @@
+// {{ ansible_managed }}
+// Base YARA rules for ELKIE SOC malware analysis pipeline
+
+rule CryptoMiner_Indicators
+{
+    meta:
+        description = "Detects cryptocurrency mining indicators"
+        author = "ELKIE SOC"
+        severity = "medium"
+
+    strings:
+        $s1 = "stratum+tcp://" ascii wide
+        $s2 = "stratum+ssl://" ascii wide
+        $s3 = "xmrig" ascii wide nocase
+        $s4 = "monero" ascii wide nocase
+        $s5 = "nicehash" ascii wide nocase
+        $s6 = "pool." ascii wide
+        $s7 = "donate-level" ascii wide
+        $s8 = "mining.subscribe" ascii wide
+
+    condition:
+        2 of them
+}
+
+rule Botnet_Mirai_Variant
+{
+    meta:
+        description = "Detects Mirai botnet variants"
+        author = "ELKIE SOC"
+        severity = "high"
+
+    strings:
+        $s1 = "/bin/busybox" ascii
+        $s2 = "scanner" ascii
+        $s3 = "killer" ascii
+        $s4 = "attack" ascii
+        $s5 = "/dev/watchdog" ascii
+        $s6 = "/dev/misc/watchdog" ascii
+        $telnet1 = "telnet" ascii
+        $telnet2 = ":23" ascii
+
+    condition:
+        uint32(0) == 0x464C457F and 4 of them
+}
+
+rule Botnet_Gafgyt
+{
+    meta:
+        description = "Detects Gafgyt/Bashlite botnet"
+        author = "ELKIE SOC"
+        severity = "high"
+
+    strings:
+        $s1 = "HTTPSTOODS" ascii
+        $s2 = "JUNKFLOOD" ascii
+        $s3 = "UDPFLOOD" ascii
+        $s4 = "TCPFLOOD" ascii
+        $s5 = "SYNFLOOD" ascii
+        $s6 = "ACKFLOOD" ascii
+        $s7 = "SCANNER" ascii
+
+    condition:
+        uint32(0) == 0x464C457F and 3 of them
+}
+
+rule SSH_Backdoor_Indicators
+{
+    meta:
+        description = "Detects SSH backdoor/rootkit indicators"
+        author = "ELKIE SOC"
+        severity = "critical"
+
+    strings:
+        $s1 = "libprocesshider" ascii
+        $s2 = "ld.so.preload" ascii
+        $s3 = "/dev/shm/." ascii
+        $s4 = "authorized_keys" ascii
+        $s5 = "sshd" ascii
+        $s6 = "dropbear" ascii
+        $proc1 = "readdir" ascii
+        $proc2 = "readdir64" ascii
+
+    condition:
+        3 of them
+}
+
+rule Ransomware_Indicators
+{
+    meta:
+        description = "Detects ransomware indicators"
+        author = "ELKIE SOC"
+        severity = "critical"
+
+    strings:
+        $s1 = "encrypt" ascii wide nocase
+        $s2 = "decrypt" ascii wide nocase
+        $s3 = "ransom" ascii wide nocase
+        $s4 = "bitcoin" ascii wide nocase
+        $s5 = ".locked" ascii wide
+        $s6 = ".encrypted" ascii wide
+        $s7 = "YOUR FILES" ascii wide nocase
+        $s8 = "pay" ascii wide nocase
+
+    condition:
+        4 of them
+}
+
+rule Reverse_Shell
+{
+    meta:
+        description = "Detects reverse shell patterns"
+        author = "ELKIE SOC"
+        severity = "high"
+
+    strings:
+        $s1 = "/bin/sh -i" ascii
+        $s2 = "/bin/bash -i" ascii
+        $s3 = "bash -c 'bash -i" ascii
+        $s4 = "/dev/tcp/" ascii
+        $s5 = "nc -e /bin" ascii
+        $s6 = "ncat -e /bin" ascii
+        $s7 = "python -c 'import socket" ascii
+        $s8 = "perl -e 'use Socket" ascii
+
+    condition:
+        any of them
+}

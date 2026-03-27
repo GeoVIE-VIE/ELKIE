@@ -1,0 +1,181 @@
+#!/usr/bin/env python3
+"""
+Honeypot PAM Authentication Module -- deployed by Ansible
+Accepts root with ANY password after {{ pam_min_failures }}-{{ pam_max_failures }} failures.
+State: {{ honeypot_state_dir }}/auth_state.json
+Log:   {{ honeypot_log_dir }}/auth.json (Filebeat ships to ES)
+"""
+
+import json
+import os
+import sys
+import time
+import random
+from datetime import datetime, timezone
+from pathlib import Path
+
+STATE_FILE = "{{ honeypot_state_dir }}/auth_state.json"
+LOG_FILE = "{{ honeypot_log_dir }}/auth.json"
+CRED_FILE = "{{ honeypot_config_dir }}/credentials.conf"
+MIN_FAILURES = {{ pam_min_failures }}
+MAX_FAILURES = {{ pam_max_failures }}
+STATE_EXPIRY = {{ pam_state_expiry }}
+
+DEFAULT_CREDS = {
+    "root": ["root", "toor", "password", "123456", "admin", "P@ssw0rd", "letmein", "changeme"],
+    "admin": ["admin", "password", "admin123"],
+    "ubuntu": ["ubuntu", "password"],
+    "deploy": ["deploy", "deploy123"],
+    "jenkins": ["jenkins", "jenkins123"],
+    "postgres": ["postgres", "pgadmin"],
+    "mysql": ["mysql", "root"],
+    "git": ["git", "git123"],
+    "test": ["test", "test123", "password"],
+    "user": ["user", "user123", "password"],
+    "ftpuser": ["ftpuser", "ftp123"],
+    "www-data": ["www-data", "password"],
+}
+
+
+def load_credentials():
+    creds = {}
+    try:
+        with open(CRED_FILE) as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                parts = line.split(":", 1)
+                if len(parts) == 2:
+                    user, passwd = parts
+                    if user not in creds:
+                        creds[user] = []
+                    creds[user].append(passwd)
+    except FileNotFoundError:
+        pass
+    return creds if creds else DEFAULT_CREDS
+
+
+def load_state():
+    try:
+        with open(STATE_FILE) as f:
+            state = json.load(f)
+        now = time.time()
+        state = {ip: data for ip, data in state.items()
+                 if now - data.get("last_seen", 0) < STATE_EXPIRY}
+        return state
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+
+def save_state(state):
+    Path(STATE_FILE).parent.mkdir(parents=True, exist_ok=True)
+    if len(state) > 10000:
+        sorted_ips = sorted(state.items(), key=lambda x: x[1].get("last_seen", 0))
+        state = dict(sorted_ips[-10000:])
+    with open(STATE_FILE, "w") as f:
+        json.dump(state, f)
+
+
+def log_attempt(ip, username, password, success, reason):
+    Path(LOG_FILE).parent.mkdir(parents=True, exist_ok=True)
+    eventid = "cowrie.login.success" if success else "cowrie.login.failed"
+    entry = {
+        "@timestamp": datetime.now(timezone.utc).isoformat(),
+        "honeypot_event": "ssh_auth",
+        "src_ip": ip,
+        "username": username,
+        "password": password,
+        "auth_success": success,
+        "auth_reason": reason,
+        "container": {"name": "cowrie"},
+        "honeypot": {
+            "eventid": eventid,
+            "username": username,
+            "password": password,
+        },
+    }
+    try:
+        with open(LOG_FILE, "a") as f:
+            f.write(json.dumps(entry) + "\n")
+    except Exception:
+        pass
+
+
+def check_auth(ip, username, password):
+    state = load_state()
+    now = time.time()
+
+    if ip not in state:
+        state[ip] = {
+            "attempts": 0,
+            "failures": 0,
+            "first_seen": now,
+            "last_seen": now,
+            "accepted_user": None,
+            "accepted_pass": None,
+            "required_failures": random.randint(MIN_FAILURES, MAX_FAILURES),
+        }
+
+    ip_state = state[ip]
+    ip_state["attempts"] += 1
+    ip_state["last_seen"] = now
+
+    # Only accept root
+    if username != "root":
+        ip_state["failures"] += 1
+        save_state(state)
+        log_attempt(ip, username, password, False, "not_root")
+        return False, "not_root"
+
+    # Returning attacker — must use same password
+    if ip_state["accepted_user"] is not None:
+        if password != ip_state["accepted_pass"]:
+            ip_state["failures"] += 1
+            save_state(state)
+            log_attempt(ip, username, password, False, "wrong_password")
+            return False, "wrong_password"
+        save_state(state)
+        log_attempt(ip, username, password, True, "returning_attacker")
+        return True, "returning_attacker"
+
+    # Need more failures first
+    if ip_state["failures"] < ip_state["required_failures"]:
+        ip_state["failures"] += 1
+        save_state(state)
+        log_attempt(ip, username, password, False,
+                    f"need_more_failures ({ip_state['failures']}/{ip_state['required_failures']})")
+        return False, "need_more_failures"
+
+    # Accept ANY password for root after enough failures
+    ip_state["accepted_user"] = username
+    ip_state["accepted_pass"] = password
+    save_state(state)
+    log_attempt(ip, username, password, True, "first_success")
+    return True, "first_success"
+
+
+def main():
+    username = os.environ.get("PAM_USER", "")
+    ip = os.environ.get("PAM_RHOST", "unknown")
+    pam_type = os.environ.get("PAM_TYPE", "")
+
+    if pam_type != "auth":
+        sys.exit(0)
+
+    try:
+        password = sys.stdin.readline().strip()
+    except Exception:
+        password = ""
+
+    if not username or not password:
+        sys.exit(1)
+
+    time.sleep(random.uniform(0.1, 0.5))
+
+    accepted, reason = check_auth(ip, username, password)
+    sys.exit(0 if accepted else 1)
+
+
+if __name__ == "__main__":
+    main()

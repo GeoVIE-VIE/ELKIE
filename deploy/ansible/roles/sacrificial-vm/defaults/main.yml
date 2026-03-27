@@ -1,0 +1,54 @@
+---
+# Sacrificial VM defaults — override in inventory.yml or group_vars
+cover_hostname: "ds-prod-web01"
+cover_company: "Dirigo Systems LLC"
+cover_domain: "dirigosystems.net"
+cover_city: "Auburn"
+cover_state: "Maine"
+cover_country: "US"
+cover_ssl_cn: "portal.{{ cover_domain }}"
+
+# PAM auth tuning
+pam_min_failures: 1
+pam_max_failures: 3
+pam_state_expiry: 604800
+
+# Guard daemon
+guard_check_interval: 5
+
+# Honeypot directories
+honeypot_state_dir: /var/lib/honeypot
+honeypot_log_dir: /var/log/honeypot
+honeypot_config_dir: /etc/honeypot
+honeypot_quarantine_dir: /opt/.quarantine
+
+# Decoy users to create
+decoy_users:
+  - { name: "deploy", shell: "/bin/bash" }
+  - { name: "jenkins", shell: "/bin/bash" }
+  - { name: "postgres", shell: "/bin/bash" }
+  - { name: "mysql", shell: "/bin/bash" }
+  - { name: "git", shell: "/bin/bash" }
+  - { name: "www-data", shell: "/usr/sbin/nologin" }
+  - { name: "ftpuser", shell: "/bin/bash" }
+  - { name: "admin", shell: "/bin/bash" }
+  - { name: "ubuntu", shell: "/bin/bash" }
+  - { name: "test", shell: "/bin/bash" }
+  - { name: "user", shell: "/bin/bash" }
+  - { name: "dev", shell: "/bin/bash" }
+  - { name: "backup", shell: "/bin/bash" }
+  - { name: "docker", shell: "/bin/bash" }
+  - { name: "ansible", shell: "/bin/bash" }
+  - { name: "nagios", shell: "/bin/bash" }
+  - { name: "tomcat", shell: "/bin/bash" }
+  - { name: "redis", shell: "/bin/bash" }
+  - { name: "elastic", shell: "/bin/bash" }
+  - { name: "k8sadmin", shell: "/bin/bash" }
+
+# Files to make immutable (chattr +i)
+immutable_files:
+  - /root/.ssh/authorized_keys
+  - /etc/ssh/sshd_config
+  - /etc/pam.d/sshd
+  - /usr/local/bin/honeypot_pam.py
+  - /etc/ld.so.preload

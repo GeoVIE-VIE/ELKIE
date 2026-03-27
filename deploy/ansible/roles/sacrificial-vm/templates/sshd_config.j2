@@ -1,0 +1,42 @@
+# {{ ansible_managed }}
+# Sacrificial VM SSH config -- looks like a real production server
+# Honeypot PAM handles auth -- this just needs to allow password auth
+
+Port 22
+ListenAddress 0.0.0.0
+Protocol 2
+
+# Authentication -- PAM handles the real logic
+PermitRootLogin yes
+PasswordAuthentication yes
+ChallengeResponseAuthentication yes
+UsePAM yes
+
+# Timeouts -- keep sessions alive so attackers stay connected
+ClientAliveInterval 120
+ClientAliveCountMax 3
+LoginGraceTime 60
+
+# Looks like a normal server
+Banner /etc/ssh/banner
+PrintMotd yes
+PrintLastLog yes
+
+# Logging
+SyslogFacility AUTH
+LogLevel VERBOSE
+
+# Allow forwarding (attackers expect this)
+AllowTcpForwarding yes
+X11Forwarding yes
+GatewayPorts no
+
+# SFTP
+Subsystem sftp /usr/lib/openssh/sftp-server
+
+# Restrict to root only (PAM handles user filtering)
+AllowUsers root
+
+# Key exchange and ciphers -- standard, not too hardened (looks real)
+KexAlgorithms curve25519-sha256,curve25519-sha256@libssh.org,ecdh-sha2-nistp256,diffie-hellman-group14-sha256
+HostKeyAlgorithms ssh-ed25519,rsa-sha2-512,rsa-sha2-256

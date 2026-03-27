@@ -1,0 +1,18 @@
+---
+- name: restart sshd
+  ansible.builtin.systemd:
+    name: sshd
+    state: restarted
+
+- name: reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: restart auditd
+  ansible.builtin.command: service auditd restart
+  # auditd does not support systemctl restart
+
+- name: restart filebeat
+  ansible.builtin.systemd:
+    name: filebeat
+    state: restarted

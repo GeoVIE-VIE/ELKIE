@@ -1,0 +1,39 @@
+# {{ ansible_managed }}
+# Auditd rules for sacrificial VM honeypot
+# Captures attacker commands for analysis pipeline
+
+# Delete existing rules
+-D
+
+# Buffer size
+-b 8192
+
+# Failure mode (1 = printk, 2 = panic)
+-f 1
+
+# Log all execve calls (command execution)
+-a always,exit -F arch=b64 -S execve -k honeypot_cmd
+-a always,exit -F arch=b32 -S execve -k honeypot_cmd
+
+# File creation/modification in sensitive locations
+-w /etc/passwd -p wa -k honeypot_passwd
+-w /etc/shadow -p wa -k honeypot_shadow
+-w /etc/crontab -p wa -k honeypot_cron
+-w /var/spool/cron -p wa -k honeypot_cron
+-w /etc/ld.so.preload -p wa -k honeypot_preload
+
+# SSH key access
+-w /root/.ssh -p wa -k honeypot_ssh
+-w /home -p wa -k honeypot_home
+
+# Network connections (connect syscall)
+-a always,exit -F arch=b64 -S connect -k honeypot_net
+-a always,exit -F arch=b32 -S connect -k honeypot_net
+
+# File downloads to common malware drop locations
+-w /tmp -p w -k honeypot_tmp
+-w /dev/shm -p w -k honeypot_shm
+-w /var/tmp -p w -k honeypot_vartmp
+
+# Make the config immutable (requires reboot to change)
+-e 2

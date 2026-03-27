@@ -1,0 +1,24 @@
+---
+tpot_user: lepots
+tpot_home: "/home/{{ tpot_user }}"
+tpot_base: "{{ tpot_home }}/tpotce"
+tpot_ssh_port: 64295
+
+# Reduced honeypot ports (8 instead of full T-Pot suite)
+# Shodan fingerprints Dionaea by default cert -- replace with realistic ones
+tpot_exposed_ports:
+  - { port: 22, service: "cowrie", proto: "tcp" }
+  - { port: 23, service: "cowrie", proto: "tcp" }
+  - { port: 80, service: "tanner", proto: "tcp" }
+  - { port: 443, service: "tanner", proto: "tcp" }
+  - { port: 445, service: "dionaea", proto: "tcp" }
+  - { port: 3306, service: "dionaea", proto: "tcp" }
+  - { port: 5060, service: "dionaea", proto: "udp" }
+  - { port: 8080, service: "tanner", proto: "tcp" }
+
+# Cover story SSL cert (used by Dionaea to avoid Shodan honeypot fingerprint)
+cover_domain: "dirigosystems.net"
+cover_company: "Dirigo Systems LLC"
+cover_city: "Auburn"
+cover_state: "Maine"
+cover_country: "US"

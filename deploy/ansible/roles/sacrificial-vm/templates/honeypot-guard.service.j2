@@ -1,0 +1,16 @@
+# {{ ansible_managed }}
+[Unit]
+Description=Honeypot Guard Daemon
+After=network.target sshd.service
+Wants=sshd.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/honeypot-guard.sh
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

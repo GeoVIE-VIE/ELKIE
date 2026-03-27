@@ -1,0 +1,38 @@
+# {{ ansible_managed }}
+# Filebeat config for ELK host -- local Suricata + syslog from pfSense
+
+filebeat.inputs:
+  # Local Suricata EVE JSON
+  - type: log
+    enabled: true
+    paths:
+      - /var/log/suricata/eve.json
+    json.keys_under_root: true
+    json.add_error_key: true
+    fields:
+      service.type: suricata
+      observer.name: elk-suricata
+    fields_under_root: true
+
+  # pfSense syslog (Suricata EVE forwarded via syslog-ng)
+  - type: udp
+    enabled: true
+    host: "0.0.0.0:514"
+    fields:
+      service.type: suricata
+      observer.name: pfsense-suricata
+    fields_under_root: true
+
+output.elasticsearch:
+  hosts: ["localhost:9200"]
+
+processors:
+  - add_host_metadata:
+      when.not.contains.tags: forwarded
+
+logging.level: warning
+logging.to_files: true
+logging.files:
+  path: /var/log/filebeat
+  name: filebeat
+  keepfiles: 5

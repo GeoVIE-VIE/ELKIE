@@ -1,0 +1,84 @@
+# =============================================================================
+# Common role — base setup for all ELKIE SOC hosts
+# =============================================================================
+---
+
+- name: Set timezone to UTC
+  community.general.timezone:
+    name: UTC
+
+- name: Install chrony for NTP
+  ansible.builtin.apt:
+    name: chrony
+    state: present
+    update_cache: true
+  when: ansible_os_family == "Debian"
+
+- name: Enable and start chrony
+  ansible.builtin.systemd:
+    name: chronyd
+    enabled: true
+    state: started
+
+- name: Force NTP sync
+  ansible.builtin.command: chronyc makestep
+  changed_when: false
+
+- name: Install base packages
+  ansible.builtin.apt:
+    name:
+      - curl
+      - wget
+      - jq
+      - htop
+      - tmux
+      - vim
+      - unzip
+      - python3
+      - python3-pip
+      - ca-certificates
+      - gnupg
+      - apt-transport-https
+      - net-tools
+      - rsync
+    state: present
+    update_cache: true
+  when: ansible_os_family == "Debian"
+
+- name: Ensure .ssh directory exists for ansible_user
+  ansible.builtin.file:
+    path: "/home/{{ ansible_user }}/.ssh"
+    state: directory
+    owner: "{{ ansible_user }}"
+    mode: "0700"
+  when: ansible_user != "root"
+
+- name: Ensure .ssh directory exists for root
+  ansible.builtin.file:
+    path: /root/.ssh
+    state: directory
+    owner: root
+    mode: "0700"
+
+- name: Deploy authorized SSH keys
+  ansible.builtin.authorized_key:
+    user: "{{ ansible_user }}"
+    key: "{{ lookup('file', '~/.ssh/id_ed25519.pub') }}"
+    state: present
+  ignore_errors: true
+
+- name: Harden SSH — disable password auth (non-honeypot hosts)
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "^#?PasswordAuthentication"
+    line: "PasswordAuthentication no"
+  notify: restart sshd
+  when: "'honeypot_hosts' not in group_names or inventory_hostname == 'remnux'"
+
+- name: Harden SSH — disable root login (non-honeypot hosts)
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "^#?PermitRootLogin"
+    line: "PermitRootLogin no"
+  notify: restart sshd
+  when: "'honeypot_hosts' not in group_names"

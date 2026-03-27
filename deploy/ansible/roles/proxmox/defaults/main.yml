@@ -1,0 +1,34 @@
+---
+proxmox_api_url: "https://192.168.99.160:8006"
+proxmox_node: "flexiserve"
+pve_token_id: "root@pam!ApiKeyForElkie"
+pve_api_token: ""
+
+# VM definitions for provisioning
+proxmox_vms:
+  - name: sacrificial-vm
+    vmid: 107
+    memory: 2048
+    cores: 2
+    disk: "32G"
+    net: "virtio,bridge=vmbr40"
+    ostype: l26
+    snapshot: "clean"
+
+  - name: remnux
+    vmid: 106
+    memory: 4096
+    cores: 4
+    disk: "64G"
+    net: "virtio,bridge=vmbr40"
+    ostype: l26
+    snapshot: "clean"
+
+  - name: sandbox
+    vmid: 109
+    memory: 2048
+    cores: 2
+    disk: "32G"
+    net: "virtio,bridge=vmbr40"
+    ostype: l26
+    snapshot: "clean"

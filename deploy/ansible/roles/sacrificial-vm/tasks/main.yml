@@ -1,0 +1,237 @@
+# =============================================================================
+# Sacrificial VM — SSH honeypot with PAM auth, guard daemon, decoys
+# =============================================================================
+# Hostname: ds-prod-web01 (cover story: Dirigo Systems LLC)
+# PAM: accepts root with ANY password after 1-3 failures
+# Guard: protects SSH keys, kills rogue sshd, monitors ld.so.preload
+# Decoys: 20 fake users with planted credentials
+# =============================================================================
+---
+
+# ---- Hostname and cover story ----
+
+- name: Set hostname to cover story
+  ansible.builtin.hostname:
+    name: "{{ cover_hostname }}"
+
+- name: Set /etc/hosts entry
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    regexp: "^127\\.0\\.1\\.1"
+    line: "127.0.1.1  {{ cover_hostname }}"
+
+# ---- Required packages ----
+
+- name: Install required packages
+  ansible.builtin.apt:
+    name:
+      - python3
+      - libpam-python
+      - auditd
+      - audispd-plugins
+      - openssl
+      - jq
+      - inotify-tools
+    state: present
+    update_cache: true
+
+# ---- Directory structure ----
+
+- name: Create honeypot directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    mode: "0755"
+  loop:
+    - "{{ honeypot_state_dir }}"
+    - "{{ honeypot_log_dir }}"
+    - "{{ honeypot_config_dir }}"
+    - "{{ honeypot_quarantine_dir }}"
+
+# ---- SSL certificate (cover story) ----
+
+- name: Generate self-signed SSL cert for cover story
+  ansible.builtin.command: >
+    openssl req -x509 -nodes -days 3650
+    -newkey rsa:2048
+    -keyout /etc/ssl/private/{{ cover_domain }}.key
+    -out /etc/ssl/certs/{{ cover_domain }}.crt
+    -subj "/C={{ cover_country }}/ST={{ cover_state }}/L={{ cover_city }}/O={{ cover_company }}/CN={{ cover_ssl_cn }}"
+  args:
+    creates: "/etc/ssl/certs/{{ cover_domain }}.crt"
+
+# ---- PAM honeypot module ----
+
+- name: Deploy honeypot PAM module
+  ansible.builtin.template:
+    src: honeypot_pam.py.j2
+    dest: /usr/local/bin/honeypot_pam.py
+    owner: root
+    mode: "0755"
+
+- name: Deploy credential list
+  ansible.builtin.template:
+    src: credentials.conf.j2
+    dest: "{{ honeypot_config_dir }}/credentials.conf"
+    owner: root
+    mode: "0600"
+
+- name: Deploy sshd_config for honeypot
+  ansible.builtin.template:
+    src: sshd_config.j2
+    dest: /etc/ssh/sshd_config
+    owner: root
+    mode: "0644"
+    validate: "sshd -t -f %s"
+  notify: restart sshd
+
+- name: Configure PAM for honeypot auth
+  ansible.builtin.template:
+    src: pam_sshd.j2
+    dest: /etc/pam.d/sshd
+    owner: root
+    mode: "0644"
+
+# ---- Guard daemon ----
+
+- name: Deploy honeypot guard daemon
+  ansible.builtin.template:
+    src: honeypot-guard.sh.j2
+    dest: /usr/local/bin/honeypot-guard.sh
+    owner: root
+    mode: "0755"
+
+- name: Deploy honeypot-guard systemd unit
+  ansible.builtin.template:
+    src: honeypot-guard.service.j2
+    dest: /etc/systemd/system/honeypot-guard.service
+    owner: root
+    mode: "0644"
+  notify: reload systemd
+
+- name: Enable and start honeypot-guard
+  ansible.builtin.systemd:
+    name: honeypot-guard
+    enabled: true
+    state: started
+    daemon_reload: true
+
+# ---- Sample catcher (grabs malware from /proc before self-delete) ----
+
+- name: Deploy sample catcher script
+  ansible.builtin.template:
+    src: sample_catcher.sh.j2
+    dest: /usr/local/bin/sample_catcher.sh
+    owner: root
+    mode: "0755"
+
+- name: Deploy sample-catcher systemd unit
+  ansible.builtin.template:
+    src: sample-catcher.service.j2
+    dest: /etc/systemd/system/sample-catcher.service
+    owner: root
+    mode: "0644"
+  notify: reload systemd
+
+- name: Enable and start sample-catcher
+  ansible.builtin.systemd:
+    name: sample-catcher
+    enabled: true
+    state: started
+    daemon_reload: true
+
+# ---- Decoy users ----
+
+- name: Create decoy users
+  ansible.builtin.user:
+    name: "{{ item.name }}"
+    shell: "{{ item.shell }}"
+    create_home: true
+    state: present
+  loop: "{{ decoy_users }}"
+
+- name: Plant fake AWS credentials
+  ansible.builtin.template:
+    src: decoy_aws_credentials.j2
+    dest: "/home/{{ item.name }}/.aws/credentials"
+    owner: "{{ item.name }}"
+    mode: "0600"
+  loop: "{{ decoy_users | selectattr('shell', 'equalto', '/bin/bash') | list }}"
+
+- name: Create .aws directories for decoy users
+  ansible.builtin.file:
+    path: "/home/{{ item.name }}/.aws"
+    state: directory
+    owner: "{{ item.name }}"
+    mode: "0700"
+  loop: "{{ decoy_users | selectattr('shell', 'equalto', '/bin/bash') | list }}"
+
+- name: Plant fake bash history
+  ansible.builtin.template:
+    src: decoy_bash_history.j2
+    dest: "/home/{{ item.name }}/.bash_history"
+    owner: "{{ item.name }}"
+    mode: "0600"
+  loop: "{{ decoy_users | selectattr('shell', 'equalto', '/bin/bash') | list }}"
+
+- name: Plant fake .env with database creds
+  ansible.builtin.template:
+    src: decoy_env.j2
+    dest: "/home/{{ item.name }}/.env"
+    owner: "{{ item.name }}"
+    mode: "0600"
+  loop:
+    - { name: "deploy" }
+    - { name: "jenkins" }
+    - { name: "dev" }
+
+# ---- Auditd rules ----
+
+- name: Deploy auditd rules for honeypot
+  ansible.builtin.template:
+    src: auditd_honeypot.rules.j2
+    dest: /etc/audit/rules.d/honeypot.rules
+    owner: root
+    mode: "0640"
+  notify: restart auditd
+
+- name: Enable and start auditd
+  ansible.builtin.systemd:
+    name: auditd
+    enabled: true
+    state: started
+
+# ---- Filebeat for log shipping ----
+
+- name: Deploy Filebeat config for honeypot logs
+  ansible.builtin.template:
+    src: filebeat_honeypot.yml.j2
+    dest: /etc/filebeat/filebeat.yml
+    owner: root
+    mode: "0600"
+  notify: restart filebeat
+  when: ansible_service_mgr == "systemd"
+
+# ---- Empty ld.so.preload (attackers inject libprocesshider here) ----
+
+- name: Ensure ld.so.preload is empty
+  ansible.builtin.copy:
+    content: ""
+    dest: /etc/ld.so.preload
+    owner: root
+    mode: "0644"
+
+# ---- Immutable files (chattr +i) ----
+# Remove immutable first to allow updates, then re-set
+
+- name: Remove immutable flag before setting files
+  ansible.builtin.command: "chattr -i {{ item }}"
+  loop: "{{ immutable_files }}"
+  ignore_errors: true
+  changed_when: false
+
+- name: Set immutable flag on protected files
+  ansible.builtin.command: "chattr +i {{ item }}"
+  loop: "{{ immutable_files }}"
+  changed_when: true

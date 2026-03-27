@@ -1,10 +1,14 @@
 #!/bin/bash
 # Report attacker IPs to AbuseIPDB with enriched honeypot intel
-source /home/legs/.sample_analyzer_env 2>/dev/null
+ELKIE_HOME="${ELKIE_HOME:-/home/legs}"
+source "$ELKIE_HOME/.sample_analyzer_env" 2>/dev/null
+source "$ELKIE_HOME/.env" 2>/dev/null
 API_KEY="${ABUSEIPDB_API_KEY:-}"
-REPORTED_FILE="/home/legs/reported_ips.txt"
-ES_URL="http://localhost:9200"
-INDEX="filebeat-*"
+REPORTED_FILE="${ELKIE_HOME}/reported_ips.txt"
+ES_URL="${ES_URL:-http://localhost:9200}"
+INDEX="${ES_FILEBEAT_INDEX:-filebeat-*}"
+AGENT_NAME="${SACRIFICIAL_AGENT_NAME:-ds-prod-web01}"
+AGENT_ALT="${SACRIFICIAL_AGENT_ALT:-prodction1}"
 
 touch $REPORTED_FILE
 
@@ -87,8 +91,8 @@ r = requests.post(f"{es}/{idx}/_search", json={
         {"term": {"service.type": "auditd"}},
         {"term": {"event.action": "execve"}},
         {"bool": {"should": [
-            {"term": {"agent.name": "ds-prod-web01"}},
-            {"term": {"agent.name": "prodction1"}}
+            {"term": {"agent.name": "'"$AGENT_NAME"'"}},
+            {"term": {"agent.name": "'"$AGENT_ALT"'"}}
         ], "minimum_should_match": 1}}
     ], "must_not": [
         {"terms": {"process.executable": [
@@ -138,8 +142,8 @@ r = requests.post(f"{es}/{idx}/_search", json={
         {"term": {"event.action": "execve"}},
         {"terms": {"process.executable": ["wget", "curl"]}},
         {"bool": {"should": [
-            {"term": {"agent.name": "ds-prod-web01"}},
-            {"term": {"agent.name": "prodction1"}}
+            {"term": {"agent.name": "'"$AGENT_NAME"'"}},
+            {"term": {"agent.name": "'"$AGENT_ALT"'"}}
         ], "minimum_should_match": 1}}
     ]}},
     "_source": ["process.args"],
@@ -176,8 +180,8 @@ r = requests.post(f"{es}/{idx}/_search", json={
     "size": 10,
     "query": {"bool": {"must": [
         {"bool": {"should": [
-            {"term": {"agent.name": "ds-prod-web01"}},
-            {"term": {"agent.name": "prodction1"}}
+            {"term": {"agent.name": "'"$AGENT_NAME"'"}},
+            {"term": {"agent.name": "'"$AGENT_ALT"'"}}
         ], "minimum_should_match": 1}},
         {"bool": {"should": [
             {"wildcard": {"message": "*ALERT*"}},

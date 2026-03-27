@@ -1,0 +1,19 @@
+---
+elk_user: legs
+elk_home: "/home/{{ elk_user }}"
+es_url: "http://localhost:9200"
+es_result_index: "malware-analysis"
+es_filebeat_index: ".ds-filebeat-*"
+
+# Ingest proxy
+ingest_proxy_port: 5044
+
+# Sample analyzer
+staging_dir: "{{ elk_home }}/sample_staging"
+reports_dir: "{{ elk_home }}/reports"
+state_file: "{{ elk_home }}/.sample_analyzer_state.json"
+log_file: "{{ elk_home }}/sample_analyzer.log"
+poll_interval: 60
+
+# AbuseIPDB reporting
+abuseipdb_report_interval: "6h"

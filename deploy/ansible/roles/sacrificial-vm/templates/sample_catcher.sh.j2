@@ -1,0 +1,40 @@
+#!/bin/bash
+# {{ ansible_managed }}
+# Sample Catcher -- grabs malware from /proc/PID/exe before self-delete
+# Malware drops to filesystem root (/.randomname) not /tmp -- scan everywhere
+# Uses inotifywait to detect new files, then copies from /proc while alive
+
+QUARANTINE="{{ honeypot_quarantine_dir }}"
+LOG="{{ honeypot_log_dir }}/catcher.log"
+
+mkdir -p "$QUARANTINE"
+
+log_msg() {
+    echo "$(date -u +%Y-%m-%dT%H:%M:%S+00:00) $1" >> "$LOG"
+}
+
+# Monitor filesystem root and common drop locations
+WATCH_DIRS="/ /tmp /dev/shm /var/tmp /run"
+
+inotifywait -m -r -e create -e moved_to --format '%w%f' $WATCH_DIRS 2>/dev/null | while read -r filepath; do
+    # Skip known safe paths
+    case "$filepath" in
+        /proc/*|/sys/*|/run/lock/*|/var/log/*|{{ honeypot_quarantine_dir }}/*) continue ;;
+    esac
+
+    # Skip if not a regular file or too small
+    [ -f "$filepath" ] || continue
+    filesize=$(stat -c%s "$filepath" 2>/dev/null) || continue
+    [ "$filesize" -lt 1024 ] && continue
+    [ "$filesize" -gt 52428800 ] && continue
+
+    # Check if executable
+    if file -b "$filepath" 2>/dev/null | grep -qiE 'ELF|executable|script'; then
+        HASH=$(sha256sum "$filepath" 2>/dev/null | awk '{print $1}')
+        [ -z "$HASH" ] && continue
+        [ -f "$QUARANTINE/$HASH" ] && continue
+
+        cp "$filepath" "$QUARANTINE/$HASH" 2>/dev/null
+        log_msg "Captured: $filepath -> $QUARANTINE/$HASH ($filesize bytes)"
+    fi
+done

@@ -1,0 +1,98 @@
+#!/bin/bash
+# {{ ansible_managed }}
+# Detonation script -- runs a sample with monitoring for {{ sandbox_timeout }}s
+#
+# Usage: ./detonate.sh /path/to/sample
+# Output: pcap, strace log, auditd log, filesystem diff
+
+set -euo pipefail
+
+SAMPLE="${1:-}"
+[ -z "$SAMPLE" ] && { echo "Usage: detonate.sh <sample_path>"; exit 1; }
+[ -f "$SAMPLE" ] || { echo "Sample not found: $SAMPLE"; exit 1; }
+
+SHA256=$(sha256sum "$SAMPLE" | awk '{print $1}')
+TIMEOUT={{ sandbox_timeout }}
+PCAP_DIR="{{ sandbox_pcap_dir }}"
+STRACE_DIR="{{ sandbox_strace_dir }}"
+DET_DIR="{{ sandbox_detonation_dir }}/$SHA256"
+
+mkdir -p "$DET_DIR" "$PCAP_DIR" "$STRACE_DIR"
+
+echo "=== Detonating $SHA256 for ${TIMEOUT}s ==="
+
+# Snapshot filesystem state before detonation
+find / -xdev -type f -newer /etc/hostname 2>/dev/null | sort > "$DET_DIR/fs_before.txt" || true
+
+# Start packet capture
+sudo tcpdump -i any -w "$PCAP_DIR/${SHA256}.pcap" -Z "{{ sandbox_user }}" &
+TCPDUMP_PID=$!
+
+# Clear auditd log for clean capture
+sudo auditctl -D 2>/dev/null || true
+sudo auditctl -a always,exit -F arch=b64 -S execve -k det_exec
+sudo auditctl -a always,exit -F arch=b64 -S connect -k det_net
+
+# Make sample executable and run with strace
+chmod +x "$SAMPLE"
+timeout "$TIMEOUT" strace -f -tt -o "$STRACE_DIR/${SHA256}.strace" "$SAMPLE" &
+SAMPLE_PID=$!
+
+# Wait for timeout or sample exit
+sleep "$TIMEOUT" || true
+
+# Kill sample if still running
+kill -9 "$SAMPLE_PID" 2>/dev/null || true
+sleep 2
+
+# Stop packet capture
+kill "$TCPDUMP_PID" 2>/dev/null || true
+sleep 1
+
+# Snapshot filesystem state after detonation
+find / -xdev -type f -newer /etc/hostname 2>/dev/null | sort > "$DET_DIR/fs_after.txt" || true
+
+# Generate filesystem diff
+comm -13 "$DET_DIR/fs_before.txt" "$DET_DIR/fs_after.txt" > "$DET_DIR/fs_diff.txt" || true
+
+# Copy auditd log
+cp /var/log/audit/audit.log "$DET_DIR/audit.log" 2>/dev/null || true
+
+# Build results JSON
+python3 << PYEOF
+import json, os, subprocess
+
+sha256 = "$SHA256"
+det_dir = "$DET_DIR"
+
+# Parse filesystem diff
+fs_changes = []
+diff_file = os.path.join(det_dir, "fs_diff.txt")
+if os.path.exists(diff_file):
+    with open(diff_file) as f:
+        fs_changes = [l.strip() for l in f if l.strip()]
+
+# Check pcap size
+pcap_path = "$PCAP_DIR/${SHA256}.pcap"
+pcap_size = os.path.getsize(pcap_path) if os.path.exists(pcap_path) else 0
+
+# Check strace output
+strace_path = "$STRACE_DIR/${SHA256}.strace"
+strace_size = os.path.getsize(strace_path) if os.path.exists(strace_path) else 0
+
+result = {
+    "sha256": sha256,
+    "detonation_timeout": $TIMEOUT,
+    "pcap_path": pcap_path,
+    "pcap_size": pcap_size,
+    "strace_path": strace_path,
+    "strace_size": strace_size,
+    "filesystem_changes": fs_changes[:500],
+    "filesystem_changes_count": len(fs_changes),
+}
+
+output = os.path.join(det_dir, "result.json")
+with open(output, "w") as f:
+    json.dump(result, f, indent=2)
+print(f"Detonation complete: {output}")
+PYEOF

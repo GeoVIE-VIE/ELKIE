@@ -1,0 +1,129 @@
+# =============================================================================
+# Sandbox — Dynamic malware analysis / detonation environment
+# =============================================================================
+# Tools: tcpdump, strace, auditd
+# DNS/HTTP simulation handled by INetSim on REMnux (192.168.40.5)
+# Snapshot "clean" is restored before each detonation
+# =============================================================================
+---
+
+# ---- Packages ----
+
+- name: Install dynamic analysis packages
+  ansible.builtin.apt:
+    name:
+      - tcpdump
+      - strace
+      - ltrace
+      - auditd
+      - audispd-plugins
+      - procps
+      - iproute2
+      - net-tools
+      - file
+      - curl
+      - wget
+      - jq
+      - sysstat
+    state: present
+    update_cache: true
+
+# ---- Directory structure ----
+
+- name: Create detonation directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ sandbox_user }}"
+    mode: "0755"
+  loop:
+    - "{{ sandbox_detonation_dir }}"
+    - "{{ sandbox_pcap_dir }}"
+    - "{{ sandbox_strace_dir }}"
+
+# ---- DNS configuration (point to INetSim on REMnux) ----
+
+- name: Configure DNS to point to INetSim
+  ansible.builtin.copy:
+    content: |
+      # DNS points to INetSim on REMnux for simulated network services
+      nameserver {{ inetsim_host }}
+    dest: /etc/resolv.conf
+    owner: root
+    mode: "0644"
+
+- name: Prevent resolv.conf from being overwritten
+  ansible.builtin.command: chattr +i /etc/resolv.conf
+  changed_when: true
+
+# ---- Auditd rules for detonation monitoring ----
+
+- name: Deploy auditd rules for sandbox
+  ansible.builtin.copy:
+    content: |
+      # Sandbox detonation auditd rules
+      -D
+      -b 8192
+      -f 1
+
+      # All process execution
+      -a always,exit -F arch=b64 -S execve -k sandbox_exec
+      -a always,exit -F arch=b32 -S execve -k sandbox_exec
+
+      # Network connections
+      -a always,exit -F arch=b64 -S connect -S accept -k sandbox_net
+      -a always,exit -F arch=b32 -S connect -S accept -k sandbox_net
+
+      # File creation
+      -a always,exit -F arch=b64 -S open -S openat -S creat -F exit=-EACCES -k sandbox_file
+      -a always,exit -F arch=b64 -S open -S openat -S creat -F a1&0100 -k sandbox_write
+
+      # Process creation
+      -a always,exit -F arch=b64 -S clone -S fork -S vfork -k sandbox_proc
+      -a always,exit -F arch=b32 -S clone -S fork -S vfork -k sandbox_proc
+
+      # Module loading (rootkits)
+      -a always,exit -F arch=b64 -S init_module -S finit_module -k sandbox_module
+
+      -e 2
+    dest: /etc/audit/rules.d/sandbox.rules
+    owner: root
+    mode: "0640"
+  notify: restart auditd
+
+- name: Enable and start auditd
+  ansible.builtin.systemd:
+    name: auditd
+    enabled: true
+    state: started
+
+# ---- Detonation helper script ----
+
+- name: Deploy detonation script
+  ansible.builtin.template:
+    src: detonate.sh.j2
+    dest: "{{ sandbox_home }}/detonate.sh"
+    owner: "{{ sandbox_user }}"
+    mode: "0755"
+
+# ---- tcpdump permissions ----
+
+- name: Allow sandbox user to run tcpdump
+  ansible.builtin.copy:
+    content: |
+      {{ sandbox_user }} ALL=(root) NOPASSWD: /usr/bin/tcpdump
+      {{ sandbox_user }} ALL=(root) NOPASSWD: /usr/sbin/auditctl
+    dest: /etc/sudoers.d/sandbox
+    owner: root
+    mode: "0440"
+    validate: "visudo -cf %s"
+
+# ---- Cleanup cron ----
+
+- name: Add cron to clean old detonation data
+  ansible.builtin.cron:
+    name: "Clean old detonation data"
+    minute: "0"
+    hour: "4"
+    job: "find {{ sandbox_detonation_dir }} {{ sandbox_pcap_dir }} {{ sandbox_strace_dir }} -type f -mtime +{{ sample_retention_days | default(30) }} -delete"
+    user: "{{ sandbox_user }}"

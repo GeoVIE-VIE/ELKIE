@@ -1,0 +1,14 @@
+# {{ ansible_managed }}
+# PAM config for sshd on sacrificial VM honeypot
+# Routes auth through honeypot_pam.py via pam_exec
+
+# Honeypot PAM module -- handles all auth decisions
+auth required pam_exec.so expose_authtok /usr/local/bin/honeypot_pam.py
+
+# Standard account/session modules
+account required pam_nologin.so
+account required pam_permit.so
+
+session required pam_limits.so
+session required pam_unix.so
+session optional pam_umask.so

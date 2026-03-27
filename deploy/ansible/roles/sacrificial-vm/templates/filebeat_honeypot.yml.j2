@@ -1,0 +1,44 @@
+# {{ ansible_managed }}
+# Filebeat config for sacrificial VM -- ships to ELK ingest proxy (port 5044)
+# NEVER ship to port 9200 (blocked at pfSense)
+
+filebeat.inputs:
+  # Honeypot PAM auth logs (JSON)
+  - type: log
+    enabled: true
+    paths:
+      - {{ honeypot_log_dir }}/auth.json
+    json.keys_under_root: true
+    json.add_error_key: true
+    fields:
+      log_type: honeypot_auth
+    fields_under_root: true
+
+  # Auditd logs
+  - type: log
+    enabled: true
+    paths:
+      - /var/log/audit/audit.log
+    fields:
+      log_type: auditd
+    fields_under_root: true
+
+output.elasticsearch:
+  hosts: ["{{ elk_ip }}:5044"]
+  # Uses ingest proxy -- only POST/PUT allowed, no reads
+  protocol: "http"
+
+processors:
+  - add_host_metadata:
+      when.not.contains.tags: forwarded
+  - add_fields:
+      target: agent
+      fields:
+        name: "{{ cover_hostname }}"
+
+logging.level: warning
+logging.to_files: true
+logging.files:
+  path: /var/log/filebeat
+  name: filebeat
+  keepfiles: 3

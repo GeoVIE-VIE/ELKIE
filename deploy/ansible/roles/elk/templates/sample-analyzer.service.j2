@@ -1,0 +1,19 @@
+# {{ ansible_managed }}
+[Unit]
+Description=ELKIE SOC Sample Analyzer Pipeline
+After=network.target elasticsearch.service
+Wants=elasticsearch.service
+
+[Service]
+Type=simple
+User={{ elk_user }}
+WorkingDirectory={{ elk_home }}
+ExecStart=/usr/bin/python3 {{ elk_home }}/sample_analyzer.py
+Restart=always
+RestartSec=30
+EnvironmentFile={{ elk_home }}/.sample_analyzer_env
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

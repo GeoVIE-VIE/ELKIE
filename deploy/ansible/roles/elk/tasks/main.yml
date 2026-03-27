@@ -1,0 +1,170 @@
+# =============================================================================
+# ELK Stack — ES index templates, Filebeat, ingest proxy, sample-analyzer
+# =============================================================================
+# ES ingest proxy on port 5044: allows POST/PUT only, blocks reads
+# sample-analyzer.service: automated malware analysis pipeline daemon
+# AbuseIPDB reporting: enriched intel every 6 hours
+# =============================================================================
+---
+
+# ---- Directories ----
+
+- name: Create ELKIE working directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ elk_user }}"
+    mode: "0755"
+  loop:
+    - "{{ staging_dir }}"
+    - "{{ reports_dir }}"
+
+# ---- Elasticsearch index templates ----
+
+- name: Deploy malware-analysis index template
+  ansible.builtin.uri:
+    url: "{{ es_url }}/_index_template/malware-analysis"
+    method: PUT
+    body_format: json
+    body:
+      index_patterns: ["malware-analysis*"]
+      template:
+        settings:
+          number_of_shards: 1
+          number_of_replicas: 0
+        mappings:
+          properties:
+            sha256: { type: keyword }
+            md5: { type: keyword }
+            ssdeep: { type: keyword }
+            file_type: { type: text }
+            mime_type: { type: keyword }
+            file_size: { type: long }
+            is_pe: { type: boolean }
+            is_elf: { type: boolean }
+            indexed_at: { type: date }
+            analyzed_at: { type: date }
+            yara_matches: { type: keyword }
+            interesting_strings: { type: text }
+            capa_capabilities: { type: object }
+            confidence_score: { type: integer }
+            threat_classification: { type: keyword }
+            mitre_techniques: { type: keyword }
+            vt_detection_ratio: { type: keyword }
+            vt_link: { type: keyword }
+            llm_summary: { type: text }
+    status_code: [200]
+  ignore_errors: true
+
+- name: Deploy honeypot-auth index template
+  ansible.builtin.uri:
+    url: "{{ es_url }}/_index_template/honeypot-auth"
+    method: PUT
+    body_format: json
+    body:
+      index_patterns: ["honeypot-auth*"]
+      template:
+        settings:
+          number_of_shards: 1
+          number_of_replicas: 0
+        mappings:
+          properties:
+            src_ip: { type: ip }
+            username: { type: keyword }
+            password: { type: keyword }
+            auth_success: { type: boolean }
+            auth_reason: { type: keyword }
+            honeypot_event: { type: keyword }
+    status_code: [200]
+  ignore_errors: true
+
+# ---- Nginx ingest proxy ----
+
+- name: Install nginx
+  ansible.builtin.apt:
+    name: nginx
+    state: present
+
+- name: Deploy ES ingest proxy nginx config
+  ansible.builtin.template:
+    src: nginx_ingest_proxy.conf.j2
+    dest: /etc/nginx/sites-available/es-ingest-proxy
+    owner: root
+    mode: "0644"
+  notify: reload nginx
+
+- name: Enable ingest proxy site
+  ansible.builtin.file:
+    src: /etc/nginx/sites-available/es-ingest-proxy
+    dest: /etc/nginx/sites-enabled/es-ingest-proxy
+    state: link
+  notify: reload nginx
+
+# ---- Filebeat configuration ----
+
+- name: Deploy ELK Filebeat config
+  ansible.builtin.template:
+    src: filebeat_elk.yml.j2
+    dest: /etc/filebeat/filebeat.yml
+    owner: root
+    mode: "0600"
+  notify: restart filebeat
+  when: ansible_service_mgr == "systemd"
+
+# ---- Sample analyzer service ----
+
+- name: Deploy sample-analyzer systemd unit
+  ansible.builtin.template:
+    src: sample-analyzer.service.j2
+    dest: /etc/systemd/system/sample-analyzer.service
+    owner: root
+    mode: "0644"
+  notify: reload systemd
+
+- name: Enable and start sample-analyzer
+  ansible.builtin.systemd:
+    name: sample-analyzer
+    enabled: true
+    state: started
+    daemon_reload: true
+
+# ---- AbuseIPDB reporting cron ----
+
+- name: Deploy AbuseIPDB reporting cron
+  ansible.builtin.cron:
+    name: "AbuseIPDB reporting"
+    minute: "0"
+    hour: "*/6"
+    job: "{{ elk_home }}/ReportIPs.sh >> {{ elk_home }}/abuseipdb_report.log 2>&1"
+    user: "{{ elk_user }}"
+
+# ---- Sacrificial VM watchdog cron ----
+
+- name: Deploy sacrificial watchdog cron
+  ansible.builtin.cron:
+    name: "Sacrificial VM watchdog"
+    minute: "*/30"
+    job: "{{ elk_home }}/check_sacrificial.sh >> {{ elk_home }}/sacrificial_watchdog.log 2>&1"
+    user: "{{ elk_user }}"
+
+# ---- ES index lifecycle (prevent disk fill from auditd noise) ----
+
+- name: Deploy ILM policy for honeypot indices
+  ansible.builtin.uri:
+    url: "{{ es_url }}/_ilm/policy/honeypot-lifecycle"
+    method: PUT
+    body_format: json
+    body:
+      policy:
+        phases:
+          hot:
+            actions:
+              rollover:
+                max_size: "10gb"
+                max_age: "7d"
+          delete:
+            min_age: "30d"
+            actions:
+              delete: {}
+    status_code: [200]
+  ignore_errors: true
