@@ -96,10 +96,10 @@ class Config:
     sacrificial_port: int = _env_int("SACRIFICIAL_SSH_PORT", 22)
     sacrificial_user: str = _env("SACRIFICIAL_SSH_USER", "root")
     # Proxmox API
-    pve_api_url: str = _env("PROXMOX_API_URL", "https://192.168.99.160:8006")
+    pve_api_url: str = _env("PVE_API_URL", "https://192.168.99.160:8006")
     pve_node: str = _env("PROXMOX_NODE", "flexiserve")
     pve_token_id: str = _env("PVE_TOKEN_ID", "")
-    pve_token_secret: str = _env("PVE_API_TOKEN", "")
+    pve_token_secret: str = _env("PVE_TOKEN_SECRET", "")
     # MISP
     misp_url: str = _env("MISP_URL", "https://localhost")
     misp_api_key: str = _env("MISP_API_KEY", "")
@@ -118,6 +118,12 @@ class Config:
     analysis_timeout: int = _env_int("ANALYSIS_TIMEOUT", 300)
     max_sample_size: int = _env_int("MAX_SAMPLE_SIZE", 52428800)
     alert_confidence_threshold: int = _env_int("ALERT_CONFIDENCE_THRESHOLD", 20)
+    # Ghidra MCP interactive analysis
+    ghidra_mcp_enabled: bool = _env_bool("GHIDRA_MCP_ENABLED", True)
+    ghidra_mcp_max_turns: int = _env_int("GHIDRA_MCP_MAX_TURNS", 15)
+    ghidra_mcp_max_cost: float = float(_env("GHIDRA_MCP_MAX_COST", "0.50"))
+    ghidra_mcp_bridge_port: int = _env_int("GHIDRA_MCP_BRIDGE_PORT", 8081)
+    ghidra_mcp_ghidra_port: int = _env_int("GHIDRA_MCP_GHIDRA_PORT", 8080)
 
 STAGING_DIR = Path(_env("STAGING_DIR", str(ELKIE_HOME / "sample_staging")))
 ANALYSIS_SCRIPT_LOCAL = Path(str(ELKIE_HOME / "analyze_sample.sh"))
@@ -143,6 +149,17 @@ else:
 
 SEVERITY_ORDER = {"low": 0, "medium": 1, "high": 2, "critical": 3}
 
+# Auditd false positive patterns — bracket-wrapped names are fake kernel threads,
+# common malware trick to hide in `ps` output.
+_AUDITD_FP_PATTERNS = [
+    re.compile(r'^\[.*\]$'),          # [kworker/1:0H], [kthreadd], etc.
+    re.compile(r'^/proc/'),            # /proc paths aren't real executables
+    re.compile(r'^/sys/'),             # sysfs paths
+]
+
+# Persistent false-positive list (path-based, loaded from file)
+_FP_LIST_FILE = ELKIE_HOME / ".sample_analyzer_fp.json"
+
 # ---------------------------------------------------------------------------
 # Main daemon class
 # ---------------------------------------------------------------------------
@@ -152,6 +169,8 @@ class SampleAnalyzer:
     def __init__(self, config: Config):
         self.cfg = config
         self.known_hashes: set = set()
+        self._auditd_cooldown: dict[str, float] = {}  # path -> last_seen timestamp
+        self._false_positives: dict[str, str] = {}     # path or hash -> reason
         self.last_timestamp: Optional[str] = None
         self.last_dir_scan: float = 0
         self.last_cleanup: float = 0
@@ -208,6 +227,75 @@ class SampleAnalyzer:
             pass
         except Exception as e:
             self.logger.warning("Failed to load state: %s", e)
+        self._load_false_positives()
+
+    # -- false positive management -----------------------------------------
+
+    def _load_false_positives(self):
+        """Load persistent false positive list from disk."""
+        try:
+            with open(_FP_LIST_FILE) as f:
+                self._false_positives = json.load(f)
+            if self._false_positives:
+                self.logger.info("Loaded %d false positive entries", len(self._false_positives))
+        except FileNotFoundError:
+            self._false_positives = {}
+        except Exception as e:
+            self.logger.warning("Failed to load false positives: %s", e)
+            self._false_positives = {}
+
+    def _save_false_positives(self):
+        """Persist false positive list to disk."""
+        try:
+            with open(_FP_LIST_FILE, "w") as f:
+                json.dump(self._false_positives, f, indent=2)
+        except Exception as e:
+            self.logger.warning("Failed to save false positives: %s", e)
+
+    def add_false_positive(self, key: str, reason: str):
+        """Add a path or hash to the false positive list with a reason.
+        key: file path (e.g. /tmp/VX0p2tL1wv) or SHA256 hash
+        reason: why this is a false positive (e.g. 'landscape-sysinfo wrapper')
+        """
+        self._false_positives[key] = reason
+        self._save_false_positives()
+        self.logger.info("Added false positive: %s — %s", key, reason)
+
+    def remove_false_positive(self, key: str):
+        """Remove a path or hash from the false positive list."""
+        if key in self._false_positives:
+            del self._false_positives[key]
+            self._save_false_positives()
+            self.logger.info("Removed false positive: %s", key)
+
+    def _is_false_positive_path(self, exe: str) -> bool:
+        """Check if an executable path matches known false positive patterns."""
+        # Check regex patterns (fake kernel threads, /proc, /sys)
+        for pat in _AUDITD_FP_PATTERNS:
+            if pat.match(exe):
+                return True
+        # Check persistent FP list (exact path match)
+        if exe in self._false_positives:
+            return True
+        return False
+
+    def _is_false_positive_hash(self, sha256: str) -> bool:
+        """Check if a sample hash is in the false positive list."""
+        return sha256 in self._false_positives
+
+    def _auditd_on_cooldown(self, exe: str, cooldown_secs: int = 600) -> bool:
+        """Suppress repeated auditd detections of the same path.
+        Returns True if this path was seen within cooldown_secs (default 10 min)."""
+        now = time.time()
+        last_seen = self._auditd_cooldown.get(exe, 0)
+        if now - last_seen < cooldown_secs:
+            return True
+        self._auditd_cooldown[exe] = now
+        # Prune stale entries (older than 1 hour)
+        stale = [k for k, v in self._auditd_cooldown.items() if now - v > 3600]
+        for k in stale:
+            del self._auditd_cooldown[k]
+        return False
 
     # -- SSH/SCP helpers ---------------------------------------------------
 
@@ -734,6 +822,9 @@ class SampleAnalyzer:
         if now - self.last_dir_scan > 300:
             dir_samples = self._scan_tpot_dirs()
             samples.extend(dir_samples)
+            # Scan sacrificial VM filesystem for dropped files
+            sac_samples = self._scan_sacrificial_vm()
+            samples.extend(sac_samples)
             self.last_dir_scan = now
 
         return samples
@@ -932,6 +1023,14 @@ class SampleAnalyzer:
                 if 'honeypot_guard' in exe or 'honeypot_pam' in exe or 'filebeat' in exe:
                     continue
 
+                # --- False positive filtering ---
+                if self._is_false_positive_path(exe):
+                    continue
+
+                # --- Cooldown: suppress repeated detections (10 min) ---
+                if self._auditd_on_cooldown(exe):
+                    continue
+
                 self.logger.info("Auditd: suspicious binary executed: %s", exe)
 
                 # SSH into the VM and hash the file
@@ -939,14 +1038,32 @@ class SampleAnalyzer:
                     f"sha256sum {shlex.quote(exe)} 2>/dev/null",
                     timeout=10,
                 )
+
+                # Fallback: if file was self-deleted, try /proc/PID/exe
                 if rc != 0 or not stdout.strip():
-                    continue
+                    self.logger.info("Auditd: file gone, trying /proc/PID/exe fallback for %s", exe)
+                    rc, stdout, _ = self._sacrificial_ssh_cmd(
+                        f"pid=$(pgrep -f {shlex.quote(exe)} 2>/dev/null | head -1); "
+                        f"if [ -n \"$pid\" ] && [ -e /proc/$pid/exe ]; then "
+                        f"  sha256sum /proc/$pid/exe 2>/dev/null; "
+                        f"fi",
+                        timeout=15,
+                    )
+                    if rc != 0 or not stdout.strip():
+                        self.logger.debug("Auditd: %s — file deleted and no live process found", exe)
+                        continue
 
                 parts = stdout.strip().split(maxsplit=1)
                 if len(parts) != 2 or len(parts[0]) != 64:
                     continue
 
                 sha256 = parts[0]
+
+                # Check false positive list by hash
+                if self._is_false_positive_hash(sha256):
+                    self.logger.debug("Auditd: skipping FP hash %s (%s)", sha256[:16], exe)
+                    continue
+
                 if sha256 in self.known_hashes:
                     continue
 
@@ -968,18 +1085,17 @@ class SampleAnalyzer:
             return []
 
     def _scan_sacrificial_vm(self) -> list[dict]:
-        """Scan sacrificial VM for files dropped by attackers (via T-Pot jump host)."""
+        """Scan sacrificial VM for files dropped by attackers (via T-Pot jump host).
+        Focuses on common drop locations: /tmp, /dev/shm, /var/tmp, /root, /home, filesystem root."""
         samples = []
-        # Scan entire filesystem — malware drops anywhere (e.g. /.hidden_binary)
+        # Targeted scan of attacker drop locations — no mtime limit since snapshots reset clocks
         rc, stdout, _ = self._sacrificial_ssh_cmd(
-            f"find / -type f -mmin -60 "
-            f"-not -path '/proc/*' -not -path '/sys/*' -not -path '/run/*' "
-            f"-not -path '/snap/*' -not -path '/usr/*' -not -path '/lib/*' "
-            f"-not -path '/boot/*' -not -path '/var/log/*' -not -path '/var/cache/*' "
-            f"-not -path '/var/lib/*' -not -path '/etc/*' "
-            f"-not -name '*.log' -not -name '*.json' "
-            f"-size +100c -size -50M "
-            f"-exec sha256sum {{}} \\; 2>/dev/null | head -50",
+            "find /tmp /dev/shm /var/tmp /root /home /.* / -maxdepth 2 -type f "
+            "-not -path '/proc/*' -not -path '/sys/*' -not -path '/run/*' "
+            "-not -path '/snap/*' -not -path '/boot/*' "
+            "-not -name '*.log' -not -name '*.json' -not -name '*.timer' "
+            "-size +50c -size -50M "
+            "-exec sha256sum {} \\; 2>/dev/null | head -50",
             timeout=30,
         )
         if rc == 0 and stdout.strip():
@@ -987,7 +1103,7 @@ class SampleAnalyzer:
                 parts = line.strip().split(maxsplit=1)
                 if len(parts) == 2 and len(parts[0]) == 64:
                     filepath = parts[1]
-                    # Skip system/decoy files
+                    # Skip system/decoy/known files (decoys from setup_honeypot_decoys.sh)
                     if any(skip in filepath for skip in [
                         '/proc/', '/sys/', '.bash_history', '.bashrc', '.profile',
                         '.ssh/', '.env', '.kube/', '.aws/', '.my.cnf', '.pgpass',
@@ -995,6 +1111,16 @@ class SampleAnalyzer:
                         '/opt/webapp/', '/opt/ansible/', '/var/lib/jenkins/',
                         '/var/lib/landscape/', '/var/lib/dpkg/', '/var/lib/apt/',
                         '/var/lib/systemd/', '/var/lib/chrony/', '/etc/',
+                        'sshd.bak', 'honeypot_pam', 'honeypot_guard',
+                        'sample_catcher', 'swap.img', '.sudo_as_admin',
+                        '/var/lib/filebeat/', '/var/lib/snapd/',
+                        # Decoy files planted by setup_honeypot_decoys.sh
+                        '/root/scripts/', '/root/.my.cnf',
+                        '/home/dbadmin/', '/home/devops/', '/home/jchen/',
+                        '/home/mkovacs/', '/home/srao/',
+                        'database.yml', 'secrets.yml', 'deploy.sh', 'backup.sh',
+                        'seed_backup', 'docker-compose.yml', 'server.js',
+                        'group_vars/', 'inventory/production',
                     ]):
                         continue
                     samples.append({
@@ -1066,6 +1192,23 @@ class SampleAnalyzer:
                 if ok:
                     self.logger.info("Fetched sample %s from sacrificial VM", sha256[:16])
                     return local_path
+
+        # Last resort: grab from /proc/PID/exe if the file self-deleted but process is alive
+        self.logger.info("Trying /proc/PID/exe fallback for %s", sha256[:16])
+        rc, stdout, _ = self._sacrificial_ssh_cmd(
+            "for pid in /proc/[0-9]*/exe; do "
+            "  h=$(sha256sum \"$pid\" 2>/dev/null) && "
+            f"  echo \"$h\" | grep -q '^{sha256}' && "
+            "  echo \"$pid\" && break; "
+            "done",
+            timeout=30,
+        )
+        if rc == 0 and stdout.strip():
+            proc_path = stdout.strip()
+            ok = self._sacrificial_scp_from(proc_path, str(local_path))
+            if ok:
+                self.logger.info("Fetched sample %s from %s (self-deleted binary)", sha256[:16], proc_path)
+                return local_path
 
         self.logger.warning("Sample %s not found on T-Pot or sacrificial VM", sha256[:16])
         return None
@@ -2110,6 +2253,416 @@ SELECTED FUNCTIONS ({len(selected_funcs)} of {len(func_index)} total):
             "cost": round(total_cost, 4),
         }
 
+    # -- Ghidra MCP interactive analysis ------------------------------------
+
+    # Tool definitions matching bridge_mcp_ghidra.py — subset of most useful
+    # tools for automated malware analysis (skip rename/comment tools that
+    # mutate Ghidra state, we only need read-only tools)
+    GHIDRA_MCP_TOOLS = [
+        {"name": "list_methods", "description": "List all function names with pagination.", "input_schema": {
+            "type": "object", "properties": {"offset": {"type": "integer", "default": 0}, "limit": {"type": "integer", "default": 100}}}},
+        {"name": "list_imports", "description": "List imported symbols with pagination.", "input_schema": {
+            "type": "object", "properties": {"offset": {"type": "integer", "default": 0}, "limit": {"type": "integer", "default": 100}}}},
+        {"name": "list_exports", "description": "List exported functions/symbols with pagination.", "input_schema": {
+            "type": "object", "properties": {"offset": {"type": "integer", "default": 0}, "limit": {"type": "integer", "default": 100}}}},
+        {"name": "list_segments", "description": "List memory segments.", "input_schema": {
+            "type": "object", "properties": {"offset": {"type": "integer", "default": 0}, "limit": {"type": "integer", "default": 100}}}},
+        {"name": "list_strings", "description": "List defined strings with addresses. Use filter param to search.", "input_schema": {
+            "type": "object", "properties": {"offset": {"type": "integer", "default": 0}, "limit": {"type": "integer", "default": 500}, "filter": {"type": "string"}}}},
+        {"name": "decompile_function", "description": "Decompile a function by name, returns C code.", "input_schema": {
+            "type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]}},
+        {"name": "decompile_function_by_address", "description": "Decompile function at a given hex address.", "input_schema": {
+            "type": "object", "properties": {"address": {"type": "string"}}, "required": ["address"]}},
+        {"name": "disassemble_function", "description": "Get assembly for a function at address.", "input_schema": {
+            "type": "object", "properties": {"address": {"type": "string"}}, "required": ["address"]}},
+        {"name": "search_functions_by_name", "description": "Search functions whose name contains substring.", "input_schema": {
+            "type": "object", "properties": {"query": {"type": "string"}, "offset": {"type": "integer", "default": 0}, "limit": {"type": "integer", "default": 100}}, "required": ["query"]}},
+        {"name": "get_xrefs_to", "description": "Get all cross-references TO an address.", "input_schema": {
+            "type": "object", "properties": {"address": {"type": "string"}, "offset": {"type": "integer", "default": 0}, "limit": {"type": "integer", "default": 100}}, "required": ["address"]}},
+        {"name": "get_xrefs_from", "description": "Get all cross-references FROM an address.", "input_schema": {
+            "type": "object", "properties": {"address": {"type": "string"}, "offset": {"type": "integer", "default": 0}, "limit": {"type": "integer", "default": 100}}, "required": ["address"]}},
+        {"name": "get_function_xrefs", "description": "Get all references to a function by name.", "input_schema": {
+            "type": "object", "properties": {"name": {"type": "string"}, "offset": {"type": "integer", "default": 0}, "limit": {"type": "integer", "default": 100}}, "required": ["name"]}},
+        {"name": "list_data_items", "description": "List defined data labels and values.", "input_schema": {
+            "type": "object", "properties": {"offset": {"type": "integer", "default": 0}, "limit": {"type": "integer", "default": 100}}}},
+        {"name": "list_namespaces", "description": "List all non-global namespaces.", "input_schema": {
+            "type": "object", "properties": {"offset": {"type": "integer", "default": 0}, "limit": {"type": "integer", "default": 100}}}},
+    ]
+
+    # Map tool names to their MCP bridge HTTP endpoints and methods
+    _MCP_TOOL_ROUTES = {
+        "list_methods": ("GET", "methods"),
+        "list_imports": ("GET", "imports"),
+        "list_exports": ("GET", "exports"),
+        "list_segments": ("GET", "segments"),
+        "list_strings": ("GET", "strings"),
+        "decompile_function": ("POST", "decompile"),
+        "decompile_function_by_address": ("GET", "decompile_function"),
+        "disassemble_function": ("GET", "disassemble_function"),
+        "search_functions_by_name": ("GET", "searchFunctions"),
+        "get_xrefs_to": ("GET", "xrefs_to"),
+        "get_xrefs_from": ("GET", "xrefs_from"),
+        "get_function_xrefs": ("GET", "function_xrefs"),
+        "list_data_items": ("GET", "data"),
+        "list_namespaces": ("GET", "namespaces"),
+    }
+
+    def _ghidra_mcp_call_tool(self, tunnel_port: int, tool_name: str, tool_input: dict) -> str:
+        """Execute a Ghidra MCP tool call via the HTTP bridge through SSH tunnel."""
+        route = self._MCP_TOOL_ROUTES.get(tool_name)
+        if not route:
+            return f"Unknown tool: {tool_name}"
+
+        method, endpoint = route
+        url = f"http://127.0.0.1:{tunnel_port}/{endpoint}"
+
+        try:
+            if method == "POST":
+                # decompile_function takes raw string body
+                if tool_name == "decompile_function":
+                    r = requests.post(url, data=tool_input.get("name", "").encode("utf-8"), timeout=30)
+                else:
+                    r = requests.post(url, data=tool_input, timeout=30)
+            else:
+                r = requests.get(url, params=tool_input, timeout=30)
+
+            if r.ok:
+                text = r.text.strip()
+                # Cap response to avoid blowing up context
+                if len(text) > 12000:
+                    text = text[:12000] + "\n... [truncated, use offset/limit to paginate]"
+                return text
+            else:
+                return f"Error {r.status_code}: {r.text[:500]}"
+        except requests.exceptions.ConnectionError:
+            return "Error: Ghidra MCP bridge not reachable — server may have crashed"
+        except Exception as e:
+            return f"Request failed: {e}"
+
+    def _start_ghidra_mcp(self, sha256: str) -> Optional[tuple[subprocess.Popen, int]]:
+        """Start Ghidra headless with MCP server script on REMnux and set up SSH tunnel.
+        Uses ghidra_mcp_server.py (Jython) which starts an HTTP server inside
+        analyzeHeadless — no GUI or Xvfb needed.
+        Returns (tunnel_process, local_port) or None on failure."""
+
+        ghidra_port = self.cfg.ghidra_mcp_ghidra_port
+        bridge_port = self.cfg.ghidra_mcp_bridge_port
+
+        # Ensure sample is on REMnux
+        remote_sample = f"{self.cfg.remnux_inbox}/{sha256}"
+        local_sample = STAGING_DIR / sha256
+        if local_sample.exists():
+            self._scp_to(
+                self.cfg.remnux_host, self.cfg.remnux_port, self.cfg.remnux_user,
+                self._remnux_pass, str(local_sample), remote_sample
+            )
+
+        # Deploy the MCP server script
+        self._scp_to(
+            self.cfg.remnux_host, self.cfg.remnux_port, self.cfg.remnux_user,
+            self._remnux_pass, str(ELKIE_HOME / "ghidra_mcp_server.py"),
+            f"/home/{self.cfg.remnux_user}/ghidra_mcp_server.py"
+        )
+
+        # Kill any leftover Ghidra processes on REMnux
+        self._ssh_cmd(
+            self.cfg.remnux_host, self.cfg.remnux_port, self.cfg.remnux_user,
+            "pkill -f analyzeHeadless 2>/dev/null; sleep 1",
+            password=self._remnux_pass, timeout=10,
+        )
+
+        # Start Ghidra headless with MCP server postscript
+        # -scriptTimeout 0 prevents analyzeHeadless from killing the script
+        # The script blocks serving HTTP until MCP_SERVER_TIMEOUT expires
+        self._ssh_cmd(
+            self.cfg.remnux_host, self.cfg.remnux_port, self.cfg.remnux_user,
+            f"rm -rf /tmp/ghidra_mcp_project; mkdir -p /tmp/ghidra_mcp_project; "
+            f"MCP_SERVER_PORT={ghidra_port} MCP_SERVER_TIMEOUT=600 "
+            f"nohup /opt/ghidra/support/analyzeHeadless /tmp/ghidra_mcp_project mcp_session "
+            f"-import {remote_sample} "
+            f"-postScript /home/{self.cfg.remnux_user}/ghidra_mcp_server.py "
+            f"-scriptTimeout 0 "
+            f"-analysisTimeoutPerFile 240 "
+            f"> /tmp/ghidra_mcp.log 2>&1 &",
+            password=self._remnux_pass, timeout=15,
+        )
+
+        # Wait for Ghidra MCP HTTP server to come up (analysis + script startup)
+        self.logger.info("Waiting for Ghidra MCP HTTP server on REMnux:%d...", ghidra_port)
+        for attempt in range(60):  # 120s max (analysis can take a while)
+            rc, out, _ = self._ssh_cmd(
+                self.cfg.remnux_host, self.cfg.remnux_port, self.cfg.remnux_user,
+                f"curl -s http://127.0.0.1:{ghidra_port}/health 2>/dev/null",
+                password=self._remnux_pass, timeout=5,
+            )
+            if rc == 0 and out.strip() == "ok":
+                self.logger.info("Ghidra MCP server ready (attempt %d, ~%ds)", attempt + 1, attempt * 2)
+                break
+            time.sleep(2)
+        else:
+            self.logger.warning("Ghidra MCP server did not start — falling back to batch analysis")
+            rc, log_out, _ = self._ssh_cmd(
+                self.cfg.remnux_host, self.cfg.remnux_port, self.cfg.remnux_user,
+                "tail -30 /tmp/ghidra_mcp.log 2>/dev/null",
+                password=self._remnux_pass, timeout=5,
+            )
+            if log_out:
+                self.logger.warning("Ghidra MCP log: %s", log_out.strip()[-500:])
+            return None
+
+        # Set up SSH tunnel: local bridge_port → REMnux ghidra_port
+        tunnel_cmd = [
+            "ssh", "-o", "StrictHostKeyChecking=no", "-o", "BatchMode=yes",
+            "-o", "ConnectTimeout=10", "-N",
+            "-L", f"{bridge_port}:127.0.0.1:{ghidra_port}",
+            "-J", f"{self.cfg.tpot_user}@{self.cfg.tpot_host}:{self.cfg.tpot_port}",
+            "-p", str(self.cfg.remnux_port),
+            f"{self.cfg.remnux_user}@{self.cfg.remnux_host}",
+        ]
+        tunnel = subprocess.Popen(tunnel_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        time.sleep(2)
+
+        # Verify tunnel works
+        try:
+            r = requests.get(f"http://127.0.0.1:{bridge_port}/health", timeout=5)
+            if not r.ok:
+                self.logger.warning("SSH tunnel test failed: %s", r.status_code)
+                tunnel.kill()
+                return None
+        except Exception as e:
+            self.logger.warning("SSH tunnel not working: %s", e)
+            tunnel.kill()
+            return None
+
+        self.logger.info("Ghidra MCP tunnel established on local port %d", bridge_port)
+        return tunnel, bridge_port
+
+    def _stop_ghidra_mcp(self, tunnel: Optional[subprocess.Popen]):
+        """Clean up Ghidra MCP session."""
+        if tunnel:
+            tunnel.kill()
+            tunnel.wait()
+        self._ssh_cmd(
+            self.cfg.remnux_host, self.cfg.remnux_port, self.cfg.remnux_user,
+            "pkill -f analyzeHeadless 2>/dev/null; pkill -f bridge_mcp_ghidra 2>/dev/null; "
+            "rm -rf /tmp/ghidra_mcp_project 2>/dev/null",
+            password=self._remnux_pass, timeout=10,
+        )
+
+    def ghidra_mcp_analysis(self, sha256: str, results: dict) -> Optional[dict]:
+        """Interactive Ghidra analysis via MCP — Claude explores the binary autonomously.
+        Falls back to batch deep_ghidra_analysis if MCP setup fails."""
+
+        if not self.cfg.ghidra_mcp_enabled:
+            return self.deep_ghidra_analysis(sha256, results)
+
+        score = self._score_sample(results)
+        self.logger.info("Sample %s deep analysis score: %d (threshold: 40)", sha256[:16], score)
+        if score < 40:
+            return None
+        if not self._can_deep_analyze_today():
+            self.logger.info("Deep analysis budget exhausted for today")
+            return None
+        if not (results.get("is_elf") or results.get("is_pe")):
+            return None
+
+        self.logger.info("Starting Ghidra MCP interactive analysis for %s (score=%d)", sha256[:16], score)
+
+        # Ensure REMnux is up
+        if not self._ensure_remnux_running():
+            return None
+
+        # Start Ghidra + tunnel
+        mcp_session = self._start_ghidra_mcp(sha256)
+        if not mcp_session:
+            self.logger.info("MCP setup failed — falling back to batch Ghidra analysis")
+            return self.deep_ghidra_analysis(sha256, results)
+
+        tunnel, local_port = mcp_session
+
+        try:
+            return self._run_mcp_agent_loop(sha256, results, local_port)
+        finally:
+            self._stop_ghidra_mcp(tunnel)
+
+    def _run_mcp_agent_loop(self, sha256: str, results: dict, tunnel_port: int) -> Optional[dict]:
+        """Run the Claude tool-use agent loop against Ghidra MCP."""
+        try:
+            import anthropic
+        except ImportError:
+            return None
+
+        api_key = self._anthropic_key
+        if not api_key:
+            return None
+
+        client = anthropic.Anthropic(api_key=api_key)
+        total_cost = 0.0
+        max_cost = self.cfg.ghidra_mcp_max_cost
+        max_turns = self.cfg.ghidra_mcp_max_turns
+        tool_calls_log = []
+
+        # Build context from prior analysis stages
+        context_parts = []
+        if results.get("file_type"):
+            context_parts.append(f"File: {results['file_type']} | {results.get('file_size', 0)} bytes")
+        if results.get("yara_matches"):
+            context_parts.append(f"YARA: {', '.join(results['yara_matches'][:10])}")
+        if results.get("capa_capabilities"):
+            context_parts.append(f"Capabilities: {', '.join(results['capa_capabilities'][:10])}")
+        if results.get("interesting_strings"):
+            context_parts.append(f"Strings: {', '.join(results['interesting_strings'][:15])}")
+        dyn = results.get("dynamic_analysis", {})
+        if dyn:
+            if dyn.get("outbound_connections"):
+                context_parts.append(f"Network: {json.dumps(dyn['outbound_connections'][:10])}")
+            if dyn.get("dns_queries"):
+                context_parts.append(f"DNS: {json.dumps(dyn['dns_queries'][:10])}")
+        vt = results.get("virustotal", {})
+        if vt and vt.get("found"):
+            context_parts.append(f"VirusTotal: {vt.get('detections', 0)}/{vt.get('total', 0)} detections — {vt.get('popular_threat_name', 'unknown')}")
+
+        system_prompt = """You are a malware reverse engineer analyzing a binary captured from an SSH honeypot.
+You have access to Ghidra via MCP tools. Use them to systematically investigate the binary.
+
+APPROACH:
+1. Start with list_imports and list_strings to get an overview
+2. Use list_methods to see all functions, then search_functions_by_name for interesting ones
+3. Decompile suspicious functions and follow xrefs to trace execution flow
+4. Look for: C2 addresses, encryption keys, persistence mechanisms, credential theft, anti-analysis
+
+RULES:
+- Only report what the code DEMONSTRATES — cite specific functions, addresses, strings
+- Follow the evidence chain: import → xref → decompile → analyze
+- When you find something interesting, follow xrefs to understand the full call chain
+- Stop when you've covered all significant functionality or hit diminishing returns
+
+BUDGET: You have limited tool calls. Be strategic — don't enumerate everything, focus on what matters.
+
+When done, provide your final analysis as structured text."""
+
+        prior_context = "\n".join(context_parts)
+        user_msg = f"""Analyze this binary from our SSH honeypot. Prior analysis context:
+
+{prior_context}
+
+SHA256: {sha256}
+
+Explore the binary using the Ghidra tools and provide a complete code-level threat assessment."""
+
+        messages = [{"role": "user", "content": user_msg}]
+
+        for turn in range(max_turns):
+            if total_cost >= max_cost:
+                self.logger.info("MCP analysis hit cost cap ($%.4f >= $%.2f) at turn %d",
+                                 total_cost, max_cost, turn + 1)
+                break
+
+            try:
+                response = client.messages.create(
+                    model=self.cfg.llm_api_model,
+                    max_tokens=4000,
+                    system=system_prompt,
+                    tools=self.GHIDRA_MCP_TOOLS,
+                    messages=messages,
+                )
+            except Exception as e:
+                self.logger.error("MCP agent loop API error at turn %d: %s", turn + 1, e)
+                break
+
+            # Track cost (Sonnet pricing)
+            turn_cost = (response.usage.input_tokens * 3 / 1_000_000) + (response.usage.output_tokens * 15 / 1_000_000)
+            total_cost += turn_cost
+
+            # Check if Claude is done (no more tool calls)
+            if response.stop_reason == "end_turn":
+                # Extract final text analysis
+                final_text = ""
+                for block in response.content:
+                    if hasattr(block, "text"):
+                        final_text += block.text
+                self.logger.info("MCP analysis complete — %d turns, $%.4f", turn + 1, total_cost)
+                messages.append({"role": "assistant", "content": response.content})
+                break
+
+            # Process tool calls
+            tool_use_blocks = [b for b in response.content if b.type == "tool_use"]
+            if not tool_use_blocks:
+                # Text-only response, Claude is done
+                final_text = ""
+                for block in response.content:
+                    if hasattr(block, "text"):
+                        final_text += block.text
+                self.logger.info("MCP analysis complete (text only) — %d turns, $%.4f", turn + 1, total_cost)
+                break
+
+            # Append assistant message with tool use
+            messages.append({"role": "assistant", "content": response.content})
+
+            # Execute each tool call and build results
+            tool_results = []
+            for tool_block in tool_use_blocks:
+                tool_name = tool_block.name
+                tool_input = tool_block.input
+                self.logger.info("MCP turn %d: %s(%s)", turn + 1, tool_name,
+                                 json.dumps(tool_input)[:100])
+
+                result_text = self._ghidra_mcp_call_tool(tunnel_port, tool_name, tool_input)
+                tool_calls_log.append({
+                    "turn": turn + 1,
+                    "tool": tool_name,
+                    "input": tool_input,
+                    "output_length": len(result_text),
+                })
+
+                tool_results.append({
+                    "type": "tool_result",
+                    "tool_use_id": tool_block.id,
+                    "content": result_text,
+                })
+
+            messages.append({"role": "user", "content": tool_results})
+
+        else:
+            # Exhausted all turns — ask for final summary
+            self.logger.info("MCP analysis hit turn limit (%d), requesting summary", max_turns)
+            messages.append({"role": "user", "content": [{"type": "text",
+                "text": "You've used all available tool calls. Provide your final analysis now based on everything you've found."}]})
+            try:
+                final_resp = client.messages.create(
+                    model=self.cfg.llm_api_model,
+                    max_tokens=4000,
+                    system=system_prompt,
+                    messages=messages,
+                )
+                final_cost = (final_resp.usage.input_tokens * 3 / 1_000_000) + (final_resp.usage.output_tokens * 15 / 1_000_000)
+                total_cost += final_cost
+                final_text = ""
+                for block in final_resp.content:
+                    if hasattr(block, "text"):
+                        final_text += block.text
+            except Exception as e:
+                self.logger.error("MCP final summary failed: %s", e)
+                final_text = ""
+
+        self._mark_deep_analyzed(sha256)
+
+        if not final_text:
+            return None
+
+        return {
+            "deep_analysis": final_text,
+            "analysis_mode": "ghidra_mcp_interactive",
+            "triage": {"mode": "mcp_interactive", "tool_calls": tool_calls_log},
+            "functions_analyzed": len([t for t in tool_calls_log if "decompile" in t["tool"]]),
+            "functions_total": 0,  # Unknown in MCP mode
+            "decompiled_function_count": len([t for t in tool_calls_log if "decompile" in t["tool"]]),
+            "score": self._score_sample(results),
+            "cost": round(total_cost, 4),
+            "mcp_turns": len(set(t["turn"] for t in tool_calls_log)),
+            "mcp_tool_calls": len(tool_calls_log),
+        }
+
     def claude_analyze(self, results: dict) -> Optional[dict]:
         """Call LLM for threat assessment and YARA rule generation."""
         if self.cfg.llm_mode == "none":
@@ -2987,7 +3540,9 @@ Requirements:
             )
             if rc == 0 and output.strip():
                 try:
-                    vol_results[name] = json.loads(output)
+                    parsed = json.loads(output)
+                    # Serialize back to string for ES text field compatibility
+                    vol_results[name] = json.dumps(parsed)[:5000]
                 except json.JSONDecodeError:
                     vol_results[name] = output[:3000]
             else:
@@ -3799,6 +4354,14 @@ Requirements:
             self.logger.debug("Skipping already-analyzed sample: %s", sha256[:16])
             return False
 
+        # Check false positive list (by hash or filepath)
+        fp = sample_info.get("filepath", "")
+        if self._is_false_positive_hash(sha256) or (fp and self._is_false_positive_path(fp)):
+            reason = self._false_positives.get(sha256, self._false_positives.get(fp, "unknown"))
+            self.logger.info("Skipping false positive %s — %s", sha256[:16], reason)
+            self.known_hashes.add(sha256)
+            return False
+
         self.logger.info("Processing new sample: %s (from %s via %s)",
                          sha256[:16], sample_info.get("src_ip", "?"), sample_info.get("honeypot", "?"))
 
@@ -3831,12 +4394,17 @@ Requirements:
         # Step 2: Submit to REMnux
         ok = self.submit_for_analysis(sha256, local_path)
         if not ok:
+            self.logger.warning("Submit failed for %s — marking known to prevent retry loop", sha256[:16])
+            self.known_hashes.add(sha256)
+            self.save_state()
             return False
 
         # Step 3: Wait for and collect results
         results = self.wait_for_results(sha256)
         if not results:
-            self.logger.warning("No results received for %s", sha256[:16])
+            self.logger.warning("No results received for %s — marking known to prevent retry loop", sha256[:16])
+            self.known_hashes.add(sha256)
+            self.save_state()
             return False
 
         # Step 4: Claude API threat analysis + YARA rule generation
@@ -3872,8 +4440,8 @@ Requirements:
         if mb_result:
             results["malwarebazaar"] = mb_result
 
-        # Step 7: Deep Ghidra decompilation (if sample scores high enough, max 1/day)
-        deep = self.deep_ghidra_analysis(sha256, results)
+        # Step 7: Deep Ghidra analysis — MCP interactive (preferred) or batch fallback
+        deep = self.ghidra_mcp_analysis(sha256, results)
         if deep:
             results["deep_analysis"] = deep.get("deep_analysis", "")
             results["deep_analysis_score"] = deep.get("score", 0)
@@ -3881,9 +4449,14 @@ Requirements:
             results["deep_analysis_triage"] = deep.get("triage", {})
             results["deep_analysis_functions_analyzed"] = deep.get("functions_analyzed", 0)
             results["deep_analysis_functions_total"] = deep.get("functions_total", 0)
-            self.logger.info("Deep analysis complete for %s — %d/%d functions analyzed, score=%d, cost=$%.4f",
-                             sha256[:16], deep.get("functions_analyzed", 0),
-                             deep.get("functions_total", 0), deep["score"], deep["cost"])
+            results["deep_analysis_mode"] = deep.get("analysis_mode", "batch")
+            mode = deep.get("analysis_mode", "batch")
+            mcp_info = ""
+            if mode == "ghidra_mcp_interactive":
+                mcp_info = f", mcp_turns={deep.get('mcp_turns', 0)}, tool_calls={deep.get('mcp_tool_calls', 0)}"
+            self.logger.info("Deep analysis complete for %s — mode=%s, %d functions decompiled, score=%d, cost=$%.4f%s",
+                             sha256[:16], mode, deep.get("functions_analyzed", 0),
+                             deep["score"], deep["cost"], mcp_info)
 
         # Step 8: C2 infrastructure mapping
         c2_map = self.map_c2_infrastructure(results)

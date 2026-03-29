@@ -1,0 +1,294 @@
+#!/usr/bin/env python3
+"""
+labctl — Cisco Lab CLI
+
+Simple commands to manage a GNS3-backed Cisco networking lab.
+Designed for SSH users on the jumpbox (192.168.30.10).
+
+Usage:
+  DEVICE MANAGEMENT:
+    labctl add <name> <type>                    — Spin up a new device
+    labctl remove <name>                        — Destroy a device
+    labctl start <name>                         — Boot a device
+    labctl stop <name>                          — Shut down a device
+    labctl start-all                            — Boot all devices
+    labctl stop-all                             — Shut down all devices
+
+  CONNECTIVITY:
+    labctl connect <A> <intA> <B> <intB>        — Cable two devices together
+    labctl disconnect <A> <intA> <B> <intB>     — Remove a cable
+    labctl console <name>                       — Console into a device (telnet)
+    labctl ssh <name>                           — Alias for console
+
+  VISIBILITY:
+    labctl status                               — Show all devices and links
+    labctl topology                             — ASCII topology map
+    labctl watch                                — Live-updating topology (Ctrl+C to exit)
+    labctl images                               — List available/missing images
+
+  TROUBLESHOOTING SCENARIOS:
+    labctl scenario list [category] [difficulty] — Browse 100 scenarios
+    labctl scenario start <id>                   — Deploy a broken topology
+    labctl scenario configure [id]               — Push configs after devices boot
+    labctl scenario hint                         — Get a hint
+    labctl scenario check                        — Validate your fix
+    labctl scenario stop                         — Tear down active scenario
+    labctl scenario random [difficulty]           — Pick a random scenario
+
+  RESOURCE MANAGEMENT:
+    labctl monitor                              — Show device activity/idle status
+    labctl monitor timeout <minutes>            — Set idle timeout (default: 30m)
+    labctl monitor auto                         — Toggle auto-shutdown on/off
+    labctl monitor sweep                        — Shut down idle devices now
+
+  ADMIN:
+    labctl save                                 — Save running configs
+    labctl wipe [--confirm]                     — Destroy entire lab
+    labctl adduser <name>                       — Create a lab user account
+    labctl users                                — List lab users
+    labctl help                                 — Show this help
+
+Device types: router, switch, firewall, csr, nxos
+
+Examples:
+  labctl add R1 csr
+  labctl add R2 csr
+  labctl connect R1 gi0/0 R2 gi0/0
+  labctl start R1
+  labctl ssh R1
+  labctl scenario start 1
+  labctl scenario check
+"""
+
+import sys
+import os
+
+# Add lab dir to path
+sys.path.insert(0, "/opt/cisco-lab")
+
+from lab_manager import LabManager
+
+
+def usage():
+    print(__doc__)
+    sys.exit(0)
+
+
+def main():
+    if len(sys.argv) < 2:
+        usage()
+
+    cmd = sys.argv[1].lower()
+
+    if cmd in ("help", "-h", "--help"):
+        usage()
+
+    try:
+        lab = LabManager()
+    except Exception as e:
+        print(f"Error connecting to GNS3: {e}")
+        print("Is gns3-server running? Check: systemctl status gns3-server")
+        sys.exit(1)
+
+    try:
+        # --- Device management ---
+        if cmd == "add":
+            if len(sys.argv) != 4:
+                print("Usage: labctl add <name> <type>")
+                print(f"Types: {', '.join(lab.config['device_templates'].keys())}")
+                sys.exit(1)
+            lab.add_device(sys.argv[2], sys.argv[3].lower())
+
+        elif cmd in ("remove", "rm", "delete"):
+            if len(sys.argv) != 3:
+                print("Usage: labctl remove <name>")
+                sys.exit(1)
+            lab.remove_device(sys.argv[2])
+
+        elif cmd == "start":
+            if len(sys.argv) != 3:
+                print("Usage: labctl start <name>")
+                sys.exit(1)
+            lab.start_device(sys.argv[2])
+
+        elif cmd == "stop":
+            if len(sys.argv) != 3:
+                print("Usage: labctl stop <name>")
+                sys.exit(1)
+            lab.stop_device(sys.argv[2])
+
+        elif cmd == "start-all":
+            lab.start_all()
+
+        elif cmd == "stop-all":
+            lab.stop_all()
+
+        # --- Connectivity ---
+        elif cmd in ("connect", "link"):
+            if len(sys.argv) != 6:
+                print("Usage: labctl connect <deviceA> <intA> <deviceB> <intB>")
+                print("Example: labctl connect R1 gi0/0 SW1 e0/1")
+                sys.exit(1)
+            lab.connect(sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5])
+
+        elif cmd in ("disconnect", "unlink"):
+            if len(sys.argv) != 6:
+                print("Usage: labctl disconnect <deviceA> <intA> <deviceB> <intB>")
+                sys.exit(1)
+            lab.disconnect(sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5])
+
+        elif cmd in ("console", "con", "ssh"):
+            if len(sys.argv) != 3:
+                print("Usage: labctl ssh <name>")
+                sys.exit(1)
+            # Update activity tracking
+            try:
+                from lab_monitor import IdleMonitor
+                mon = IdleMonitor(lab)
+                mon.update_activity(sys.argv[2])
+            except Exception:
+                pass
+            lab.console(sys.argv[2])
+
+        # --- Visibility ---
+        elif cmd in ("status", "ls", "list"):
+            lab.status()
+
+        elif cmd in ("topology", "topo", "map"):
+            lab.topology()
+
+        elif cmd == "watch":
+            from lab_monitor import live_topology
+            interval = int(sys.argv[2]) if len(sys.argv) > 2 else 5
+            live_topology(lab, interval=interval)
+
+        elif cmd in ("images", "img"):
+            lab.list_images()
+
+        # --- Troubleshooting scenarios ---
+        elif cmd == "scenario":
+            from lab_scenarios import ScenarioEngine
+            engine = ScenarioEngine(lab)
+
+            if len(sys.argv) < 3:
+                print("Usage: labctl scenario <list|start|configure|hint|check|stop|random>")
+                sys.exit(1)
+
+            subcmd = sys.argv[2].lower()
+
+            if subcmd == "list":
+                category = sys.argv[3] if len(sys.argv) > 3 else None
+                difficulty = sys.argv[4] if len(sys.argv) > 4 else None
+                # Handle if only difficulty passed
+                if category and category.isdigit():
+                    difficulty = category
+                    category = None
+                engine.list_scenarios(category=category, difficulty=difficulty)
+
+            elif subcmd in ("start", "deploy"):
+                if len(sys.argv) != 4:
+                    print("Usage: labctl scenario start <id>")
+                    sys.exit(1)
+                engine.deploy(sys.argv[3])
+
+            elif subcmd in ("configure", "config", "push"):
+                sid = sys.argv[3] if len(sys.argv) > 3 else None
+                engine.configure(sid)
+
+            elif subcmd == "hint":
+                engine.hint()
+
+            elif subcmd in ("check", "validate", "verify"):
+                engine.check()
+
+            elif subcmd in ("stop", "teardown", "end"):
+                engine.stop()
+
+            elif subcmd == "random":
+                diff = sys.argv[3] if len(sys.argv) > 3 else None
+                engine.random(difficulty=diff)
+
+            else:
+                print(f"Unknown scenario command: {subcmd}")
+                print("Usage: labctl scenario <list|start|configure|hint|check|stop|random>")
+
+        # --- Resource management ---
+        elif cmd == "monitor":
+            from lab_monitor import IdleMonitor
+            mon = IdleMonitor(lab)
+
+            if len(sys.argv) < 3:
+                mon.status()
+            else:
+                subcmd = sys.argv[2].lower()
+                if subcmd == "timeout":
+                    if len(sys.argv) != 4:
+                        print("Usage: labctl monitor timeout <minutes>")
+                        sys.exit(1)
+                    mon.set_timeout(int(sys.argv[3]))
+                elif subcmd == "auto":
+                    mon.toggle_auto()
+                elif subcmd == "sweep":
+                    mon.auto_shutdown()
+                else:
+                    print(f"Unknown monitor command: {subcmd}")
+                    print("Usage: labctl monitor [timeout <min>|auto|sweep]")
+
+        # --- Snapshots ---
+        elif cmd == "snapshot":
+            if len(sys.argv) < 3:
+                print("Usage: labctl snapshot <save|restore|list|delete> [name]")
+                print("  save    — Save VM state (instant restore later)")
+                print("  restore — Restore VM state")
+                print("  list    — Show saved states")
+                print("  delete  — Remove a saved state")
+                sys.exit(1)
+            subcmd = sys.argv[2].lower()
+            name = sys.argv[3] if len(sys.argv) > 3 else "clean"
+            if subcmd in ("save", "create"):
+                lab.vm_snapshot_create(name)
+            elif subcmd == "restore":
+                lab.vm_snapshot_restore(name)
+            elif subcmd == "list":
+                lab.vm_snapshot_list()
+            elif subcmd == "delete":
+                lab.vm_snapshot_delete(name)
+            else:
+                print(f"Unknown: {subcmd}")
+
+        # --- Admin ---
+        elif cmd == "save":
+            lab.save_configs()
+
+        elif cmd == "wipe":
+            confirmed = "--confirm" in sys.argv
+            lab.wipe(confirmed=confirmed)
+
+        elif cmd == "adduser":
+            if len(sys.argv) != 3:
+                print("Usage: labctl adduser <username>")
+                sys.exit(1)
+            lab.add_user(sys.argv[2])
+
+        elif cmd == "users":
+            lab.list_users()
+
+        else:
+            # Check if it's a device name — shortcut for console
+            node = lab._find_node(sys.argv[1])
+            if node:
+                lab.console(sys.argv[1])
+            else:
+                print(f"Unknown command: {cmd}")
+                usage()
+
+    except (ValueError, FileNotFoundError, RuntimeError) as e:
+        print(f"Error: {e}")
+        sys.exit(1)
+    except KeyboardInterrupt:
+        print("\nAborted.")
+        sys.exit(0)
+
+
+if __name__ == "__main__":
+    main()

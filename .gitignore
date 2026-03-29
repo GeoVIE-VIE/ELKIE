@@ -88,3 +88,12 @@ __pycache__/
 # Editor
 .python_history
 .selected_editor
+
+# Recon dashboard runtime
+recon-dashboard-v2/recon.db
+recon-dashboard-v2/recon.db-*
+recon-dashboard-v2/intel_cache/
+recon-dashboard-v2/snapshots/
+
+# False positive state
+.sample_analyzer_fp.json

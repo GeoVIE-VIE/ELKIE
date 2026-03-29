@@ -217,6 +217,33 @@ try:
 except:
     pass
 
+# --- 7. Campaign cluster data ---
+campaign_info = ""
+try:
+    r = requests.post(f"{es}/campaign-clusters/_search", json={
+        "size": 5,
+        "query": {"term": {"ips": ip}}
+    }, timeout=5)
+    if r.status_code == 200:
+        hits = r.json().get("hits", {}).get("hits", [])
+        if hits:
+            c = hits[0]["_source"]
+            cname = c.get("campaign_name", "")
+            conf = c.get("confidence", "")
+            ip_count = c.get("ip_count", 0)
+            classification = c.get("classification", "")
+            sigs = c.get("cluster_signals", "")
+            # Only include if medium+ confidence
+            if conf in ("confirmed", "high", "medium"):
+                parts = [f"Campaign: {cname} ({conf} confidence, {ip_count} coordinated IPs, {classification})"]
+                # Extract definitive/strong signals
+                for line in sigs.split("\n"):
+                    if "DEFINITIVE" in line or "STRONG" in line:
+                        parts.append(line.strip())
+                campaign_info = ". ".join(parts[:3])
+except Exception:
+    pass
+
 # --- Build report ---
 lines = []
 
@@ -252,6 +279,10 @@ if malware_info:
 if ipinfo.get("org"):
     loc = f"{ipinfo.get('city','')}, {ipinfo.get('country','')}" if ipinfo.get('city') else ipinfo.get('country','')
     lines.append(f"Source: {ipinfo['org']} ({loc}).")
+
+# Campaign intel
+if campaign_info:
+    lines.append(campaign_info)
 
 # Disclosure
 lines.append("Data from SSH honeypot — not a production system.")

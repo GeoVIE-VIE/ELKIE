@@ -1,0 +1,14 @@
+[Unit]
+Description=Cisco Lab Web UI
+After=network.target gns3-server.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/cisco-lab/web/app.py
+Restart=on-failure
+RestartSec=5
+User=root
+WorkingDirectory=/opt/cisco-lab/web
+
+[Install]
+WantedBy=multi-user.target

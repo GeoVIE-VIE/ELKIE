@@ -1,0 +1,1496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cisco Lab</title>
+<script src="https://unpkg.com/vis-network@9.1.6/standalone/umd/vis-network.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.min.js"></script>
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #1a1a2e; color: #e0e0e0; font-family: 'Segoe UI', monospace; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+/* Header */
+.header { background: #16213e; padding: 8px 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #0f3460; flex-shrink: 0; }
+.header h1 { font-size: 18px; color: #e94560; font-weight: 600; }
+.header .stats { font-size: 13px; color: #7f8c8d; }
+.header .stats span { margin-left: 16px; }
+.stats .running { color: #2ecc71; }
+.stats .ram { color: #f39c12; }
+
+/* Main split */
+.main { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+
+/* Top: topology + sidebar */
+.top-pane { flex: 1; display: flex; min-height: 0; border-bottom: 3px solid #0f3460; }
+
+/* Topology */
+#topology { flex: 1; background: #0a0a1a; position: relative; }
+#topology-canvas { width: 100%; height: 100%; }
+.topo-overlay { position: absolute; top: 8px; left: 8px; display: flex; gap: 6px; z-index: 10; }
+.topo-btn { background: #16213e; border: 1px solid #0f3460; color: #e0e0e0; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+.topo-btn:hover { background: #0f3460; }
+.topo-btn.active { background: #e94560; border-color: #e94560; }
+
+/* Sidebar */
+.sidebar { width: 320px; background: #16213e; border-left: 1px solid #0f3460; display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0; }
+.sidebar-tabs { display: flex; border-bottom: 1px solid #0f3460; flex-shrink: 0; }
+.sidebar-tab { flex: 1; padding: 8px; text-align: center; cursor: pointer; font-size: 12px; color: #7f8c8d; border-bottom: 2px solid transparent; }
+.sidebar-tab.active { color: #e94560; border-bottom-color: #e94560; }
+.sidebar-content { flex: 1; overflow-y: auto; padding: 8px; }
+
+/* Scenarios panel */
+.scenario-card { background: #1a1a2e; border: 1px solid #0f3460; border-radius: 6px; padding: 10px; margin-bottom: 8px; cursor: pointer; transition: border-color 0.2s; }
+.scenario-card:hover { border-color: #3498db; }
+.scenario-card.active { border-color: #e94560; background: #2a1a2e; }
+.scenario-card.completed { border-left: 3px solid #2ecc71; }
+.scenario-card .sc-header { display: flex; justify-content: space-between; margin-bottom: 4px; }
+.scenario-card .sc-id { color: #e94560; font-weight: bold; font-size: 13px; }
+.scenario-card .sc-cat { color: #7f8c8d; font-size: 11px; }
+.scenario-card .sc-name { font-size: 13px; margin-bottom: 4px; }
+.scenario-card .sc-diff { color: #f39c12; font-size: 11px; }
+.scenario-card .sc-desc { color: #95a5a6; font-size: 11px; display: none; margin-top: 6px; }
+.scenario-card.expanded .sc-desc { display: block; }
+.scenario-actions { display: flex; gap: 6px; margin-top: 8px; }
+.sc-btn { padding: 4px 10px; border-radius: 4px; border: none; cursor: pointer; font-size: 11px; }
+.sc-btn.start { background: #2ecc71; color: #fff; }
+.sc-btn.stop { background: #e74c3c; color: #fff; }
+.sc-btn.hint { background: #f39c12; color: #fff; }
+.sc-btn.check { background: #3498db; color: #fff; }
+.sc-btn.config { background: #9b59b6; color: #fff; }
+
+/* Device panel */
+.device-row { display: flex; align-items: center; justify-content: space-between; padding: 8px; background: #1a1a2e; border: 1px solid #0f3460; border-radius: 4px; margin-bottom: 6px; }
+.device-row .name { font-weight: bold; font-size: 13px; }
+.device-row .status { font-size: 11px; }
+.device-row .status.up { color: #2ecc71; }
+.device-row .status.down { color: #95a5a6; }
+.device-row .status.booting { color: #f39c12; animation: pulse 1.5s ease-in-out infinite; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+.device-row .actions { display: flex; gap: 4px; }
+.device-row .actions button { padding: 3px 8px; border: none; border-radius: 3px; cursor: pointer; font-size: 11px; }
+.btn-console { background: #3498db; color: #fff; }
+.btn-start { background: #2ecc71; color: #fff; }
+.btn-stop { background: #e74c3c; color: #fff; }
+.btn-delete { background: #7f8c8d; color: #fff; }
+
+/* Add device form */
+.add-form { display: flex; gap: 4px; margin-bottom: 8px; }
+.add-form input, .add-form select { background: #1a1a2e; border: 1px solid #0f3460; color: #e0e0e0; padding: 6px; border-radius: 4px; font-size: 12px; }
+.add-form input { flex: 1; }
+.add-form button { background: #2ecc71; color: #fff; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+
+/* Filter */
+.filter-row { display: flex; gap: 4px; margin-bottom: 8px; }
+.filter-row select, .filter-row input { background: #1a1a2e; border: 1px solid #0f3460; color: #e0e0e0; padding: 5px; border-radius: 4px; font-size: 11px; flex: 1; }
+
+/* Bottom: terminal */
+.bottom-pane { height: 350px; background: #000; display: flex; flex-direction: column; flex-shrink: 0; }
+.term-header { background: #16213e; padding: 4px 12px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #0f3460; flex-shrink: 0; }
+.term-header .term-title { font-size: 13px; color: #7f8c8d; }
+.term-tabs { display: flex; align-items: center; flex-wrap: wrap; gap: 2px; }
+.term-tab { padding: 3px 10px; background: #1a1a2e; border: 1px solid #0f3460; border-bottom: none; border-radius: 4px 4px 0 0; color: #7f8c8d; font-size: 12px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+.term-tab.active { background: #0a0a1a; color: #2ecc71; border-color: #2ecc71; font-weight: bold; }
+.term-tab .tab-close { font-size: 10px; opacity: 0.5; cursor: pointer; }
+.term-tab .tab-close:hover { opacity: 1; color: #e74c3c; }
+#terminal-container { flex: 1; padding: 4px 0 12px 0; overflow: hidden; position: relative; }
+#terminal-container .xterm-screen { padding-bottom: 8px; }
+.term-pane { position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: none; }
+.term-pane.active { display: block; }
+
+/* Resize handle */
+.resize-handle { height: 5px; background: #0f3460; cursor: ns-resize; flex-shrink: 0; }
+.resize-handle:hover { background: #e94560; }
+
+/* Toast */
+.toast { position: fixed; bottom: 20px; right: 20px; background: #16213e; border: 1px solid #0f3460; padding: 12px 20px; border-radius: 6px; z-index: 1000; display: none; animation: fadeIn 0.3s; }
+.toast.success { border-color: #2ecc71; }
+.toast.error { border-color: #e74c3c; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #1a1a2e; }
+::-webkit-scrollbar-thumb { background: #0f3460; border-radius: 3px; }
+
+/* Scenario description in active banner */
+.active-scenario { background: #2a1a2e; border: 1px solid #e94560; border-radius: 6px; padding: 10px; margin-bottom: 8px; }
+.active-scenario h3 { color: #e94560; font-size: 14px; margin-bottom: 6px; }
+.active-scenario p { color: #bdc3c7; font-size: 12px; line-height: 1.4; }
+
+/* Scenario panel in terminal area */
+.scenario-panel {
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    background: #0a0a1a;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 16px;
+    padding-bottom: 80px;
+}
+.scenario-panel .sp-title { color: #e94560; font-size: 16px; font-weight: bold; margin-bottom: 4px; }
+.scenario-panel .sp-meta { color: #7f8c8d; font-size: 12px; margin-bottom: 12px; }
+.scenario-panel .sp-desc { color: #e0e0e0; font-size: 14px; line-height: 1.5; padding: 12px; background: #16213e; border: 1px solid #0f3460; border-radius: 6px; margin-bottom: 12px; }
+.scenario-panel .sp-hint { color: #f39c12; font-size: 13px; padding: 10px; background: #2a2a1e; border: 1px solid #f39c12; border-radius: 6px; margin-bottom: 12px; display: none; }
+.scenario-panel .sp-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.scenario-panel .sp-actions button { padding: 10px 18px; border-radius: 6px; border: none; cursor: pointer; font-size: 14px; font-weight: bold; color: #fff; }
+.scenario-panel .sp-result { padding: 10px; border-radius: 6px; margin-bottom: 12px; font-size: 13px; display: none; }
+.scenario-panel .sp-result.pass { background: rgba(46,204,113,0.15); border: 1px solid #2ecc71; color: #2ecc71; }
+.scenario-panel .sp-result.fail { background: rgba(231,76,60,0.15); border: 1px solid #e74c3c; color: #e74c3c; }
+.sp-browse { margin-top: 12px; }
+.sp-browse .sp-card { background: #16213e; border: 1px solid #0f3460; border-radius: 6px; padding: 12px; margin-bottom: 8px; cursor: pointer; }
+.sp-browse .sp-card:active { border-color: #3498db; }
+.sp-browse .sp-card.completed { border-left: 3px solid #2ecc71; }
+.sp-browse .sp-card-head { display: flex; justify-content: space-between; margin-bottom: 4px; }
+.sp-browse .sp-card-id { color: #e94560; font-weight: bold; }
+.sp-browse .sp-card-cat { color: #7f8c8d; font-size: 11px; }
+.sp-browse .sp-card-name { font-size: 14px; }
+.sp-browse .sp-card-diff { color: #f39c12; font-size: 12px; }
+
+/* Mobile hamburger */
+.mobile-nav { display: none; }
+.hamburger { background: none; border: 1px solid #0f3460; color: #e0e0e0; font-size: 20px; padding: 4px 10px; border-radius: 4px; cursor: pointer; }
+
+/* Mobile bottom bar */
+.mobile-bar { display: none; }
+.mobile-bar-btn { flex: 1; background: #16213e; border: none; border-top: 2px solid transparent; color: #7f8c8d; padding: 10px 4px; font-size: 11px; cursor: pointer; text-align: center; }
+.mobile-bar-btn.active { color: #e94560; border-top-color: #e94560; }
+.mobile-bar-btn .bar-icon { font-size: 18px; display: block; margin-bottom: 2px; }
+
+/* ===== MOBILE RESPONSIVE ===== */
+@media (max-width: 768px) {
+    /* Header compact */
+    .header { padding: 6px 10px; }
+    .header h1 { font-size: 15px; }
+    .header .stats { display: none; }
+    .mobile-nav { display: flex; align-items: center; gap: 8px; }
+    .mobile-stats { font-size: 11px; color: #7f8c8d; }
+
+    /* Stack layout vertically */
+    .main { flex-direction: column; }
+    .top-pane { flex-direction: column; flex: 1; }
+
+    /* Topology takes top portion */
+    #topology { min-height: 200px; flex: 1; }
+    .topo-overlay { top: 4px; left: 4px; }
+    .topo-btn { padding: 4px 8px; font-size: 11px; }
+
+    /* Sidebar becomes a full-screen overlay — but leaves room for bottom bar */
+    .sidebar {
+        display: none;
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 52px;
+        width: 100%;
+        z-index: 50;
+        border: none;
+        overflow-y: auto;
+    }
+    .sidebar.mobile-open { display: flex; }
+    .sidebar-tabs { padding: 4px; }
+    .sidebar-tab { padding: 10px; font-size: 14px; }
+    .sidebar-content { padding: 10px; }
+
+    /* Close button for sidebar overlay */
+    .sidebar-close { display: block; position: absolute; top: 8px; right: 12px; background: none; border: none; color: #e94560; font-size: 24px; cursor: pointer; z-index: 51; }
+
+    /* Larger touch targets */
+    .device-row { padding: 12px; }
+    .device-row .name { font-size: 15px; }
+    .device-row .status { font-size: 13px; }
+    .device-row .actions button { padding: 8px 14px; font-size: 13px; border-radius: 6px; }
+    .btn-console { min-width: 70px; }
+
+    .scenario-card { padding: 14px; }
+    .scenario-card .sc-name { font-size: 15px; }
+    .scenario-card .sc-diff { font-size: 13px; }
+    .sc-btn { padding: 8px 14px; font-size: 13px; border-radius: 6px; }
+
+    .add-form input, .add-form select, .add-form button {
+        padding: 10px; font-size: 14px;
+    }
+    .filter-row select { padding: 8px; font-size: 13px; }
+
+    /* Terminal takes bottom */
+    .bottom-pane { height: 45vh; min-height: 200px; }
+    .resize-handle { height: 8px; }
+    .term-header { padding: 4px 8px; }
+    .term-tab { padding: 6px 12px; font-size: 13px; }
+    .term-tab .tab-close { font-size: 14px; padding: 2px 4px; }
+    #terminal-container { padding: 2px 0 8px 0; }
+
+    /* Toast */
+    .toast { bottom: 70px; left: 10px; right: 10px; font-size: 13px; }
+
+    /* Mobile bottom navigation bar — always on top */
+    .mobile-bar {
+        display: flex;
+        background: #16213e;
+        border-top: 1px solid #0f3460;
+        flex-shrink: 0;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 100;
+        height: 52px;
+    }
+    /* Push main content up so it's not hidden behind the fixed bar */
+    .main { padding-bottom: 52px; }
+
+    /* Active scenario banner compact */
+    .active-scenario h3 { font-size: 13px; }
+    .active-scenario p { font-size: 12px; }
+}
+
+/* Extra small phones */
+@media (max-width: 400px) {
+    .header h1 { font-size: 13px; }
+    .bottom-pane { height: 40vh; }
+    .device-row .actions { flex-wrap: wrap; }
+    .term-tab { padding: 4px 8px; font-size: 11px; }
+}
+
+/* Landscape phone */
+@media (max-height: 500px) {
+    #topology { min-height: 120px; }
+    .bottom-pane { height: 50vh; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+    <h1>CISCO LAB</h1>
+    <div class="stats">
+        <span class="running" id="stat-running">0 running</span>
+        <span>|</span>
+        <span id="stat-links">0 links</span>
+        <span>|</span>
+        <span class="ram" id="stat-ram">0 / 32GB</span>
+        <span>|</span>
+        <span id="user-info" style="color:#3498db"></span>
+        <span><button class="topo-btn" onclick="doLogout()" style="padding:3px 8px;font-size:11px;">Logout</button></span>
+    </div>
+    <div class="mobile-nav">
+        <span class="mobile-stats" id="mobile-stats">0 up</span>
+        <button class="topo-btn" onclick="doLogout()" style="padding:3px 8px;font-size:11px;">Out</button>
+    </div>
+</div>
+
+<div class="main">
+    <div class="top-pane">
+        <!-- Topology -->
+        <div id="topology">
+            <div class="topo-overlay">
+                <button class="topo-btn" onclick="refreshTopology()">Refresh</button>
+                <button class="topo-btn" id="btn-auto-refresh" onclick="toggleAutoRefresh()">Auto ●</button>
+            </div>
+            <div id="topology-canvas"></div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="sidebar" id="sidebar">
+            <button class="sidebar-close" onclick="closeSidebar()" style="display:none;">&times;</button>
+            <div class="sidebar-tabs">
+                <div class="sidebar-tab active" data-tab="devices" onclick="switchTab('devices')">Devices</div>
+                <div class="sidebar-tab" data-tab="scenarios" onclick="switchTab('scenarios')">Scenarios</div>
+                <div class="sidebar-tab" data-tab="users" onclick="switchTab('users')">Users</div>
+            </div>
+            <div class="sidebar-content" id="sidebar-content">
+                <!-- Filled by JS -->
+            </div>
+        </div>
+    </div>
+
+    <div class="resize-handle" id="resize-handle"></div>
+
+    <!-- Terminal -->
+    <div class="bottom-pane" id="bottom-pane">
+        <div class="term-header">
+            <div class="term-tabs" id="term-tabs">
+                <span class="term-title" style="margin-right:8px;">Terminal</span>
+                <!-- Tabs injected here by JS -->
+            </div>
+            <div style="display:flex;gap:8px;">
+                <button class="topo-btn" onclick="closeActiveTab()">Close Tab</button>
+            </div>
+        </div>
+        <div id="terminal-container"></div>
+        <div id="scenario-panel" class="scenario-panel" style="display:none;">
+            <!-- Filled by JS -->
+        </div>
+    </div>
+</div>
+
+<!-- Mobile bottom nav -->
+<div class="mobile-bar" id="mobile-bar">
+    <button class="mobile-bar-btn active" onclick="mobileView('topology')" id="mob-topo">
+        <span class="bar-icon">&#9700;</span>Topology
+    </button>
+    <button class="mobile-bar-btn" onclick="mobileView('terminal')" id="mob-term">
+        <span class="bar-icon">&#9641;</span>Terminal
+    </button>
+    <button class="mobile-bar-btn" onclick="mobileView('devices')" id="mob-dev">
+        <span class="bar-icon">&#9881;</span>Devices
+    </button>
+    <button class="mobile-bar-btn" onclick="mobileView('scenarios')" id="mob-scn">
+        <span class="bar-icon">&#9733;</span>Scenarios
+    </button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// --- State ---
+let network = null;
+let autoRefresh = true;
+let refreshInterval = null;
+let currentTab = 'devices';
+let scenarios = [];
+let activeScenario = null;
+let connectedDevice = null;
+let csrfToken = '{{ csrf_token }}';
+
+// CSRF header for all fetch POST/DELETE calls
+const _origFetch = window.fetch;
+window.fetch = function(url, opts = {}) {
+    if (opts.method && opts.method !== 'GET') {
+        opts.headers = opts.headers || {};
+        if (typeof opts.headers === 'object' && !(opts.headers instanceof Headers)) {
+            opts.headers['X-CSRF-Token'] = csrfToken;
+        }
+    }
+    return _origFetch(url, opts).then(r => {
+        if (r.status === 401) window.location.href = '/login';
+        return r;
+    });
+};
+
+// Load user info
+fetch('/api/auth/status').then(r=>r.json()).then(d => {
+    document.getElementById('user-info').textContent = d.username || '';
+    if (d.csrf) csrfToken = d.csrf;
+});
+
+function doLogout() {
+    fetch('/logout', {method:'POST'}).then(() => window.location.href = '/login');
+}
+
+// --- Socket.IO ---
+const socket = io({
+    reconnection: true,
+    reconnectionDelay: 1000,
+    reconnectionAttempts: 10,
+});
+
+socket.on('connect', () => {
+    console.log('Socket connected:', socket.id);
+    // Reconnect all open tabs
+    Object.entries(tabs).forEach(([name, t]) => {
+        socket.emit('connect_device', {name: name, port: t.port, channel: name});
+    });
+});
+
+socket.on('disconnect', reason => {
+    console.log('Socket disconnected:', reason);
+    if (activeTab && tabs[activeTab]) {
+        tabs[activeTab].term.write('\r\n[Socket disconnected — reconnecting...]\r\n');
+    }
+});
+
+// --- Tabbed Terminal ---
+// tabs = { "R1": { term, fitAddon, paneEl, port }, "R2": { ... } }
+const tabs = {};
+let activeTab = null;
+
+const termTheme = {
+    background: '#0a0a1a',
+    foreground: '#e0e0e0',
+    cursor: '#e94560',
+    selectionBackground: '#3498db44',
+};
+
+function createTab(name, port) {
+    if (tabs[name]) {
+        // Already exists, just switch to it
+        switchToTab(name);
+        return;
+    }
+
+    // Create xterm instance
+    const t = new Terminal({
+        theme: termTheme,
+        fontFamily: '"Cascadia Code", "Fira Code", monospace',
+        fontSize: 14,
+        cursorBlink: true,
+        scrollback: 10000,
+        scrollOnUserInput: true,
+    });
+    const fa = new FitAddon.FitAddon();
+    t.loadAddon(fa);
+
+    // Create pane div
+    const pane = document.createElement('div');
+    pane.className = 'term-pane';
+    pane.id = 'term-pane-' + name;
+    document.getElementById('terminal-container').appendChild(pane);
+
+    t.open(pane);
+
+    // Wire input
+    t.onData(data => {
+        if (socket.connected) {
+            socket.emit('terminal_input', {channel: name, data: data});
+        }
+    });
+
+    tabs[name] = {term: t, fitAddon: fa, paneEl: pane, port: port};
+
+    // Connect to device
+    socket.emit('connect_device', {name: name, port: port, channel: name});
+
+    switchToTab(name);
+    renderTabs();
+}
+
+function switchToTab(name) {
+    if (!tabs[name]) return;
+
+    // Hide scenario panel, show terminal container
+    scenarioTabActive = false;
+    document.getElementById('scenario-panel').style.display = 'none';
+    document.getElementById('terminal-container').style.display = '';
+
+    // Hide all panes
+    Object.keys(tabs).forEach(k => {
+        tabs[k].paneEl.classList.remove('active');
+    });
+
+    // Show selected
+    tabs[name].paneEl.classList.add('active');
+    activeTab = name;
+    connectedDevice = name;
+
+    // Fit after showing
+    setTimeout(() => {
+        tabs[name].fitAddon.fit();
+        tabs[name].term.focus();
+    }, 50);
+
+    renderTabs();
+}
+
+function closeTab(name) {
+    const tab = tabs[name];
+    if (!tab) return;
+
+    // Close server-side telnet
+    socket.emit('close_device', {channel: name});
+
+    // Destroy terminal
+    tab.term.dispose();
+    tab.paneEl.remove();
+    delete tabs[name];
+
+    // Switch to another tab or clear
+    const remaining = Object.keys(tabs);
+    if (remaining.length > 0) {
+        switchToTab(remaining[remaining.length - 1]);
+    } else {
+        activeTab = null;
+        connectedDevice = null;
+    }
+
+    renderTabs();
+}
+
+function closeActiveTab() {
+    if (activeTab) closeTab(activeTab);
+}
+
+let scenarioTabActive = false;
+
+function renderTabs() {
+    const container = document.getElementById('term-tabs');
+    let html = '';
+
+    // Scenario tab (always present)
+    html += `<div class="term-tab ${scenarioTabActive ? 'active' : ''}" onclick="showScenarioTab()" style="border-color:${scenarioTabActive ? '#e94560' : '#0f3460'};${scenarioTabActive ? 'color:#e94560;' : ''}">
+        Scenarios
+    </div>`;
+
+    // Device tabs
+    Object.keys(tabs).forEach(name => {
+        const isActive = name === activeTab && !scenarioTabActive;
+        html += `<div class="term-tab ${isActive ? 'active' : ''}" onclick="switchToTab('${name}')">
+            ${name}
+            <span class="tab-close" onclick="event.stopPropagation();closeTab('${name}')">&times;</span>
+        </div>`;
+    });
+
+    container.innerHTML = html;
+}
+
+function showScenarioTab() {
+    scenarioTabActive = true;
+    // Hide all terminal panes
+    Object.keys(tabs).forEach(k => tabs[k].paneEl.classList.remove('active'));
+    // Show scenario panel
+    document.getElementById('scenario-panel').style.display = 'block';
+    document.getElementById('terminal-container').style.display = 'none';
+    renderScenarioPanel();
+    renderTabs();
+}
+
+function hideScenarioTab() {
+    scenarioTabActive = false;
+    document.getElementById('scenario-panel').style.display = 'none';
+    document.getElementById('terminal-container').style.display = '';
+    if (activeTab && tabs[activeTab]) {
+        switchToTab(activeTab);
+    }
+    renderTabs();
+}
+
+let spViewMode = 'list';  // 'list', 'detail', 'active'
+let spSelectedId = null;
+let spCatFilter = '';
+let spDiffFilter = '';
+
+function renderScenarioPanel() {
+    fetch('/api/scenarios').then(r => r.json()).then(data => {
+        const panel = document.getElementById('scenario-panel');
+        const active = data.active;
+        const scenarios = data.scenarios;
+        const activeSc = active ? scenarios.find(s => s.id === active) : null;
+
+        // If there's an active scenario, show it (unless browsing)
+        if (activeSc && spViewMode !== 'list') {
+            spViewMode = 'active';
+        }
+
+        let html = '';
+
+        if (spViewMode === 'active' && activeSc) {
+            // Active scenario view with back button
+            const stars = '\u2605'.repeat(activeSc.difficulty) + '\u2606'.repeat(5 - activeSc.difficulty);
+            html += `
+                <div style="margin-bottom:12px;">
+                    <button onclick="spViewMode='list';renderScenarioPanel()" style="background:#16213e;border:1px solid #0f3460;color:#e0e0e0;padding:8px 14px;border-radius:6px;cursor:pointer;font-size:13px;">\u2190 All Scenarios</button>
+                </div>
+                <div class="sp-title">#${activeSc.id} — ${activeSc.name}</div>
+                <div class="sp-meta">${activeSc.category} | ${stars} | ${activeSc.device_count} device(s)</div>
+                <div class="sp-desc">${activeSc.description}</div>
+                <div class="sp-hint" id="sp-hint"></div>
+                <div class="sp-result" id="sp-result"></div>
+                <div class="sp-actions">
+                    <button style="background:#9b59b6" onclick="spConfigure()">Configure</button>
+                    <button style="background:#f39c12" onclick="spHint()">Hint</button>
+                    <button style="background:#3498db" onclick="spCheck()">Check Fix</button>
+                    <button style="background:#e74c3c" onclick="spStop()">Stop</button>
+                </div>
+                <div style="color:#7f8c8d;font-size:12px;margin-top:12px;">
+                    ${data.completed_count}/${data.total} completed
+                </div>
+            `;
+        } else if (spViewMode === 'detail' && spSelectedId) {
+            // Scenario detail view (before deploying)
+            const s = scenarios.find(sc => sc.id === spSelectedId);
+            if (s) {
+                const stars = '\u2605'.repeat(s.difficulty) + '\u2606'.repeat(5 - s.difficulty);
+                html += `
+                    <div style="margin-bottom:12px;">
+                        <button onclick="spViewMode='list';renderScenarioPanel()" style="background:#16213e;border:1px solid #0f3460;color:#e0e0e0;padding:8px 14px;border-radius:6px;cursor:pointer;font-size:13px;">\u2190 Back</button>
+                    </div>
+                    <div class="sp-title">#${s.id} — ${s.name}</div>
+                    <div class="sp-meta">${s.category} | ${stars} | ${s.device_count} device(s) ${s.completed ? '| \u2713 Completed' : ''}</div>
+                    <div class="sp-desc">${s.description}</div>
+                    <div class="sp-actions">
+                        ${active ? '<div style="color:#e74c3c;font-size:12px;margin-bottom:8px;">Stop current scenario first</div>' : ''}
+                        <button style="background:#2ecc71;${active ? 'opacity:0.5;' : ''}" onclick="${active ? '' : 'spDeploy('+s.id+')'}" ${active ? 'disabled' : ''}>Deploy This Scenario</button>
+                    </div>
+                `;
+            }
+        } else {
+            // Browse list
+            spViewMode = 'list';
+
+            html += `
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+                    <div class="sp-title" style="margin:0;">Scenarios</div>
+                    <div style="color:#7f8c8d;font-size:12px;">${data.completed_count}/${data.total}</div>
+                </div>
+            `;
+
+            // Active scenario banner if exists
+            if (activeSc) {
+                html += `
+                    <div style="background:#2a1a2e;border:1px solid #e94560;border-radius:6px;padding:10px;margin-bottom:10px;cursor:pointer;" onclick="spViewMode='active';renderScenarioPanel()">
+                        <div style="color:#e94560;font-size:13px;font-weight:bold;">Active: #${activeSc.id} — ${activeSc.name}</div>
+                        <div style="color:#7f8c8d;font-size:11px;margin-top:4px;">Tap to view</div>
+                    </div>
+                `;
+            }
+
+            html += `
+                <div style="display:flex;gap:6px;margin-bottom:10px;">
+                    <select id="sp-cat" onchange="spCatFilter=this.value;renderScenarioPanel()" style="flex:1;background:#16213e;border:1px solid #0f3460;color:#e0e0e0;padding:8px;border-radius:4px;font-size:13px;">
+                        <option value="">All categories</option>
+            `;
+            const cats = [...new Set(scenarios.map(s => s.category))];
+            cats.forEach(c => { html += `<option value="${c}" ${c===spCatFilter?'selected':''}>${c}</option>`; });
+            html += `</select>
+                    <select id="sp-diff" onchange="spDiffFilter=this.value;renderScenarioPanel()" style="flex:1;background:#16213e;border:1px solid #0f3460;color:#e0e0e0;padding:8px;border-radius:4px;font-size:13px;">
+                        <option value="">All</option>
+                        <option value="1" ${spDiffFilter==='1'?'selected':''}>\u2605</option>
+                        <option value="2" ${spDiffFilter==='2'?'selected':''}>\u2605\u2605</option>
+                        <option value="3" ${spDiffFilter==='3'?'selected':''}>\u2605\u2605\u2605</option>
+                        <option value="4" ${spDiffFilter==='4'?'selected':''}>\u2605\u2605\u2605\u2605</option>
+                        <option value="5" ${spDiffFilter==='5'?'selected':''}>\u2605\u2605\u2605\u2605\u2605</option>
+                    </select>
+                </div>
+                <div class="sp-browse">
+            `;
+
+            let filtered = scenarios;
+            if (spCatFilter) filtered = filtered.filter(s => s.category === spCatFilter);
+            if (spDiffFilter) filtered = filtered.filter(s => s.difficulty === parseInt(spDiffFilter));
+
+            filtered.forEach(s => {
+                const stars = '\u2605'.repeat(s.difficulty) + '\u2606'.repeat(5 - s.difficulty);
+                const cls = s.completed ? 'sp-card completed' : 'sp-card';
+                html += `
+                    <div class="${cls}" onclick="spSelectedId=${s.id};spViewMode='detail';renderScenarioPanel()">
+                        <div class="sp-card-head">
+                            <span class="sp-card-id">#${s.id}</span>
+                            <span class="sp-card-cat">${s.category}</span>
+                        </div>
+                        <div class="sp-card-name">${s.name} ${s.completed ? '\u2713' : ''}</div>
+                        <div class="sp-card-diff">${stars}</div>
+                    </div>
+                `;
+            });
+
+            html += '</div>';
+        }
+
+        panel.innerHTML = html;
+    });
+}
+
+function spDeploy(id) {
+    if (!confirm('Deploy scenario #' + id + '?')) return;
+    toast('Deploying scenario...', true);
+    fetch('/api/scenarios/' + id + '/start', {method: 'POST'})
+        .then(r => r.json())
+        .then(d => {
+            if (d.ok) {
+                toast('Scenario deployed!', true);
+                spViewMode = 'active';
+                refreshTopology();
+                renderScenarioPanel();
+            } else {
+                toast(d.error, false);
+            }
+        });
+}
+
+function spConfigure() {
+    toast('Pushing configs + injecting fault...', true);
+    fetch('/api/scenarios/configure', {method: 'POST'})
+        .then(r => r.json())
+        .then(d => {
+            toast(d.ok ? 'Configs pushed! Fault injected. Go fix it!' : d.error, d.ok);
+            renderScenarioPanel();
+        });
+}
+
+function spHint() {
+    fetch('/api/scenarios/hint')
+        .then(r => r.json())
+        .then(d => {
+            const el = document.getElementById('sp-hint');
+            if (el) { el.textContent = d.hint; el.style.display = 'block'; }
+        });
+}
+
+function spCheck() {
+    toast('Checking...', true);
+    fetch('/api/scenarios/check', {method: 'POST'})
+        .then(r => r.json())
+        .then(d => {
+            const el = document.getElementById('sp-result');
+            if (el) {
+                el.textContent = d.passed ? 'SOLVED! Well done!' : (d.output || 'Not fixed yet. Keep going!');
+                el.className = 'sp-result ' + (d.passed ? 'pass' : 'fail');
+                el.style.display = 'block';
+            }
+            if (d.passed) toast('SOLVED!', true, 5000);
+            renderScenarioPanel();
+        });
+}
+
+function spStop() {
+    if (!confirm('Stop current scenario?')) return;
+    fetch('/api/scenarios/stop', {method: 'POST'})
+        .then(r => r.json())
+        .then(d => {
+            toast(d.ok ? 'Scenario stopped.' : d.error, d.ok);
+            spViewMode = 'list';
+            refreshTopology();
+            renderScenarioPanel();
+        });
+}
+
+// Route output to correct tab
+socket.on('terminal_output', msg => {
+    const channel = msg.channel;
+    if (channel && tabs[channel]) {
+        tabs[channel].term.write(msg.data);
+    }
+});
+
+renderTabs();
+
+// --- Resize ---
+const resizeHandle = document.getElementById('resize-handle');
+const bottomPane = document.getElementById('bottom-pane');
+let isResizing = false;
+
+resizeHandle.addEventListener('mousedown', e => {
+    isResizing = true;
+    document.addEventListener('mousemove', onResize);
+    document.addEventListener('mouseup', () => {
+        isResizing = false;
+        document.removeEventListener('mousemove', onResize);
+        fitAddon.fit();
+    });
+});
+
+function onResize(e) {
+    if (!isResizing) return;
+    const newHeight = window.innerHeight - e.clientY;
+    if (newHeight > 100 && newHeight < window.innerHeight - 200) {
+        bottomPane.style.height = newHeight + 'px';
+        fitAllTerminals();
+        if (network) network.redraw();
+    }
+}
+
+function fitAllTerminals() {
+    Object.values(tabs).forEach(t => {
+        try { t.fitAddon.fit(); } catch(e) {}
+    });
+}
+
+window.addEventListener('resize', () => { fitAllTerminals(); if (network) network.redraw(); });
+
+// --- Topology ---
+function refreshTopology() {
+    fetch('/api/topology')
+        .then(r => r.json())
+        .then(data => {
+            updateTopology(data);
+            updateStats(data.stats);
+        });
+}
+
+function updateTopology(data) {
+    const container = document.getElementById('topology-canvas');
+
+    if (!network) {
+        const visData = {
+            nodes: new vis.DataSet(data.nodes),
+            edges: new vis.DataSet(data.edges),
+        };
+        const options = {
+            physics: {
+                enabled: true,
+                solver: 'forceAtlas2Based',
+                forceAtlas2Based: { gravitationalConstant: -80, springLength: 200 },
+                stabilization: { iterations: 50 },
+            },
+            interaction: { hover: true, tooltipDelay: 200 },
+            edges: { smooth: { type: 'curvedCW', roundness: 0.1 } },
+        };
+        network = new vis.Network(container, visData, options);
+
+        network.on('click', params => {
+            if (params.nodes.length > 0) {
+                const nodeId = params.nodes[0];
+                const node = data.nodes.find(n => n.id === nodeId);
+                if (node && node.console && node.status === 'started') {
+                    const name = node.label.split('\n')[0];
+                    connectToDevice(name, node.console);
+                }
+            }
+        });
+
+        network.on('doubleClick', params => {
+            if (params.nodes.length > 0) {
+                const nodeId = params.nodes[0];
+                const node = data.nodes.find(n => n.id === nodeId);
+                if (node && node.status !== 'started') {
+                    const name = node.label.split('\n')[0];
+                    startDevice(name);
+                }
+            }
+        });
+    } else {
+        // Update existing
+        const nodeDataSet = network.body.data.nodes;
+        const edgeDataSet = network.body.data.edges;
+
+        // Update nodes
+        const existingIds = nodeDataSet.getIds();
+        const newIds = data.nodes.map(n => n.id);
+
+        // Remove deleted
+        existingIds.filter(id => !newIds.includes(id)).forEach(id => nodeDataSet.remove(id));
+        // Add/update
+        data.nodes.forEach(n => {
+            if (nodeDataSet.get(n.id)) {
+                nodeDataSet.update(n);
+            } else {
+                nodeDataSet.add(n);
+            }
+        });
+
+        // Update edges
+        edgeDataSet.clear();
+        edgeDataSet.add(data.edges);
+    }
+}
+
+function updateStats(stats) {
+    document.getElementById('stat-running').textContent = `${stats.running} running, ${stats.stopped} stopped`;
+    document.getElementById('stat-links').textContent = `${stats.links} links`;
+    document.getElementById('stat-ram').textContent = `${(stats.ram_used / 1024).toFixed(1)} / ${(stats.ram_total / 1024).toFixed(0)} GB`;
+    updateMobileStats(stats);
+}
+
+function toggleAutoRefresh() {
+    autoRefresh = !autoRefresh;
+    const btn = document.getElementById('btn-auto-refresh');
+    if (autoRefresh) {
+        btn.textContent = 'Auto ●';
+        btn.classList.add('active');
+        startAutoRefresh();
+    } else {
+        btn.textContent = 'Auto ○';
+        btn.classList.remove('active');
+        if (refreshInterval) clearInterval(refreshInterval);
+    }
+}
+
+function startAutoRefresh() {
+    if (refreshInterval) clearInterval(refreshInterval);
+    refreshInterval = setInterval(refreshTopology, 5000);
+}
+
+// --- Device Console ---
+function connectToDevice(name, port) {
+    if (!port) { toast('Device has no console port', false); return; }
+    createTab(name, port);
+    // On mobile, switch to terminal view
+    if (mobileMode) {
+        closeSidebar();
+        mobileView('terminal');
+    }
+}
+
+// --- Device Management ---
+function startDevice(name) {
+    fetch(`/api/devices/${name}/start`, {method: 'POST'})
+        .then(r => r.json())
+        .then(d => { toast(d.ok ? `${name} starting...` : d.error, d.ok); refreshTopology(); });
+}
+
+function stopDevice(name) {
+    fetch(`/api/devices/${name}/stop`, {method: 'POST'})
+        .then(r => r.json())
+        .then(d => { toast(d.ok ? `${name} stopped` : d.error, d.ok); refreshTopology(); });
+}
+
+function deleteDevice(name) {
+    if (!confirm(`Delete ${name}?`)) return;
+    fetch(`/api/devices/${name}`, {method: 'DELETE'})
+        .then(r => r.json())
+        .then(d => { toast(d.ok ? `${name} deleted` : d.error, d.ok); refreshTopology(); });
+}
+
+function addDevice() {
+    const name = document.getElementById('add-name').value.trim();
+    const type = document.getElementById('add-type').value;
+    if (!name) return;
+    fetch('/api/devices', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({name, type}),
+    })
+    .then(r => r.json())
+    .then(d => {
+        toast(d.ok ? `${name} created` : d.error, d.ok);
+        document.getElementById('add-name').value = '';
+        refreshTopology();
+        renderDevices();
+    });
+}
+
+function connectIfaces() {
+    const a = document.getElementById('conn-a').value;
+    const a_if = document.getElementById('conn-a-if').value;
+    const b = document.getElementById('conn-b').value;
+    const b_if = document.getElementById('conn-b-if').value;
+    if (a === b) { toast('Cannot connect device to itself', false); return; }
+    fetch('/api/connect', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({a, a_if, b, b_if}),
+    })
+    .then(r => r.json())
+    .then(d => {
+        toast(d.ok ? `Connected ${a} ${a_if} to ${b} ${b_if}` : d.error, d.ok);
+        refreshTopology();
+        renderDevices();
+    });
+}
+
+function disconnectIfaces() {
+    const a = document.getElementById('conn-a').value;
+    const a_if = document.getElementById('conn-a-if').value;
+    const b = document.getElementById('conn-b').value;
+    const b_if = document.getElementById('conn-b-if').value;
+    fetch('/api/disconnect', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({a, a_if, b, b_if}),
+    })
+    .then(r => r.json())
+    .then(d => {
+        toast(d.ok ? `Disconnected ${a} ${a_if} from ${b} ${b_if}` : d.error, d.ok);
+        refreshTopology();
+        renderDevices();
+    });
+}
+
+// --- Sidebar ---
+function switchTab(tab) {
+    currentTab = tab;
+    document.querySelectorAll('.sidebar-tab').forEach(t => t.classList.remove('active'));
+    document.querySelector(`.sidebar-tab[data-tab="${tab}"]`).classList.add('active');
+    renderSidebar();
+}
+
+function renderSidebar() {
+    if (currentTab === 'devices') renderDevices();
+    else if (currentTab === 'scenarios') renderScenarios();
+    else if (currentTab === 'users') renderUsers();
+}
+
+function renderDevices() {
+    fetch('/api/topology').then(r => r.json()).then(data => {
+        const content = document.getElementById('sidebar-content');
+        let html = `
+            <div class="add-form">
+                <input id="add-name" placeholder="Name (e.g. R3)" onkeydown="if(event.key==='Enter')addDevice()">
+                <select id="add-type">
+                    <option value="csr">CSR1000v</option>
+                    <option value="nxos">Nexus</option>
+                </select>
+                <button onclick="addDevice()">Add</button>
+            </div>
+        `;
+
+        data.nodes.forEach(n => {
+            const up = n.status === 'started';
+            const bs = n.boot_status || 'unknown';
+            const ready = bs === 'ready';
+            const deviceName = n.label.split('\n')[0]; // strip boot status from label
+
+            let statusText, statusColor;
+            if (!up) {
+                statusText = '○ stopped';
+                statusColor = 'down';
+            } else if (ready) {
+                statusText = '● ready';
+                statusColor = 'up';
+            } else {
+                statusText = '◌ booting...';
+                statusColor = 'booting';
+            }
+
+            html += `
+                <div class="device-row">
+                    <div>
+                        <div class="name">${deviceName}</div>
+                        <div class="status ${statusColor}">${statusText} — ${n.ram}MB</div>
+                    </div>
+                    <div class="actions">
+                        ${up ? `<button class="btn-console" onclick="connectToDevice('${deviceName}', ${n.console})">${ready ? 'Console' : 'Console (booting)'}</button>` : ''}
+                        ${up ? `<button class="btn-stop" onclick="stopDevice('${deviceName}')">Stop</button>` : `<button class="btn-start" onclick="startDevice('${deviceName}')">Start</button>`}
+                        <button class="btn-delete" onclick="deleteDevice('${deviceName}')">X</button>
+                    </div>
+                </div>
+            `;
+        });
+
+        // Connect / Disconnect interfaces form
+        if (data.nodes.length >= 2) {
+            const deviceNames = data.nodes.map(n => n.label.split('\n')[0]);
+            const ifaces = ['gi1','gi2','gi3','gi4'];
+            const devOpts = deviceNames.map(d => `<option value="${d}">${d}</option>`).join('');
+            const ifOpts = ifaces.map(i => `<option value="${i}">${i}</option>`).join('');
+            html += `
+                <div class="add-form" style="margin-top:10px;border-top:1px solid #0f3460;padding-top:8px;">
+                    <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;">
+                        <select id="conn-a" style="flex:1;min-width:50px;">${devOpts}</select>
+                        <select id="conn-a-if" style="width:55px;">${ifOpts}</select>
+                        <span style="color:#7f8c8d;">to</span>
+                        <select id="conn-b" style="flex:1;min-width:50px;">${devOpts}</select>
+                        <select id="conn-b-if" style="width:55px;">${ifOpts}</select>
+                    </div>
+                    <div style="display:flex;gap:4px;margin-top:4px;">
+                        <button onclick="connectIfaces()" style="flex:1;background:#2ecc71;color:#fff;">Connect</button>
+                        <button onclick="disconnectIfaces()" style="flex:1;background:#e74c3c;color:#fff;">Disconnect</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Show existing links
+        if (data.edges && data.edges.length > 0) {
+            html += '<div style="margin-top:8px;border-top:1px solid #0f3460;padding-top:6px;font-size:11px;color:#7f8c8d;">';
+            html += '<div style="font-weight:bold;margin-bottom:4px;">Links:</div>';
+            data.edges.forEach(e => {
+                html += `<div style="padding:2px 0;">${e.label}</div>`;
+            });
+            html += '</div>';
+        }
+
+        if (data.nodes.length === 0) {
+            html += '<p style="color:#7f8c8d;text-align:center;padding:20px;">No devices yet.<br>Add one above.</p>';
+        }
+        content.innerHTML = html;
+    });
+}
+
+function renderScenarios() {
+    fetch('/api/scenarios').then(r => r.json()).then(data => {
+        scenarios = data.scenarios;
+        activeScenario = data.active;
+        const content = document.getElementById('sidebar-content');
+        const catFilter = document.getElementById('sc-cat-filter')?.value || '';
+        const diffFilter = document.getElementById('sc-diff-filter')?.value || '';
+
+        let filtered = scenarios;
+        if (catFilter) filtered = filtered.filter(s => s.category === catFilter);
+        if (diffFilter) filtered = filtered.filter(s => s.difficulty === parseInt(diffFilter));
+
+        const categories = [...new Set(scenarios.map(s => s.category))];
+
+        let html = `
+            <div style="text-align:center;margin-bottom:8px;color:#7f8c8d;font-size:12px;">
+                ${data.completed_count}/${data.total} completed
+            </div>
+            <div class="filter-row">
+                <select id="sc-cat-filter" onchange="renderScenarios()">
+                    <option value="">All categories</option>
+                    ${categories.map(c => `<option value="${c}" ${c===catFilter?'selected':''}>${c}</option>`).join('')}
+                </select>
+                <select id="sc-diff-filter" onchange="renderScenarios()">
+                    <option value="">All difficulty</option>
+                    <option value="1" ${diffFilter==='1'?'selected':''}>★</option>
+                    <option value="2" ${diffFilter==='2'?'selected':''}>★★</option>
+                    <option value="3" ${diffFilter==='3'?'selected':''}>★★★</option>
+                    <option value="4" ${diffFilter==='4'?'selected':''}>★★★★</option>
+                    <option value="5" ${diffFilter==='5'?'selected':''}>★★★★★</option>
+                </select>
+            </div>
+        `;
+
+        // Active scenario banner
+        if (activeScenario) {
+            const active = scenarios.find(s => s.id === activeScenario);
+            if (active) {
+                html += `
+                    <div class="active-scenario">
+                        <h3>Active: #${active.id} — ${active.name}</h3>
+                        <p>${active.description}</p>
+                        <div class="scenario-actions">
+                            <button class="sc-btn config" onclick="scenarioConfigure()">Configure</button>
+                            <button class="sc-btn hint" onclick="scenarioHint()">Hint</button>
+                            <button class="sc-btn check" onclick="scenarioCheck()">Check Fix</button>
+                            <button class="sc-btn stop" onclick="scenarioStop()">Stop</button>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        filtered.forEach(s => {
+            const stars = '★'.repeat(s.difficulty) + '☆'.repeat(5 - s.difficulty);
+            const classes = ['scenario-card'];
+            if (s.completed) classes.push('completed');
+            if (s.id === activeScenario) classes.push('active');
+
+            html += `
+                <div class="${classes.join(' ')}" onclick="this.classList.toggle('expanded')">
+                    <div class="sc-header">
+                        <span class="sc-id">#${s.id}</span>
+                        <span class="sc-cat">${s.category}</span>
+                    </div>
+                    <div class="sc-name">${s.name} ${s.completed ? '✓' : ''}</div>
+                    <div class="sc-diff">${stars} — ${s.device_count} device(s)</div>
+                    <div class="sc-desc">
+                        <p>${s.description}</p>
+                        ${s.id !== activeScenario ? `<div class="scenario-actions"><button class="sc-btn start" onclick="event.stopPropagation();scenarioStart(${s.id})">Deploy</button></div>` : ''}
+                    </div>
+                </div>
+            `;
+        });
+
+        content.innerHTML = html;
+    });
+}
+
+// --- Scenario Actions ---
+function scenarioStart(id) {
+    toast('Deploying scenario...', true);
+    fetch(`/api/scenarios/${id}/start`, {method: 'POST'})
+        .then(r => r.json())
+        .then(d => {
+            if (d.ok) {
+                toast(`Scenario ${id} deployed! Wait for boot, then click Configure.`, true);
+                refreshTopology();
+                renderScenarios();
+            } else {
+                toast(d.error, false);
+            }
+        });
+}
+
+function scenarioConfigure() {
+    toast('Pushing configs...', true);
+    fetch('/api/scenarios/configure', {method: 'POST'})
+        .then(r => r.json())
+        .then(d => {
+            toast(d.ok ? 'Configs pushed! Fault injected. Go fix it!' : d.error, d.ok);
+            renderScenarios();
+        });
+}
+
+function scenarioHint() {
+    fetch('/api/scenarios/hint')
+        .then(r => r.json())
+        .then(d => toast(d.hint, true, 8000));
+}
+
+function scenarioCheck() {
+    fetch('/api/scenarios/check', {method: 'POST'})
+        .then(r => r.json())
+        .then(d => {
+            if (d.passed) {
+                toast('SOLVED! Well done!', true, 5000);
+            } else {
+                toast(d.output || 'Not fixed yet. Keep going!', false, 5000);
+            }
+            renderScenarios();
+        });
+}
+
+function scenarioStop() {
+    fetch('/api/scenarios/stop', {method: 'POST'})
+        .then(r => r.json())
+        .then(d => {
+            toast(d.ok ? 'Scenario stopped.' : d.error, d.ok);
+            refreshTopology();
+            renderScenarios();
+        });
+}
+
+// --- User Management ---
+function renderUsers() {
+    // Fetch both users and progress in parallel
+    Promise.all([
+        fetch('/api/auth/users').then(r => r.status === 403 ? {users:[], noAdmin:true} : r.json()),
+        fetch('/api/progress').then(r => r.json()).catch(() => ({users:[]})),
+    ]).then(([authData, progressData]) => {
+            const content = document.getElementById('sidebar-content');
+            if (authData.noAdmin) {
+                // Non-admin: show own progress only
+                let html = '<div style="font-size:14px;color:#bdc3c7;margin-bottom:12px;font-weight:bold;">My Progress</div>';
+                (progressData.users || []).forEach(p => {
+                    const pct = p.percent || Math.round(p.completed_count / p.total * 100);
+                    html += `
+                        <div style="background:#16213e;border:1px solid #0f3460;border-radius:6px;padding:12px;margin-bottom:8px;">
+                            <div style="font-size:15px;font-weight:bold;margin-bottom:6px;">${p.completed_count} / ${p.total} scenarios</div>
+                            <div style="background:#1a1a2e;border-radius:4px;height:8px;margin-bottom:8px;">
+                                <div style="background:#2ecc71;height:100%;border-radius:4px;width:${pct}%;"></div>
+                            </div>
+                            <div style="color:#7f8c8d;font-size:12px;">${p.total_attempts || 0} attempts | ${p.total_time_min || 0}m total</div>
+                        </div>
+                    `;
+                });
+                html += `
+                    <div style="margin-top:16px;border-top:1px solid #0f3460;padding-top:12px;">
+                        <div style="font-size:13px;color:#bdc3c7;margin-bottom:8px;">Change My Password</div>
+                        <div class="add-form"><input id="cp-current" type="password" placeholder="current password"></div>
+                        <div class="add-form" style="margin-top:4px;"><input id="cp-new" type="password" placeholder="new password"></div>
+                        <div class="add-form" style="margin-top:4px;">
+                            <input id="cp-confirm" type="password" placeholder="confirm new password">
+                            <button onclick="changeMyPassword()">Change</button>
+                        </div>
+                    </div>
+                `;
+                content.innerHTML = html;
+                return;
+            }
+
+            // Admin view: progress leaderboard + user management
+            const progressMap = {};
+            (progressData.users || []).forEach(p => { progressMap[p.username] = p; });
+
+            let html = '';
+
+            // Leaderboard
+            if (progressData.users && progressData.users.length > 0) {
+                html += '<div style="font-size:14px;color:#bdc3c7;margin-bottom:8px;font-weight:bold;">Progress Leaderboard</div>';
+                progressData.users.forEach((p, i) => {
+                    const pct = p.percent || 0;
+                    const medal = i === 0 ? ' \ud83e\udd47' : i === 1 ? ' \ud83e\udd48' : i === 2 ? ' \ud83e\udd49' : '';
+                    html += `
+                        <div style="background:#16213e;border:1px solid #0f3460;border-radius:6px;padding:10px;margin-bottom:6px;">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                                <span style="font-weight:bold;font-size:14px;">${p.username}${medal}</span>
+                                <span style="color:#2ecc71;font-size:13px;">${p.completed_count}/${p.total} (${pct}%)</span>
+                            </div>
+                            <div style="background:#1a1a2e;border-radius:3px;height:6px;margin-bottom:4px;">
+                                <div style="background:#2ecc71;height:100%;border-radius:3px;width:${pct}%;transition:width 0.5s;"></div>
+                            </div>
+                            <div style="color:#7f8c8d;font-size:11px;">${p.total_attempts || 0} attempts | ${p.total_time_min || 0}m total lab time</div>
+                        </div>
+                    `;
+                });
+                html += '<div style="border-top:1px solid #0f3460;margin:12px 0;"></div>';
+            }
+
+            // User management
+            html += `
+                <div style="margin-bottom:12px;">
+                    <div style="font-size:13px;color:#bdc3c7;margin-bottom:8px;">Create User</div>
+                    <div class="add-form">
+                        <input id="new-username" placeholder="username">
+                        <select id="new-role"><option value="user">User</option><option value="admin">Admin</option></select>
+                    </div>
+                    <div class="add-form" style="margin-top:4px;">
+                        <input id="new-password" type="password" placeholder="password (min 8 chars)">
+                        <button onclick="createUser()">Create</button>
+                    </div>
+                </div>
+                <div style="font-size:13px;color:#bdc3c7;margin-bottom:8px;">Users</div>
+            `;
+
+            (authData.users || []).forEach(u => {
+                const roleColor = u.role === 'admin' ? '#e94560' : '#3498db';
+                const p = progressMap[u.username];
+                const progressText = p ? `${p.completed_count}/${p.total} done` : 'no activity';
+                html += `
+                    <div class="device-row">
+                        <div>
+                            <div class="name">${u.username}</div>
+                            <div class="status" style="color:${roleColor}">${u.role} | ${progressText}</div>
+                        </div>
+                        <div class="actions">
+                            <button class="btn-delete" onclick="deleteUser('${u.username}')">Delete</button>
+                        </div>
+                    </div>
+                `;
+            });
+
+            html += `
+                <div style="margin-top:16px;border-top:1px solid #0f3460;padding-top:12px;">
+                    <div style="font-size:13px;color:#bdc3c7;margin-bottom:8px;">Change My Password</div>
+                    <div class="add-form"><input id="cp-current" type="password" placeholder="current password"></div>
+                    <div class="add-form" style="margin-top:4px;"><input id="cp-new" type="password" placeholder="new password"></div>
+                    <div class="add-form" style="margin-top:4px;">
+                        <input id="cp-confirm" type="password" placeholder="confirm new password">
+                        <button onclick="changeMyPassword()">Change</button>
+                    </div>
+                </div>
+            `;
+
+            content.innerHTML = html;
+        });
+}
+
+function createUser() {
+    const username = document.getElementById('new-username').value.trim();
+    const password = document.getElementById('new-password').value;
+    const role = document.getElementById('new-role').value;
+    if (!username || !password) { toast('Username and password required', false); return; }
+    if (password.length < 8) { toast('Password must be at least 8 characters', false); return; }
+
+    fetch('/api/auth/users', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({username, password, role, _csrf: csrfToken}),
+    })
+    .then(r => r.json())
+    .then(d => {
+        toast(d.ok ? `User '${username}' created` : d.error, d.ok);
+        if (d.ok) {
+            document.getElementById('new-username').value = '';
+            document.getElementById('new-password').value = '';
+            renderUsers();
+        }
+    });
+}
+
+function deleteUser(username) {
+    if (!confirm(`Delete user '${username}'?`)) return;
+    fetch(`/api/auth/users/${username}`, {method: 'DELETE'})
+        .then(r => r.json())
+        .then(d => {
+            toast(d.ok ? `User '${username}' deleted` : d.error, d.ok);
+            renderUsers();
+        });
+}
+
+function changeMyPassword() {
+    const current = document.getElementById('cp-current').value;
+    const newPw = document.getElementById('cp-new').value;
+    const confirm = document.getElementById('cp-confirm').value;
+    if (newPw !== confirm) { toast('Passwords do not match', false); return; }
+    if (newPw.length < 8) { toast('Password must be at least 8 characters', false); return; }
+
+    fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({current, new_password: newPw}),
+    })
+    .then(r => r.json())
+    .then(d => {
+        toast(d.ok ? 'Password changed!' : d.error, d.ok);
+        if (d.ok) {
+            document.getElementById('cp-current').value = '';
+            document.getElementById('cp-new').value = '';
+            document.getElementById('cp-confirm').value = '';
+        }
+    });
+}
+
+// --- Toast ---
+function toast(msg, success, duration = 3000) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = 'toast ' + (success ? 'success' : 'error');
+    el.style.display = 'block';
+    setTimeout(() => { el.style.display = 'none'; }, duration);
+}
+
+// --- Mobile ---
+let mobileMode = false;
+let currentMobileView = 'topology';
+
+function checkMobile() {
+    mobileMode = window.innerWidth <= 768;
+    document.querySelectorAll('.sidebar-close').forEach(el => {
+        el.style.display = mobileMode ? 'block' : 'none';
+    });
+}
+
+function mobileView(view) {
+    if (!mobileMode) return;
+    currentMobileView = view;
+
+    // Update bottom bar
+    document.querySelectorAll('.mobile-bar-btn').forEach(b => b.classList.remove('active'));
+
+    const topo = document.getElementById('topology');
+    const sidebar = document.getElementById('sidebar');
+    const bottomPane = document.getElementById('bottom-pane');
+    const resizeHandle = document.getElementById('resize-handle');
+
+    // Always close sidebar first — prevents getting stuck
+    sidebar.classList.remove('mobile-open');
+    topo.style.display = 'none';
+    bottomPane.style.display = 'none';
+    resizeHandle.style.display = 'none';
+
+    switch(view) {
+        case 'topology':
+            document.getElementById('mob-topo').classList.add('active');
+            topo.style.display = 'block';
+            if (network) setTimeout(() => network.redraw(), 50);
+            break;
+        case 'terminal':
+            document.getElementById('mob-term').classList.add('active');
+            bottomPane.style.display = 'flex';
+            bottomPane.style.height = '100%';
+            bottomPane.style.flex = '1';
+            fitAllTerminals();
+            break;
+        case 'devices':
+            document.getElementById('mob-dev').classList.add('active');
+            sidebar.classList.add('mobile-open');
+            switchTab('devices');
+            break;
+        case 'scenarios':
+            document.getElementById('mob-scn').classList.add('active');
+            sidebar.classList.add('mobile-open');
+            switchTab('scenarios');
+            break;
+    }
+}
+
+function closeSidebar() {
+    document.getElementById('sidebar').classList.remove('mobile-open');
+    mobileView('topology');
+}
+
+function updateMobileStats(stats) {
+    const el = document.getElementById('mobile-stats');
+    if (el) el.textContent = stats.running + ' up | ' + (stats.ram_used/1024).toFixed(1) + 'G';
+}
+
+window.addEventListener('resize', () => {
+    checkMobile();
+    fitAllTerminals();
+    if (network) network.redraw();
+});
+
+checkMobile();
+
+// --- Browser back button handler ---
+window.addEventListener('popstate', (e) => {
+    // Prevent leaving the page — navigate within the app instead
+    if (scenarioTabActive) {
+        if (spViewMode === 'detail') {
+            spViewMode = 'list';
+            renderScenarioPanel();
+        } else if (spViewMode === 'active') {
+            spViewMode = 'list';
+            renderScenarioPanel();
+        } else {
+            hideScenarioTab();
+        }
+    } else if (mobileMode && currentMobileView !== 'topology') {
+        mobileView('topology');
+    }
+    // Push state again so back button keeps working
+    history.pushState({}, '');
+});
+
+// Initial history entry so back button doesn't leave
+history.pushState({}, '');
+
+// --- Init ---
+refreshTopology();
+startAutoRefresh();
+renderDevices();
+</script>
+</body>
+</html>

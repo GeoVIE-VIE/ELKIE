@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ELKIE SOC — Live Sessions</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;600;700&family=Fira+Code:wght@400;500&display=swap');
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: 'Rajdhani', sans-serif;
+    background: #0a0a0f;
+    color: #e0e0e0;
+    min-height: 100vh;
+    overflow-x: hidden;
+}
+
+body::before {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background:
+        linear-gradient(rgba(88, 101, 242, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(88, 101, 242, 0.03) 1px, transparent 1px);
+    background-size: 50px 50px;
+    z-index: -1;
+}
+
+.header {
+    text-align: center;
+    padding: 2rem 1rem 1rem;
+}
+
+.header h1 {
+    font-family: 'Orbitron', monospace;
+    font-size: 2rem;
+    background: linear-gradient(135deg, #57F287, #5865F2);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 0.3rem;
+}
+
+.header p {
+    color: #888;
+    font-size: 1.1rem;
+}
+
+.controls {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 1rem;
+    flex-wrap: wrap;
+}
+
+.controls button {
+    font-family: 'Rajdhani', sans-serif;
+    padding: 0.4rem 1rem;
+    border: 1px solid #333;
+    background: #1a1a2e;
+    color: #ccc;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    transition: all 0.2s;
+}
+
+.controls button:hover, .controls button.active {
+    border-color: #57F287;
+    color: #57F287;
+    background: rgba(87, 242, 135, 0.1);
+}
+
+.back-link {
+    position: absolute;
+    top: 1rem;
+    left: 1rem;
+    color: #5865F2;
+    text-decoration: none;
+    font-size: 1rem;
+}
+
+.back-link:hover { color: #57F287; }
+
+#status {
+    text-align: center;
+    color: #666;
+    padding: 0.5rem;
+    font-size: 0.9rem;
+}
+
+#sessions {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 1rem 2rem;
+}
+
+.session-card {
+    background: #111118;
+    border: 1px solid #222;
+    border-radius: 10px;
+    margin-bottom: 1.5rem;
+    overflow: hidden;
+    transition: border-color 0.2s;
+}
+
+.session-card:hover {
+    border-color: #57F287;
+}
+
+.session-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.8rem 1.2rem;
+    background: rgba(87, 242, 135, 0.05);
+    border-bottom: 1px solid #222;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.session-header .ip {
+    font-family: 'Fira Code', monospace;
+    color: #ED4245;
+    font-size: 1rem;
+}
+
+.session-header .meta {
+    color: #888;
+    font-size: 0.85rem;
+}
+
+.session-header .badge {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.badge.live { background: rgba(87, 242, 135, 0.2); color: #57F287; }
+.badge.ended { background: rgba(136, 136, 136, 0.2); color: #888; }
+.badge.source-cowrie { background: rgba(88, 101, 242, 0.2); color: #5865F2; }
+.badge.source-sac { background: rgba(237, 66, 69, 0.2); color: #ED4245; }
+
+.terminal {
+    background: #0a0a0f;
+    padding: 1rem;
+    font-family: 'Fira Code', monospace;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    color: #00ff41;
+    white-space: pre-wrap;
+    word-break: break-all;
+    max-height: 400px;
+    overflow-y: auto;
+    position: relative;
+}
+
+.terminal::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: repeating-linear-gradient(
+        0deg,
+        rgba(0, 255, 65, 0.02) 0px,
+        transparent 1px,
+        transparent 2px
+    );
+    pointer-events: none;
+}
+
+.terminal .prompt { color: #5865F2; }
+.terminal .cmd { color: #57F287; font-weight: 500; }
+.terminal .output { color: #999; }
+.terminal .timestamp { color: #555; font-size: 0.75rem; }
+
+.empty {
+    text-align: center;
+    color: #555;
+    padding: 4rem 1rem;
+    font-size: 1.2rem;
+}
+
+.empty .big { font-size: 3rem; margin-bottom: 1rem; }
+</style>
+</head>
+<body>
+
+<a href="/" class="back-link">&larr; Back to SOC</a>
+
+<div class="header">
+    <h1>LIVE SESSIONS</h1>
+    <p>Attacker sessions from T-Pot Cowrie and the sacrificial VM honeypot</p>
+</div>
+
+<div class="controls">
+    <button onclick="setRange('1h')" id="btn-1h">1 Hour</button>
+    <button onclick="setRange('6h')" id="btn-6h">6 Hours</button>
+    <button onclick="setRange('24h')" id="btn-24h" class="active">24 Hours</button>
+    <button onclick="setRange('7d')" id="btn-7d">7 Days</button>
+    <button onclick="setRange('30d')" id="btn-30d">30 Days</button>
+    <button onclick="refresh()" style="border-color:#57F287;color:#57F287;">Refresh</button>
+</div>
+
+<div id="status">Loading...</div>
+<div id="sessions"></div>
+
+<script>
+const ES_PROXY = '/api/es/filebeat-*/_search';
+let currentRange = '24h';
+let autoRefreshId = null;
+
+function rangeToMs(r) {
+    const m = r.match(/(\d+)([hd])/);
+    if (!m) return 86400000;
+    const n = parseInt(m[1]);
+    return m[2] === 'h' ? n * 3600000 : n * 86400000;
+}
+
+function setRange(r) {
+    currentRange = r;
+    document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+    const btn = document.getElementById('btn-' + r);
+    if (btn) btn.classList.add('active');
+    refresh();
+}
+
+function esc(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+async function fetchSessions() {
+    const now = Date.now();
+    const from = now - rangeToMs(currentRange);
+    const range = { range: { '@timestamp': { gte: from, lte: now } } };
+
+    // 1. Cowrie sessions with commands (from T-Pot)
+    const cowrieQuery = {
+        size: 0,
+        query: {
+            bool: {
+                must: [range],
+                filter: [
+                    { terms: { 'honeypot.eventid': [
+                        'cowrie.session.connect', 'cowrie.login.success', 'cowrie.login.failed',
+                        'cowrie.command.input', 'cowrie.command.failed',
+                        'cowrie.session.file_download', 'cowrie.session.file_upload',
+                        'cowrie.direct-tcpip.request', 'cowrie.session.closed'
+                    ]}}
+                ]
+            }
+        },
+        aggs: {
+            sessions: {
+                terms: { field: 'session_id', size: 50, order: { max_time: 'desc' } },
+                aggs: {
+                    max_time: { max: { field: '@timestamp' } },
+                    min_time: { min: { field: '@timestamp' } },
+                    events: {
+                        top_hits: {
+                            size: 200,
+                            sort: [{ '@timestamp': 'asc' }],
+                            _source: ['@timestamp', 'honeypot', 'src_ip', 'source.geo', 'command']
+                        }
+                    }
+                }
+            }
+        }
+    };
+
+    // 2. Sacrificial VM successful logins (PAM honeypot)
+    const authQuery = {
+        size: 200,
+        query: {
+            bool: {
+                must: [range, { term: { log_type: 'honeypot_auth' } }, { term: { auth_success: true } }]
+            }
+        },
+        sort: [{ '@timestamp': 'desc' }],
+        _source: ['@timestamp', 'src_ip', 'password', 'username', 'source.geo', 'auth_reason', 'honeypot.password', 'honeypot.username']
+    };
+
+    try {
+        const [cowrieResp, authResp] = await Promise.all([
+            fetch(ES_PROXY, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(cowrieQuery) }),
+            fetch(ES_PROXY, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(authQuery) }),
+        ]);
+        const cowrieData = await cowrieResp.json();
+        const authData = await authResp.json();
+        return {
+            cowrieSessions: cowrieData.aggregations?.sessions?.buckets || [],
+            authHits: (authData.hits?.hits || []).map(h => h._source)
+        };
+    } catch (e) {
+        console.error('ES query failed:', e);
+        return { cowrieSessions: [], authHits: [] };
+    }
+}
+
+function buildCowrieCards(sessions) {
+    let html = '';
+    for (const bucket of sessions) {
+        const hits = bucket.events?.hits?.hits || [];
+        if (hits.length === 0) continue;
+
+        const firstTime = new Date(bucket.min_time?.value);
+        const lastTime = new Date(bucket.max_time?.value);
+        const duration = Math.round((lastTime - firstTime) / 1000);
+        const isRecent = (Date.now() - lastTime.getTime()) < 120000;
+
+        let ip = 'unknown', country = '', user = '?', pass = '?';
+        const commands = [];
+        const downloads = [];
+        const tunnels = [];
+
+        for (const hit of hits) {
+            const s = hit._source;
+            const hp = s.honeypot || {};
+            const eid = hp.eventid || '';
+
+            if (hp.src_ip && ip === 'unknown') ip = hp.src_ip;
+            if (s.src_ip && ip === 'unknown') ip = s.src_ip;
+            if (s.source?.geo?.country_name && !country) country = s.source.geo.country_name;
+
+            if (eid === 'cowrie.login.success') {
+                user = hp.username || '?';
+                pass = hp.password || '?';
+            }
+            if (eid === 'cowrie.command.input' || eid === 'cowrie.command.failed') {
+                const cmd = s.command || hp.input || '';
+                if (cmd) commands.push({ time: s['@timestamp'], cmd });
+            }
+            if (eid === 'cowrie.session.file_download' || eid === 'cowrie.session.file_upload') {
+                downloads.push(hp.url || hp.shasum || hp.destfile || 'file');
+            }
+            if (eid === 'cowrie.direct-tcpip.request') {
+                tunnels.push(`${hp.dst_ip || '?'}:${hp.dst_port || '?'}`);
+            }
+        }
+
+        // Build terminal output
+        let terminal = '';
+        if (commands.length > 0) {
+            for (const c of commands) {
+                const t = new Date(c.time).toLocaleTimeString();
+                terminal += `<span class="timestamp">[${t}]</span> <span class="prompt">root@honeypot:~#</span> <span class="cmd">${esc(c.cmd)}</span>\n`;
+            }
+        }
+        if (downloads.length > 0) {
+            terminal += `\n<span class="timestamp">[downloads]</span> <span class="output">${downloads.map(esc).join('\n')}</span>\n`;
+        }
+        if (tunnels.length > 0) {
+            terminal += `\n<span class="timestamp">[tunnels]</span> <span class="output">${tunnels.map(esc).join(', ')}</span>\n`;
+        }
+
+        const hasActivity = commands.length > 0 || downloads.length > 0 || tunnels.length > 0;
+        const countryTag = country ? ` (${esc(country)})` : '';
+        const source = 'T-Pot Cowrie';
+
+        html += `
+        <div class="session-card">
+            <div class="session-header">
+                <span>
+                    <span class="ip">${esc(ip)}</span><span class="meta">${countryTag}</span>
+                    <span class="meta"> &mdash; ${esc(user)}:<code>${esc(pass)}</code></span>
+                </span>
+                <span>
+                    <span class="badge source-cowrie">${source}</span>
+                    <span class="badge ${isRecent ? 'live' : 'ended'}">${isRecent ? 'LIVE' : 'ENDED'}</span>
+                    <span class="meta">${firstTime.toLocaleString()} &mdash; ${duration}s &mdash; ${commands.length} cmd${commands.length !== 1 ? 's' : ''}</span>
+                </span>
+            </div>
+            ${hasActivity ? `<div class="terminal">${terminal}</div>` : `<div class="terminal"><span class="output">Login only — no commands executed</span></div>`}
+        </div>`;
+    }
+    return html;
+}
+
+function buildAuthCards(authHits) {
+    // Group by IP to consolidate repeated logins
+    const byIp = {};
+    for (const a of authHits) {
+        const ip = a.src_ip || 'unknown';
+        if (!byIp[ip]) byIp[ip] = [];
+        byIp[ip].push(a);
+    }
+
+    let html = '';
+    for (const [ip, logins] of Object.entries(byIp)) {
+        const first = logins[logins.length - 1];
+        const last = logins[0];
+        const firstTime = new Date(first['@timestamp']);
+        const lastTime = new Date(last['@timestamp']);
+        const duration = Math.round((lastTime - firstTime) / 1000);
+        const isRecent = (Date.now() - lastTime.getTime()) < 120000;
+        const country = first.source?.geo?.country_name || '';
+        const countryTag = country ? ` (${esc(country)})` : '';
+
+        // Show credential attempts
+        let terminal = '';
+        const seen = new Set();
+        for (const l of logins) {
+            const u = l.username || l.honeypot?.username || '?';
+            const p = l.password || l.honeypot?.password || '?';
+            const t = new Date(l['@timestamp']).toLocaleTimeString();
+            const reason = l.auth_reason || '';
+            const key = `${u}:${p}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            const reasonTag = reason ? ` <span class="output">(${esc(reason)})</span>` : '';
+            terminal += `<span class="timestamp">[${t}]</span> <span class="prompt">SSH login</span> <span class="cmd">${esc(u)}:${esc(p)}</span>${reasonTag}\n`;
+        }
+
+        html += `
+        <div class="session-card">
+            <div class="session-header">
+                <span>
+                    <span class="ip">${esc(ip)}</span><span class="meta">${countryTag}</span>
+                    <span class="meta"> &mdash; ${logins.length} login(s)</span>
+                </span>
+                <span>
+                    <span class="badge source-sac">Sacrificial VM</span>
+                    <span class="badge ${isRecent ? 'live' : 'ended'}">${isRecent ? 'LIVE' : 'ENDED'}</span>
+                    <span class="meta">${firstTime.toLocaleString()} &mdash; ${duration > 0 ? duration + 's span' : 'single login'}</span>
+                </span>
+            </div>
+            <div class="terminal">${terminal}</div>
+        </div>`;
+    }
+    return html;
+}
+
+function renderSessions(data) {
+    const { cowrieSessions, authHits } = data;
+    const container = document.getElementById('sessions');
+    const status = document.getElementById('status');
+
+    // Filter cowrie sessions that have commands/downloads/tunnels (interesting ones first)
+    const withCmds = cowrieSessions.filter(b => {
+        const hits = b.events?.hits?.hits || [];
+        return hits.some(h => {
+            const eid = h._source.honeypot?.eventid || '';
+            return eid.includes('command') || eid.includes('file_') || eid.includes('tcpip');
+        });
+    });
+    const loginOnly = cowrieSessions.filter(b => !withCmds.includes(b));
+
+    const totalSessions = withCmds.length + loginOnly.length;
+    const totalAuths = authHits.length;
+
+    if (totalSessions === 0 && totalAuths === 0) {
+        container.innerHTML = '<div class="empty"><div class="big">No sessions yet</div>Waiting for attackers to connect...</div>';
+        status.textContent = `No sessions in the last ${currentRange}. Last checked: ${new Date().toLocaleTimeString()}`;
+        return;
+    }
+
+    const parts = [];
+    parts.push(`${withCmds.length} interactive Cowrie session(s)`);
+    parts.push(`${loginOnly.length} login-only Cowrie`);
+    const uniqueIps = new Set(authHits.map(a => a.src_ip)).size;
+    parts.push(`${totalAuths} sacrificial VM login(s) from ${uniqueIps} IP(s)`);
+    status.textContent = `${parts.join(' | ')}. Refreshed: ${new Date().toLocaleTimeString()}. Auto-refresh 30s.`;
+
+    let html = '';
+
+    // Interactive cowrie sessions first (most interesting)
+    if (withCmds.length > 0) html += buildCowrieCards(withCmds);
+
+    // Sacrificial VM logins
+    if (totalAuths > 0) html += buildAuthCards(authHits);
+
+    // Login-only cowrie sessions last
+    if (loginOnly.length > 0) html += buildCowrieCards(loginOnly);
+
+    container.innerHTML = html || '<div class="empty">Data found but nothing to display.</div>';
+}
+
+async function refresh() {
+    document.getElementById('status').textContent = 'Loading...';
+    const data = await fetchSessions();
+    renderSessions(data);
+}
+
+// Auto-refresh every 30s
+function startAutoRefresh() {
+    if (autoRefreshId) clearInterval(autoRefreshId);
+    autoRefreshId = setInterval(refresh, 30000);
+}
+
+refresh();
+startAutoRefresh();
+</script>
+</body>
+</html>
