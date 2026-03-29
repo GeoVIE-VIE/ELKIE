@@ -2702,7 +2702,7 @@ Dynamic Analysis (Sandbox Detonation — {dyn.get('detonation_duration', '?')}s)
   HTTP Requests: {json.dumps(dyn.get('http_requests', [])[:15])}
   JA3 TLS Fingerprints: {json.dumps(dyn.get('ja3_fingerprints', [])[:10])}
   New Files Created: {json.dumps(dyn.get('new_files', [])[:15])}
-  Filesystem Changes: {json.dumps(dyn.get('filesystem_changes', [])[:15])}
+  Filesystem Changes: {json.dumps(dyn.get('filesystem_changes', {}))[:2000]}
   Process Tree (auditd): {json.dumps(dyn.get('process_tree', [])[:15], indent=2)[:2000]}
   Strace File Operations: {json.dumps(strace.get('file_operations', [])[:20])[:1000]}
   Strace Network Operations: {json.dumps(strace.get('network_operations', [])[:15])[:800]}
@@ -2727,13 +2727,23 @@ MalwareBazaar:
   Tags: {mb.get('tags', [])}
 """
 
-        prompt = f"""You are a malware analyst. Analyze the evidence below from a honeypot-captured sample. Your job is to report ONLY what the evidence supports — do not speculate or assume capabilities that are not demonstrated by the data.
+        prompt = f"""You are a senior malware analyst writing a threat intelligence report. Analyze ALL evidence below from a honeypot-captured sample.
 
-RULES:
-- Every claim MUST cite the specific evidence that supports it (e.g. "Classification: miner — strace shows connect() to port 3333, strings contain 'xmrig', capa identifies mining capability")
-- If evidence is ambiguous or missing, say so explicitly — do not fill gaps with assumptions
-- If the 90-second detonation window may have been too short to capture full behavior, note this
-- Distinguish between what the sample DID (observed) vs what it COULD do (static capabilities)
+CRITICAL RULES:
+- USE ALL EVIDENCE PROVIDED. If dynamic analysis data exists (PCAP, strace, connections, DNS, process tree), you MUST analyze it. Saying "no behavioral evidence" when dynamic data is present is WRONG.
+- Every claim MUST cite specific evidence (e.g. "strace shows connect() to 185.x.x.x:4444", "PCAP contains 3 TCP SYN to port 443")
+- Distinguish OBSERVED behavior (what it DID in sandbox) vs STATIC capabilities (what it COULD do based on code)
+- If the 90-second detonation window may have been too short, note what might emerge with longer execution
+
+THREAT HYPOTHESIS — you MUST take a stance on what this is:
+- Is it a reverse shell, botnet implant, loader/dropper, C2 agent, cryptominer, ransomware, or recon tool?
+- State your hypothesis with confidence level and the evidence chain that supports it
+- If evidence is insufficient for a firm classification, state your best hypothesis with caveats
+
+IP/DOMAIN CONTEXT — for every IP or domain found:
+- Note if it's a known Tor exit node, VPN endpoint, bulletproof hosting, or CDN
+- Note the port significance (4444=meterpreter, 3333=mining, 8080=proxy, etc.)
+- Correlate with VT/MB data if available
 
 Provide your response as JSON with these exact keys:
 {{
@@ -2741,10 +2751,11 @@ Provide your response as JSON with these exact keys:
   "confidence": "one of: high, medium, low — with a brief reason (e.g. 'high — VT 45/70, YARA match, observed C2 traffic')",
   "severity": "one of: critical, high, medium, low",
   "malware_family": "specific family name if identifiable from VT/MB/strings/YARA, otherwise 'unknown'",
-  "summary": "evidence-based assessment structured as: 1) What was observed (behavioral evidence), 2) Static capabilities (from capa/strings/Ghidra), 3) Network activity (DNS/connections/TLS/HTTP), 4) IOCs extracted from evidence",
-  "warrants_investigation": "list of specific things that need further analysis — e.g. encrypted strings that could not be decoded, C2 domains needing reputation lookup, functions that were not decompiled, behaviors that may emerge after longer execution, unpacked layers not yet analyzed",
-  "mitre_attack": ["Txx.xxx — technique name — citing evidence"],
-  "yara_rule": "a YARA rule based on concrete strings/bytes observed in this sample, not speculative patterns"
+  "threat_hypothesis": "Your assessment of what this malware IS and what it's designed to do, with evidence chain. Take a stance — e.g. 'This is a Mirai-variant botnet implant: it connects to C2 on port 4444 (common for Mirai), contains /bin/sh string for command execution, and was dropped via SSH brute-force. The C2 IP 185.x.x.x is a known Tor exit node, suggesting anonymized infrastructure.'",
+  "summary": "structured as: 1) BEHAVIORAL (what it DID during detonation — connections made, processes spawned, files created, DNS lookups), 2) STATIC (code capabilities from strings/capa/Ghidra — APIs called, embedded IPs/domains, encryption, persistence mechanisms), 3) NETWORK (all observed traffic — every connection, DNS query, TLS handshake, with protocol and port analysis), 4) IOCs (all extracted indicators with context — IPs with reputation, domains, file paths, mutex names, registry keys, C2 protocols)",
+  "warrants_investigation": ["list of specific actionable items — e.g. 'IP 185.x.x.x needs AbuseIPDB/Shodan lookup for infrastructure mapping', 'encrypted config blob at offset 0x400 needs decryption', 'longer detonation needed to observe beacon interval'"],
+  "mitre_attack": ["Txx.xxx — technique name — citing specific evidence"],
+  "yara_rule": "a YARA rule based on concrete strings/bytes observed in this sample"
 }}
 
 --- EVIDENCE ---
@@ -4407,7 +4418,22 @@ Requirements:
             self.save_state()
             return False
 
-        # Step 4: Claude API threat analysis + YARA rule generation
+        # Step 4: Dynamic analysis FIRST (so LLM sees behavioral data)
+        dynamic = self.detonate_sample(sha256, local_path)
+        if dynamic:
+            results["dynamic_analysis"] = dynamic
+
+        # Step 5: VirusTotal lookup
+        vt_result = self.vt_lookup(sha256)
+        if vt_result:
+            results["virustotal"] = vt_result
+
+        # Step 5.5: MalwareBazaar submission
+        mb_result = self.mb_submit(sha256, local_path, results)
+        if mb_result:
+            results["malwarebazaar"] = mb_result
+
+        # Step 6: Claude API threat analysis — now has dynamic + VT + MB data
         claude_result = self.claude_analyze(results)
         if claude_result:
             results["llm_summary"] = claude_result.get("summary", "")
@@ -4424,21 +4450,8 @@ Requirements:
                 results["malware_family"] = claude_result["malware_family"]
             if claude_result.get("mitre_attack"):
                 results["mitre_attack"] = claude_result["mitre_attack"]
-
-        # Step 5: Dynamic analysis (sandbox detonation)
-        dynamic = self.detonate_sample(sha256, local_path)
-        if dynamic:
-            results["dynamic_analysis"] = dynamic
-
-        # Step 5: VirusTotal lookup
-        vt_result = self.vt_lookup(sha256)
-        if vt_result:
-            results["virustotal"] = vt_result
-
-        # Step 6: MalwareBazaar submission
-        mb_result = self.mb_submit(sha256, local_path, results)
-        if mb_result:
-            results["malwarebazaar"] = mb_result
+            if claude_result.get("threat_hypothesis"):
+                results["threat_hypothesis"] = claude_result["threat_hypothesis"]
 
         # Step 7: Deep Ghidra analysis — MCP interactive (preferred) or batch fallback
         deep = self.ghidra_mcp_analysis(sha256, results)
