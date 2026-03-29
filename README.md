@@ -80,11 +80,14 @@ A full-stack security operations platform running on a Dell R640 (96 cores, 128G
    │              │                   │   │                 │
    │              │  Custom PAM Auth  │   │  YARA, capa     │
    │              │  Per-IP brute sim │   │  floss, strings │
-   │              │  3-100 failures   │   │  UPX 5.0 unpack │
-   │              │  7-day IP memory  │   │  Ghidra (deep)  │
+   │              │  3-100 failures   │   ��  UPX 5.0 unpack │
+   │              │  7-day IP memory  │   │  Ghidra MCP     │
+   │              │                   │   │  (headless HTTP  │
+   │              │  20 fake users    │   │   server for     │
+   │              │  Crypto wallets   │   │   interactive    │
+   │              │                   │   │   RE via Claude) │
    │              │                   │   │  Auto start/stop│
-   │              │  20 fake users    │   │  via Proxmox API│
-   │              │  Crypto wallets   │   └─────────────────┘
+   │              │                   │   │  via Proxmox API│
    │              │  AWS/K8s creds    │
    │              │  Jenkins configs  │   ┌─────────────────┐
    │              │  Webapp .env      │   │    Sandbox      │
@@ -120,16 +123,16 @@ A full-stack security operations platform running on a Dell R640 (96 cores, 128G
 
 Automated malware analysis pipeline — the core of the platform. Orchestrates a 10-step pipeline:
 
-1. **Capture** — Polls ES for Cowrie/Dionaea file events + directory scan fallback + sacrificial VM scan via T-Pot jump host
-2. **Fetch** — Pulls samples from T-Pot (SCP) or sacrificial VM (`ssh+cat` through jump host)
+1. **Capture** — ES file events (Cowrie/Dionaea) + auditd execve monitoring + sacrificial VM filesystem scan + T-Pot directory scan + `/proc/PID/exe` fallback for self-deleting malware
+2. **Fetch** — Pulls samples from T-Pot (SCP) or sacrificial VM (`ssh+cat` through jump host), with `/proc/PID/exe` recovery for deleted binaries
 3. **Static Analysis** — Submits to REMnux via SSH: YARA rules, capa (MITRE ATT&CK mapping), FLOSS (string deobfuscation), UPX 5.0 unpacking, strings extraction
-4. **Deep Ghidra Decompilation** — Scored trigger (>40 points, max 1/day): decompiles top 20 functions by size into readable C code
-5. **Claude API Threat Assessment** — LLM analysis ($0.01/sample): classification, severity, IOCs, TTPs, auto-generated YARA rules
-6. **Dynamic Analysis** — Sandbox VM detonation: restores Proxmox snapshot, uploads sample, executes for 90s, captures pcap + auditd + INetSim DNS logs, restores clean snapshot
-7. **VirusTotal** — Hash lookup for detection ratio and vendor labels
-8. **MalwareBazaar** — Auto-submits novel samples to abuse.ch with classification tags
-9. **MISP/OpenCTI** — Creates events with full IOC set, checks against threat intel feeds
-10. **Reporting** — PDF report generation, Discord webhook alert, Elasticsearch indexing
+4. **Dynamic Analysis** — Sandbox VM detonation: restores Proxmox snapshot, uploads sample, executes for 90s under strace, captures pcap + auditd + filesystem diff + INetSim DNS logs, memory dump via LiME, restores clean snapshot
+5. **VirusTotal + MalwareBazaar** — Hash lookup for detection ratio/vendor labels, auto-submits novel samples to abuse.ch
+6. **Claude API Threat Assessment** — LLM analysis with full behavioral evidence (runs AFTER dynamic analysis): threat hypothesis with evidence chain, IP/domain reputation context, MITRE ATT&CK mapping, auto-generated YARA rules
+7. **Ghidra MCP Interactive Analysis** — Scored trigger (>40 points, max 1/day): Claude autonomously explores binary via Ghidra headless HTTP API — decompiles functions, follows xrefs, traces call chains (15-turn agent loop, ~$0.20/sample)
+8. **MISP/OpenCTI** — Creates events with full IOC set, checks against threat intel feeds
+9. **Reporting** — PDF report, Discord webhook alert, Elasticsearch indexing, Sigma detection rules, ATT&CK Navigator heatmap
+10. **False Positive Filtering** — Persistent allowlist + regex patterns (fake kernel threads, decoy files), 10-min auditd cooldown for repeated detections
 
 ### Sacrificial VM Honeypot
 
@@ -172,7 +175,8 @@ Bash script deployed to REMnux VM:
 
 - **MISP** — Docker deployment with feeds: CIRCL OSINT, Botvrij.eu, abuse.ch URLhaus, Feodo Tracker, MalwareBazaar
 - **OpenCTI** — Graph-based intel with connectors: MISP, MITRE ATT&CK, AbuseIPDB, CVE
-- **Shodan Recon** — Country infrastructure scanning with daily snapshots (Flask dashboard on Kali)
+- **Shodan Recon Dashboard v2** — IP-level host tracking (not counts) with 3x daily readings, intersection averaging to eliminate Shodan's 15-25% variance, Censys Platform API v3 cross-validation, nmap SYN verification of disappeared hosts, automated Discord change summaries
+- **Campaign Clustering** — Groups attacker IPs by shared malware, SSH keys, download URLs, and subnet proximity
 
 ### Supporting Scripts
 
@@ -188,6 +192,30 @@ Bash script deployed to REMnux VM:
 | `ReportIPs.sh` | Reports attacker IPs to AbuseIPDB (cron, every 6h) |
 
 | `shodan_recon.py` | Country infrastructure recon with Shodan API |
+| `campaign_clusterer.py` | Clusters attacker IPs by shared malware/SSH keys/URLs (cron, daily) |
+| `session_correlator.py` | Maps post-login commands to attacker IPs via auditd (cron, 2h) |
+| `ghidra_mcp_server.py` | Jython HTTP server for headless Ghidra MCP — decompile, xrefs, strings |
+
+### Recon Dashboard v2 (`recon-dashboard-v2/`)
+
+Flask app on Kali (192.168.2.160:5000) with IP-level infrastructure tracking:
+
+- **3x daily Shodan collection** (02:00, 10:00, 18:00 UTC) — 7 countries x 12 sectors = 252 queries/day
+- **Intersection averaging** — only hosts seen in 2+ of 3 readings survive consolidation, eliminating Shodan's variance
+- **Censys cross-validation** — Platform API v3 host lookups confirm changes (8/day budget)
+- **Nmap verification** — SYN scan on specific ports for disappeared hosts (10/day budget)
+- **Change detection** — appeared/disappeared/modified with confidence scoring
+- **Discord daily summary** — per-country change report at 20:00 UTC
+- **Threat intel feeds** — 21 RSS sources + GDELT + CISA KEV with bias detection and cross-corroboration
+
+### Cisco Lab (`cisco_lab/`)
+
+GNS3-based networking lab on dedicated VM (192.168.30.10):
+
+- 120 scenarios (CCNA + CCNP): OSPF, BGP, EIGRP, MPLS, VRF, DMVPN, GRE, security hardening
+- `labctl` CLI for scenario management, snapshots, router console access
+- Web UI with mobile-friendly interface
+- CSR1000v routers (R1-R4) with automatic topology configuration
 
 ## Elasticsearch Indices
 
@@ -196,6 +224,8 @@ Bash script deployed to REMnux VM:
 | `.ds-filebeat-8.19.9-*` | 30 days (ILM) | Honeypot raw events + sacrificial VM auth/auditd |
 | `.ds-suricata-*` | 14 days (ILM) | Suricata IDS alerts (46M+ events) |
 | `malware-analysis` | Forever | Analyzed malware samples with full results |
+| `campaign-clusters` | Forever | Attacker campaign groupings |
+| `attacker-sessions` | Forever | Post-login command correlation |
 
 ## Grafana Dashboards
 
@@ -250,7 +280,8 @@ GRAFANA_TOKEN=<token> python3 rebuild_honeypot_dashboard.py
 | Sacrificial VM | 192.168.40.99 | SSH honeypot with PAM auth + decoys |
 | REMnux | 192.168.40.5 | Static malware analysis (auto start/stop) |
 | Sandbox | 192.168.40.6 | Dynamic analysis / detonation (auto snapshot restore) |
-| Kali | 192.168.2.160 | Shodan recon dashboard |
+| Kali | 192.168.2.160 | Shodan recon dashboard v2, threat intel feeds |
+| Cisco Lab | 192.168.30.10 | GNS3 networking lab, 120 scenarios, web UI |
 | Proxmox | 192.168.99.160 | Hypervisor — VM lifecycle via API |
 | pfSense | 192.168.0.1 | Gateway, firewall, NAT, NTP |
 
