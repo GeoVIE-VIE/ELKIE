@@ -149,6 +149,18 @@ else:
 
 SEVERITY_ORDER = {"low": 0, "medium": 1, "high": 2, "critical": 3}
 
+def _safe_hash(h: str) -> str:
+    """Validate and return a SHA256 hash, or raise ValueError. Prevents injection."""
+    h = h.strip()
+    if len(h) == 64 and all(c in '0123456789abcdef' for c in h):
+        return h
+    raise ValueError(f"Invalid SHA256 hash: {h[:20]}...")
+
+def _safe_ip(ip: str) -> str:
+    """Validate and return an IP address. Prevents injection."""
+    import ipaddress
+    return str(ipaddress.ip_address(ip.strip()))
+
 # Auditd false positive patterns — bracket-wrapped names are fake kernel threads,
 # common malware trick to hide in `ps` output.
 _AUDITD_FP_PATTERNS = [
@@ -1149,7 +1161,7 @@ class SampleAnalyzer:
         for sample_dir in TPOT_SAMPLE_DIRS:
             rc, stdout, _ = self._ssh_cmd(
                 self.cfg.tpot_host, self.cfg.tpot_port, self.cfg.tpot_user,
-                f"find {sample_dir} -type f -exec sha256sum {{}} \\; 2>/dev/null | grep '^{sha256}' | head -1",
+                f"find {sample_dir} -type f -exec sha256sum {{}} \\; 2>/dev/null | grep -F {shlex.quote(sha256)} | head -1",
                 password=self._tpot_pass,
                 timeout=30,
             )
@@ -1181,7 +1193,7 @@ class SampleAnalyzer:
         # Also check sacrificial VM (via T-Pot jump host)
         scan_dirs = "/tmp /dev/shm /var/tmp /root /home"
         rc, stdout, _ = self._sacrificial_ssh_cmd(
-            f"find {scan_dirs} -type f -exec sha256sum {{}} \\; 2>/dev/null | grep '^{sha256}' | head -1",
+            f"find {scan_dirs} -type f -exec sha256sum {{}} \\; 2>/dev/null | grep -F {shlex.quote(sha256)} | head -1",
             timeout=30,
         )
         if rc == 0 and sha256 in stdout:
@@ -1198,7 +1210,7 @@ class SampleAnalyzer:
         rc, stdout, _ = self._sacrificial_ssh_cmd(
             "for pid in /proc/[0-9]*/exe; do "
             "  h=$(sha256sum \"$pid\" 2>/dev/null) && "
-            f"  echo \"$h\" | grep -q '^{sha256}' && "
+            f"  echo \"$h\" | grep -qF {shlex.quote(sha256)} && "
             "  echo \"$pid\" && break; "
             "done",
             timeout=30,
@@ -1358,7 +1370,7 @@ class SampleAnalyzer:
             if int(time.time()) % 60 < 15:  # every ~60s
                 rc_check, ps_out, _ = self._ssh_cmd(
                     self.cfg.remnux_host, self.cfg.remnux_port, self.cfg.remnux_user,
-                    f"ps aux | grep 'analyze_sample.*{sha256[:16]}' | grep -v grep | head -1",
+                    f"ps aux | grep -F 'analyze_sample' | grep -F {shlex.quote(sha256[:16])} | grep -v grep | head -1",
                     password=self._remnux_pass, timeout=5,
                 )
                 if rc_check == 0 and ps_out.strip():
@@ -1370,7 +1382,7 @@ class SampleAnalyzer:
         # Check if script is still running — if so, add to pending for catch-up
         rc_check, ps_out, _ = self._ssh_cmd(
             self.cfg.remnux_host, self.cfg.remnux_port, self.cfg.remnux_user,
-            f"ps aux | grep 'analyze_sample.*{sha256[:16]}' | grep -v grep",
+            f"ps aux | grep -F 'analyze_sample' | grep -F {shlex.quote(sha256[:16])} | grep -v grep",
             password=self._remnux_pass, timeout=5,
         )
         if rc_check == 0 and ps_out.strip():
@@ -1437,7 +1449,7 @@ class SampleAnalyzer:
                 # Check if still analyzing (LLM might still be running)
                 rc_ps, ps_out, _ = self._ssh_cmd(
                     self.cfg.remnux_host, self.cfg.remnux_port, self.cfg.remnux_user,
-                    f"ps aux | grep 'analyze_sample.*{sha256[:16]}' | grep -v grep",
+                    f"ps aux | grep -F 'analyze_sample' | grep -F {shlex.quote(sha256[:16])} | grep -v grep",
                     password=self._remnux_pass, timeout=5,
                 )
                 if rc_ps == 0 and ps_out.strip():
@@ -3696,9 +3708,9 @@ Requirements:
             return None
 
         # Step 2: Point DNS to INetSim on REMnux, set up DoT interception
-        dns_ip = self.cfg.remnux_dns_ip
+        dns_ip = _safe_ip(self.cfg.remnux_dns_ip)
         self._sandbox_ssh(
-            f"sudo bash -c 'rm -f /etc/resolv.conf && echo nameserver {dns_ip} > /etc/resolv.conf'",
+            f"sudo bash -c 'rm -f /etc/resolv.conf && echo nameserver {shlex.quote(dns_ip)} > /etc/resolv.conf'",
             timeout=5,
         )
         # Intercept DNS-over-TLS (port 853) — socat strips TLS, forwards to INetSim plain DNS

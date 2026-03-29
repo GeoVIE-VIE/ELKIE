@@ -31,15 +31,23 @@ touch $REPORTED_FILE
 } | sort -u | while read IP; do
 
   [[ -z "$IP" ]] && continue
-  grep -q "$IP" $REPORTED_FILE && continue
+  # Validate IP format — prevents injection into Python code below
+  [[ ! "$IP" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] && continue
+  grep -qF "$IP" "$REPORTED_FILE" && continue
   [[ "$IP" =~ ^192\.168\. ]] && continue
   [[ "$IP" =~ ^10\. ]] && continue
   [[ "$IP" =~ ^172\. ]] && continue
 
   INTEL=$(python3 << PYEOF
-import json, requests
+import json, requests, ipaddress
 
 ip = "$IP"
+# Double-check IP validity inside Python
+try:
+    ipaddress.ip_address(ip)
+except ValueError:
+    print("INVALID_IP")
+    exit(1)
 es = "$ES_URL"
 idx = "$INDEX"
 

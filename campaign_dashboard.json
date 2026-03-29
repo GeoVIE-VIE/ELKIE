@@ -1,363 +1,1099 @@
 {
   "dashboard": {
     "id": null,
-    "uid": "campaign-intel-v2",
+    "uid": "campaign-intel-v3",
     "title": "Campaign Intelligence",
-    "tags": ["campaigns", "honeypot", "threat-intel"],
+    "tags": [
+      "campaigns",
+      "honeypot",
+      "threat-intel"
+    ],
     "timezone": "browser",
     "schemaVersion": 38,
     "version": 1,
     "refresh": "5m",
-    "time": { "from": "now-30d", "to": "now" },
+    "time": {
+      "from": "now-30d",
+      "to": "now"
+    },
     "panels": [
-
       {
         "id": 1,
         "type": "row",
         "title": "Overview",
-        "gridPos": { "x": 0, "y": 0, "w": 24, "h": 1 },
+        "gridPos": {
+          "x": 0,
+          "y": 0,
+          "w": 24,
+          "h": 1
+        },
         "collapsed": false
       },
-
       {
         "id": 2,
         "type": "stat",
         "title": "Total Campaigns",
-        "gridPos": { "x": 0, "y": 1, "w": 6, "h": 4 },
-        "datasource": { "type": "elasticsearch", "uid": "bfhfgdmjeb6kgd" },
-        "targets": [{
-          "refId": "A",
-          "metrics": [{ "type": "count", "id": "1" }],
-          "bucketAggs": [],
-          "query": "*",
-          "timeField": "indexed_at"
-        }],
-        "options": { "reduceOptions": { "calcs": ["sum"] }, "colorMode": "background", "graphMode": "none", "textMode": "auto" },
-        "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] } } }
+        "gridPos": {
+          "x": 0,
+          "y": 1,
+          "w": 6,
+          "h": 4
+        },
+        "datasource": {
+          "type": "elasticsearch",
+          "uid": "bfhfgdmjeb6kgd"
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "metrics": [
+              {
+                "type": "count",
+                "id": "1"
+              }
+            ],
+            "bucketAggs": [],
+            "query": "*",
+            "timeField": "indexed_at"
+          }
+        ],
+        "options": {
+          "reduceOptions": {
+            "calcs": [
+              "sum"
+            ]
+          },
+          "colorMode": "background",
+          "graphMode": "none",
+          "textMode": "auto"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "blue",
+                  "value": null
+                }
+              ]
+            }
+          }
+        }
       },
-
       {
         "id": 3,
         "type": "stat",
         "title": "Clustered IPs",
-        "gridPos": { "x": 6, "y": 1, "w": 6, "h": 4 },
-        "datasource": { "type": "elasticsearch", "uid": "bfhfgdmjeb6kgd" },
-        "targets": [{
-          "refId": "A",
-          "metrics": [{ "type": "sum", "id": "1", "field": "ip_count" }],
-          "bucketAggs": [],
-          "query": "*",
-          "timeField": "indexed_at"
-        }],
-        "options": { "reduceOptions": { "calcs": ["sum"] }, "colorMode": "background", "graphMode": "none", "textMode": "auto" },
-        "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "orange", "value": null }] } } }
+        "gridPos": {
+          "x": 6,
+          "y": 1,
+          "w": 6,
+          "h": 4
+        },
+        "datasource": {
+          "type": "elasticsearch",
+          "uid": "bfhfgdmjeb6kgd"
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "metrics": [
+              {
+                "type": "sum",
+                "id": "1",
+                "field": "ip_count"
+              }
+            ],
+            "bucketAggs": [],
+            "query": "*",
+            "timeField": "indexed_at"
+          }
+        ],
+        "options": {
+          "reduceOptions": {
+            "calcs": [
+              "sum"
+            ]
+          },
+          "colorMode": "background",
+          "graphMode": "none",
+          "textMode": "auto"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "orange",
+                  "value": null
+                }
+              ]
+            }
+          }
+        }
       },
-
       {
         "id": 4,
         "type": "stat",
         "title": "High+ Confidence Campaigns",
-        "gridPos": { "x": 12, "y": 1, "w": 6, "h": 4 },
-        "datasource": { "type": "elasticsearch", "uid": "bfhfgdmjeb6kgd" },
-        "targets": [{
-          "refId": "A",
-          "metrics": [{ "type": "count", "id": "1" }],
-          "bucketAggs": [],
-          "query": "confidence:confirmed OR confidence:high",
-          "timeField": "indexed_at"
-        }],
-        "options": { "reduceOptions": { "calcs": ["sum"] }, "colorMode": "background", "graphMode": "none", "textMode": "auto" },
-        "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }] } } }
+        "gridPos": {
+          "x": 12,
+          "y": 1,
+          "w": 6,
+          "h": 4
+        },
+        "datasource": {
+          "type": "elasticsearch",
+          "uid": "bfhfgdmjeb6kgd"
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "metrics": [
+              {
+                "type": "count",
+                "id": "1"
+              }
+            ],
+            "bucketAggs": [],
+            "query": "confidence:confirmed OR confidence:high",
+            "timeField": "indexed_at"
+          }
+        ],
+        "options": {
+          "reduceOptions": {
+            "calcs": [
+              "sum"
+            ]
+          },
+          "colorMode": "background",
+          "graphMode": "none",
+          "textMode": "auto"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "red",
+                  "value": null
+                }
+              ]
+            }
+          }
+        }
       },
-
       {
         "id": 5,
         "type": "stat",
         "title": "Total Sessions",
-        "gridPos": { "x": 18, "y": 1, "w": 6, "h": 4 },
-        "datasource": { "type": "elasticsearch", "uid": "afhfgdmrsgwe8b" },
-        "targets": [{
-          "refId": "A",
-          "metrics": [{ "type": "count", "id": "1" }],
-          "bucketAggs": [],
-          "query": "*",
-          "timeField": "indexed_at"
-        }],
-        "options": { "reduceOptions": { "calcs": ["sum"] }, "colorMode": "background", "graphMode": "none", "textMode": "auto" },
-        "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] } } }
+        "gridPos": {
+          "x": 18,
+          "y": 1,
+          "w": 6,
+          "h": 4
+        },
+        "datasource": {
+          "type": "elasticsearch",
+          "uid": "afhfgdmrsgwe8b"
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "metrics": [
+              {
+                "type": "count",
+                "id": "1"
+              }
+            ],
+            "bucketAggs": [],
+            "query": "*",
+            "timeField": "indexed_at"
+          }
+        ],
+        "options": {
+          "reduceOptions": {
+            "calcs": [
+              "sum"
+            ]
+          },
+          "colorMode": "background",
+          "graphMode": "none",
+          "textMode": "auto"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                }
+              ]
+            }
+          }
+        }
       },
-
       {
         "id": 10,
         "type": "row",
         "title": "Campaign Table",
-        "gridPos": { "x": 0, "y": 5, "w": 24, "h": 1 },
+        "gridPos": {
+          "x": 0,
+          "y": 5,
+          "w": 24,
+          "h": 1
+        },
         "collapsed": false
       },
-
       {
         "id": 11,
         "type": "table",
         "title": "Campaigns",
-        "gridPos": { "x": 0, "y": 6, "w": 24, "h": 8 },
-        "datasource": { "type": "elasticsearch", "uid": "bfhfgdmjeb6kgd" },
-        "targets": [{
-          "refId": "A",
-          "metrics": [{ "type": "raw_data", "id": "1", "settings": { "size": "100" } }],
-          "bucketAggs": [],
-          "query": "*",
-          "timeField": "indexed_at"
-        }],
-        "options": { "sortBy": [{ "displayName": "last_seen", "desc": true }] },
+        "gridPos": {
+          "x": 0,
+          "y": 6,
+          "w": 24,
+          "h": 8
+        },
+        "datasource": {
+          "type": "elasticsearch",
+          "uid": "bfhfgdmjeb6kgd"
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "metrics": [
+              {
+                "type": "raw_data",
+                "id": "1",
+                "settings": {
+                  "size": "100"
+                }
+              }
+            ],
+            "bucketAggs": [],
+            "query": "*",
+            "timeField": "indexed_at"
+          }
+        ],
+        "options": {
+          "sortBy": [
+            {
+              "displayName": "last_seen",
+              "desc": true
+            }
+          ]
+        },
         "fieldConfig": {
-          "defaults": { "custom": { "filterable": true } },
+          "defaults": {
+            "custom": {
+              "filterable": true
+            }
+          },
           "overrides": [
-            { "matcher": { "id": "byName", "options": "campaign_id" }, "properties": [{ "id": "custom.hidden", "value": true }] },
-            { "matcher": { "id": "byName", "options": "cluster_signals" }, "properties": [{ "id": "custom.hidden", "value": true }] },
-            { "matcher": { "id": "byName", "options": "indexed_at" }, "properties": [{ "id": "custom.hidden", "value": true }] },
-            { "matcher": { "id": "byName", "options": "credentials" }, "properties": [{ "id": "custom.hidden", "value": true }] },
-            { "matcher": { "id": "byName", "options": "download_urls" }, "properties": [{ "id": "custom.hidden", "value": true }] },
-            { "matcher": { "id": "byName", "options": "malware_hashes" }, "properties": [{ "id": "custom.hidden", "value": true }] },
-            { "matcher": { "id": "byName", "options": "ssh_keys_installed" }, "properties": [{ "id": "custom.hidden", "value": true }] },
-            { "matcher": { "id": "byName", "options": "ips" }, "properties": [{ "id": "custom.hidden", "value": true }] },
-            { "matcher": { "id": "byName", "options": "ttps" }, "properties": [{ "id": "custom.hidden", "value": true }] },
-            { "matcher": { "id": "byName", "options": "asns" }, "properties": [{ "id": "custom.hidden", "value": true }] },
-            { "matcher": { "id": "byName", "options": "orgs" }, "properties": [{ "id": "custom.hidden", "value": true }] },
-            { "matcher": { "id": "byName", "options": "summary" }, "properties": [{ "id": "custom.width", "value": 400 }] },
-            { "matcher": { "id": "byName", "options": "campaign_name" }, "properties": [{ "id": "custom.width", "value": 160 }] },
-            { "matcher": { "id": "byName", "options": "confidence" }, "properties": [{ "id": "custom.width", "value": 90 }] },
-            { "matcher": { "id": "byName", "options": "classification" }, "properties": [{ "id": "custom.width", "value": 110 }] },
-            { "matcher": { "id": "byName", "options": "ip_count" }, "properties": [{ "id": "custom.width", "value": 70 }] },
-            { "matcher": { "id": "byName", "options": "session_count" }, "properties": [{ "id": "custom.width", "value": 90 }] },
-            { "matcher": { "id": "byName", "options": "countries" }, "properties": [{ "id": "custom.width", "value": 90 }] }
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "campaign_id"
+              },
+              "properties": [
+                {
+                  "id": "custom.hidden",
+                  "value": true
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "cluster_signals"
+              },
+              "properties": [
+                {
+                  "id": "custom.hidden",
+                  "value": true
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "indexed_at"
+              },
+              "properties": [
+                {
+                  "id": "custom.hidden",
+                  "value": true
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "credentials"
+              },
+              "properties": [
+                {
+                  "id": "custom.hidden",
+                  "value": true
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "download_urls"
+              },
+              "properties": [
+                {
+                  "id": "custom.hidden",
+                  "value": true
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "malware_hashes"
+              },
+              "properties": [
+                {
+                  "id": "custom.hidden",
+                  "value": true
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "ssh_keys_installed"
+              },
+              "properties": [
+                {
+                  "id": "custom.hidden",
+                  "value": true
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "ips"
+              },
+              "properties": [
+                {
+                  "id": "custom.hidden",
+                  "value": true
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "ttps"
+              },
+              "properties": [
+                {
+                  "id": "custom.hidden",
+                  "value": true
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "asns"
+              },
+              "properties": [
+                {
+                  "id": "custom.hidden",
+                  "value": true
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "orgs"
+              },
+              "properties": [
+                {
+                  "id": "custom.hidden",
+                  "value": true
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "summary"
+              },
+              "properties": [
+                {
+                  "id": "custom.width",
+                  "value": 400
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "campaign_name"
+              },
+              "properties": [
+                {
+                  "id": "custom.width",
+                  "value": 160
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "confidence"
+              },
+              "properties": [
+                {
+                  "id": "custom.width",
+                  "value": 90
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "classification"
+              },
+              "properties": [
+                {
+                  "id": "custom.width",
+                  "value": 110
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "ip_count"
+              },
+              "properties": [
+                {
+                  "id": "custom.width",
+                  "value": 70
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "session_count"
+              },
+              "properties": [
+                {
+                  "id": "custom.width",
+                  "value": 90
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "countries"
+              },
+              "properties": [
+                {
+                  "id": "custom.width",
+                  "value": 90
+                }
+              ]
+            }
           ]
         }
       },
-
       {
         "id": 20,
         "type": "row",
         "title": "Classification & Confidence",
-        "gridPos": { "x": 0, "y": 14, "w": 24, "h": 1 },
+        "gridPos": {
+          "x": 0,
+          "y": 14,
+          "w": 24,
+          "h": 1
+        },
         "collapsed": false
       },
-
       {
         "id": 21,
         "type": "piechart",
         "title": "Campaign Classification",
-        "gridPos": { "x": 0, "y": 15, "w": 8, "h": 8 },
-        "datasource": { "type": "elasticsearch", "uid": "bfhfgdmjeb6kgd" },
-        "targets": [{
-          "refId": "A",
-          "metrics": [{ "type": "count", "id": "1" }],
-          "bucketAggs": [{
-            "type": "terms",
-            "field": "classification",
-            "id": "2",
-            "settings": { "size": "10", "order": "desc", "orderBy": "_count" }
-          }],
-          "query": "*",
-          "timeField": "indexed_at"
-        }],
-        "options": { "legend": { "displayMode": "table", "placement": "right" } }
+        "gridPos": {
+          "x": 0,
+          "y": 15,
+          "w": 8,
+          "h": 8
+        },
+        "datasource": {
+          "type": "elasticsearch",
+          "uid": "bfhfgdmjeb6kgd"
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "metrics": [
+              {
+                "type": "count",
+                "id": "1"
+              }
+            ],
+            "bucketAggs": [
+              {
+                "type": "terms",
+                "field": "classification",
+                "id": "2",
+                "settings": {
+                  "size": "10",
+                  "order": "desc",
+                  "orderBy": "_count"
+                }
+              }
+            ],
+            "query": "*",
+            "timeField": "indexed_at"
+          }
+        ],
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "right"
+          }
+        }
       },
-
       {
         "id": 22,
         "type": "piechart",
         "title": "Campaign Confidence",
-        "gridPos": { "x": 8, "y": 15, "w": 8, "h": 8 },
-        "datasource": { "type": "elasticsearch", "uid": "bfhfgdmjeb6kgd" },
-        "targets": [{
-          "refId": "A",
-          "metrics": [{ "type": "count", "id": "1" }],
-          "bucketAggs": [{
-            "type": "terms",
-            "field": "confidence",
-            "id": "2",
-            "settings": { "size": "10", "order": "desc", "orderBy": "_count" }
-          }],
-          "query": "*",
-          "timeField": "indexed_at"
-        }],
-        "options": { "legend": { "displayMode": "table", "placement": "right" } }
+        "gridPos": {
+          "x": 8,
+          "y": 15,
+          "w": 8,
+          "h": 8
+        },
+        "datasource": {
+          "type": "elasticsearch",
+          "uid": "bfhfgdmjeb6kgd"
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "metrics": [
+              {
+                "type": "count",
+                "id": "1"
+              }
+            ],
+            "bucketAggs": [
+              {
+                "type": "terms",
+                "field": "confidence",
+                "id": "2",
+                "settings": {
+                  "size": "10",
+                  "order": "desc",
+                  "orderBy": "_count"
+                }
+              }
+            ],
+            "query": "*",
+            "timeField": "indexed_at"
+          }
+        ],
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "right"
+          }
+        }
       },
-
       {
         "id": 23,
         "type": "barchart",
         "title": "Top Countries (Campaigns)",
-        "gridPos": { "x": 16, "y": 15, "w": 8, "h": 8 },
-        "datasource": { "type": "elasticsearch", "uid": "bfhfgdmjeb6kgd" },
-        "targets": [{
-          "refId": "A",
-          "metrics": [{ "type": "count", "id": "1" }],
-          "bucketAggs": [{
-            "type": "terms",
-            "field": "countries",
-            "id": "2",
-            "settings": { "size": "15", "order": "desc", "orderBy": "_count" }
-          }],
-          "query": "*",
-          "timeField": "indexed_at"
-        }],
+        "gridPos": {
+          "x": 16,
+          "y": 15,
+          "w": 8,
+          "h": 8
+        },
+        "datasource": {
+          "type": "elasticsearch",
+          "uid": "bfhfgdmjeb6kgd"
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "metrics": [
+              {
+                "type": "count",
+                "id": "1"
+              }
+            ],
+            "bucketAggs": [
+              {
+                "type": "terms",
+                "field": "countries",
+                "id": "2",
+                "settings": {
+                  "size": "15",
+                  "order": "desc",
+                  "orderBy": "_count"
+                }
+              }
+            ],
+            "query": "*",
+            "timeField": "indexed_at"
+          }
+        ],
         "options": {
           "xTickLabelRotation": -45,
-          "legend": { "displayMode": "list", "placement": "bottom" }
+          "legend": {
+            "displayMode": "list",
+            "placement": "bottom"
+          }
         }
       },
-
       {
         "id": 30,
         "type": "row",
         "title": "ASNs & Orgs",
-        "gridPos": { "x": 0, "y": 23, "w": 24, "h": 1 },
+        "gridPos": {
+          "x": 0,
+          "y": 23,
+          "w": 24,
+          "h": 1
+        },
         "collapsed": false
       },
-
       {
         "id": 31,
         "type": "barchart",
         "title": "Top ASNs",
-        "gridPos": { "x": 0, "y": 24, "w": 12, "h": 8 },
-        "datasource": { "type": "elasticsearch", "uid": "bfhfgdmjeb6kgd" },
-        "targets": [{
-          "refId": "A",
-          "metrics": [{ "type": "count", "id": "1" }],
-          "bucketAggs": [{
-            "type": "terms",
-            "field": "asns",
-            "id": "2",
-            "settings": { "size": "15", "order": "desc", "orderBy": "_count" }
-          }],
-          "query": "*",
-          "timeField": "indexed_at"
-        }],
+        "gridPos": {
+          "x": 0,
+          "y": 24,
+          "w": 12,
+          "h": 8
+        },
+        "datasource": {
+          "type": "elasticsearch",
+          "uid": "bfhfgdmjeb6kgd"
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "metrics": [
+              {
+                "type": "count",
+                "id": "1"
+              }
+            ],
+            "bucketAggs": [
+              {
+                "type": "terms",
+                "field": "asns",
+                "id": "2",
+                "settings": {
+                  "size": "15",
+                  "order": "desc",
+                  "orderBy": "_count"
+                }
+              }
+            ],
+            "query": "*",
+            "timeField": "indexed_at"
+          }
+        ],
         "options": {
           "xTickLabelRotation": -45,
-          "legend": { "displayMode": "list", "placement": "bottom" }
+          "legend": {
+            "displayMode": "list",
+            "placement": "bottom"
+          }
         }
       },
-
       {
         "id": 32,
         "type": "barchart",
         "title": "Top Orgs",
-        "gridPos": { "x": 12, "y": 24, "w": 12, "h": 8 },
-        "datasource": { "type": "elasticsearch", "uid": "bfhfgdmjeb6kgd" },
-        "targets": [{
-          "refId": "A",
-          "metrics": [{ "type": "count", "id": "1" }],
-          "bucketAggs": [{
-            "type": "terms",
-            "field": "orgs",
-            "id": "2",
-            "settings": { "size": "15", "order": "desc", "orderBy": "_count" }
-          }],
-          "query": "*",
-          "timeField": "indexed_at"
-        }],
+        "gridPos": {
+          "x": 12,
+          "y": 24,
+          "w": 12,
+          "h": 8
+        },
+        "datasource": {
+          "type": "elasticsearch",
+          "uid": "bfhfgdmjeb6kgd"
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "metrics": [
+              {
+                "type": "count",
+                "id": "1"
+              }
+            ],
+            "bucketAggs": [
+              {
+                "type": "terms",
+                "field": "orgs.keyword",
+                "id": "2",
+                "settings": {
+                  "size": "15",
+                  "order": "desc",
+                  "orderBy": "_count"
+                }
+              }
+            ],
+            "query": "*",
+            "timeField": "indexed_at"
+          }
+        ],
         "options": {
           "xTickLabelRotation": -45,
-          "legend": { "displayMode": "list", "placement": "bottom" }
+          "legend": {
+            "displayMode": "list",
+            "placement": "bottom"
+          }
         }
       },
-
       {
         "id": 40,
         "type": "row",
         "title": "Attacker Sessions",
-        "gridPos": { "x": 0, "y": 32, "w": 24, "h": 1 },
+        "gridPos": {
+          "x": 0,
+          "y": 32,
+          "w": 24,
+          "h": 1
+        },
         "collapsed": false
       },
-
       {
         "id": 41,
         "type": "table",
         "title": "Attacker Sessions",
-        "gridPos": { "x": 0, "y": 33, "w": 24, "h": 10 },
-        "datasource": { "type": "elasticsearch", "uid": "afhfgdmrsgwe8b" },
-        "targets": [{
-          "refId": "A",
-          "metrics": [{ "type": "raw_data", "id": "1", "settings": { "size": "200" } }],
-          "bucketAggs": [],
-          "query": "*",
-          "timeField": "indexed_at"
-        }],
-        "options": { "sortBy": [{ "displayName": "login_time", "desc": true }] },
+        "gridPos": {
+          "x": 0,
+          "y": 33,
+          "w": 24,
+          "h": 10
+        },
+        "datasource": {
+          "type": "elasticsearch",
+          "uid": "afhfgdmrsgwe8b"
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "metrics": [
+              {
+                "type": "raw_data",
+                "id": "1",
+                "settings": {
+                  "size": "200"
+                }
+              }
+            ],
+            "bucketAggs": [],
+            "query": "*",
+            "timeField": "indexed_at"
+          }
+        ],
+        "options": {
+          "sortBy": [
+            {
+              "displayName": "login_time",
+              "desc": true
+            }
+          ]
+        },
         "fieldConfig": {
-          "defaults": { "custom": { "filterable": true } },
+          "defaults": {
+            "custom": {
+              "filterable": true
+            }
+          },
           "overrides": [
-            { "matcher": { "id": "byName", "options": "session_id" }, "properties": [{ "id": "custom.hidden", "value": true }] },
-            { "matcher": { "id": "byName", "options": "sshd_pid" }, "properties": [{ "id": "custom.hidden", "value": true }] },
-            { "matcher": { "id": "byName", "options": "indexed_at" }, "properties": [{ "id": "custom.hidden", "value": true }] },
-            { "matcher": { "id": "byName", "options": "executables" }, "properties": [{ "id": "custom.hidden", "value": true }] },
-            { "matcher": { "id": "byName", "options": "credentials_tried" }, "properties": [{ "id": "custom.hidden", "value": true }] },
-            { "matcher": { "id": "byName", "options": "download_urls" }, "properties": [{ "id": "custom.hidden", "value": true }] },
-            { "matcher": { "id": "byName", "options": "attacker_ip" }, "properties": [{ "id": "custom.width", "value": 130 }] },
-            { "matcher": { "id": "byName", "options": "country" }, "properties": [{ "id": "custom.width", "value": 80 }] },
-            { "matcher": { "id": "byName", "options": "org" }, "properties": [{ "id": "custom.width", "value": 200 }] },
-            { "matcher": { "id": "byName", "options": "command_count" }, "properties": [{ "id": "custom.width", "value": 100 }] },
-            { "matcher": { "id": "byName", "options": "behavior_tags" }, "properties": [{ "id": "custom.width", "value": 150 }] },
-            { "matcher": { "id": "byName", "options": "commands" }, "properties": [{ "id": "custom.width", "value": 400 }] }
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "session_id"
+              },
+              "properties": [
+                {
+                  "id": "custom.hidden",
+                  "value": true
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "sshd_pid"
+              },
+              "properties": [
+                {
+                  "id": "custom.hidden",
+                  "value": true
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "indexed_at"
+              },
+              "properties": [
+                {
+                  "id": "custom.hidden",
+                  "value": true
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "executables"
+              },
+              "properties": [
+                {
+                  "id": "custom.hidden",
+                  "value": true
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "credentials_tried"
+              },
+              "properties": [
+                {
+                  "id": "custom.hidden",
+                  "value": true
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "download_urls"
+              },
+              "properties": [
+                {
+                  "id": "custom.hidden",
+                  "value": true
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "attacker_ip"
+              },
+              "properties": [
+                {
+                  "id": "custom.width",
+                  "value": 130
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "country"
+              },
+              "properties": [
+                {
+                  "id": "custom.width",
+                  "value": 80
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "org"
+              },
+              "properties": [
+                {
+                  "id": "custom.width",
+                  "value": 200
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "command_count"
+              },
+              "properties": [
+                {
+                  "id": "custom.width",
+                  "value": 100
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "behavior_tags"
+              },
+              "properties": [
+                {
+                  "id": "custom.width",
+                  "value": 150
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "commands"
+              },
+              "properties": [
+                {
+                  "id": "custom.width",
+                  "value": 400
+                }
+              ]
+            }
           ]
         }
       },
-
       {
         "id": 50,
         "type": "row",
         "title": "Session Breakdown",
-        "gridPos": { "x": 0, "y": 43, "w": 24, "h": 1 },
+        "gridPos": {
+          "x": 0,
+          "y": 43,
+          "w": 24,
+          "h": 1
+        },
         "collapsed": false
       },
-
       {
         "id": 51,
         "type": "barchart",
         "title": "Attacker Countries",
-        "gridPos": { "x": 0, "y": 44, "w": 14, "h": 8 },
-        "datasource": { "type": "elasticsearch", "uid": "afhfgdmrsgwe8b" },
-        "targets": [{
-          "refId": "A",
-          "metrics": [{ "type": "count", "id": "1" }],
-          "bucketAggs": [{
-            "type": "terms",
-            "field": "country",
-            "id": "2",
-            "settings": { "size": "20", "order": "desc", "orderBy": "_count" }
-          }],
-          "query": "*",
-          "timeField": "indexed_at"
-        }],
+        "gridPos": {
+          "x": 0,
+          "y": 44,
+          "w": 14,
+          "h": 8
+        },
+        "datasource": {
+          "type": "elasticsearch",
+          "uid": "afhfgdmrsgwe8b"
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "metrics": [
+              {
+                "type": "count",
+                "id": "1"
+              }
+            ],
+            "bucketAggs": [
+              {
+                "type": "terms",
+                "field": "country",
+                "id": "2",
+                "settings": {
+                  "size": "20",
+                  "order": "desc",
+                  "orderBy": "_count"
+                }
+              }
+            ],
+            "query": "*",
+            "timeField": "indexed_at"
+          }
+        ],
         "options": {
           "xTickLabelRotation": -45,
-          "legend": { "displayMode": "list", "placement": "bottom" }
+          "legend": {
+            "displayMode": "list",
+            "placement": "bottom"
+          }
         }
       },
-
       {
         "id": 52,
         "type": "piechart",
         "title": "Behavior Tags",
-        "gridPos": { "x": 14, "y": 44, "w": 10, "h": 8 },
-        "datasource": { "type": "elasticsearch", "uid": "afhfgdmrsgwe8b" },
-        "targets": [{
-          "refId": "A",
-          "metrics": [{ "type": "count", "id": "1" }],
-          "bucketAggs": [{
-            "type": "terms",
-            "field": "behavior_tags",
-            "id": "2",
-            "settings": { "size": "15", "order": "desc", "orderBy": "_count" }
-          }],
-          "query": "*",
-          "timeField": "indexed_at"
-        }],
-        "options": { "legend": { "displayMode": "table", "placement": "right" } }
+        "gridPos": {
+          "x": 14,
+          "y": 44,
+          "w": 10,
+          "h": 8
+        },
+        "datasource": {
+          "type": "elasticsearch",
+          "uid": "afhfgdmrsgwe8b"
+        },
+        "targets": [
+          {
+            "refId": "A",
+            "metrics": [
+              {
+                "type": "count",
+                "id": "1"
+              }
+            ],
+            "bucketAggs": [
+              {
+                "type": "terms",
+                "field": "behavior_tags",
+                "id": "2",
+                "settings": {
+                  "size": "15",
+                  "order": "desc",
+                  "orderBy": "_count"
+                }
+              }
+            ],
+            "query": "*",
+            "timeField": "indexed_at"
+          }
+        ],
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "right"
+          }
+        }
       }
-
     ]
   },
   "folderId": 0,
