@@ -213,6 +213,57 @@ def generate_report(sample: dict, output_path: Path, styles):
                 elements.append(Spacer(1, 6))
         elements.append(Spacer(1, 6))
 
+    # --- Threat Hypothesis ---
+    hypothesis = sample.get("threat_hypothesis", "")
+    if hypothesis:
+        elements.append(Paragraph("2b. Threat Hypothesis", styles["SectionHeader"]))
+        hypothesis = hypothesis.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        elements.append(Paragraph(hypothesis, styles["ReportBody"]))
+        elements.append(Spacer(1, 6))
+
+    # --- MITRE ATT&CK ---
+    mitre = sample.get("mitre_attack", [])
+    if mitre:
+        elements.append(Paragraph("2c. MITRE ATT&amp;CK Techniques", styles["SectionHeader"]))
+        mitre_data = [["Technique"]]
+        for t in mitre[:15]:
+            t_escaped = str(t).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            mitre_data.append([t_escaped])
+        elements.append(make_table(mitre_data, col_widths=[6.5 * inch]))
+        elements.append(Spacer(1, 6))
+
+    # --- Warrants Investigation ---
+    warrants = sample.get("warrants_investigation", [])
+    if warrants and isinstance(warrants, list):
+        elements.append(Paragraph("2d. Warrants Further Investigation", styles["SectionHeader"]))
+        for w in warrants[:10]:
+            w_escaped = str(w).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            elements.append(Paragraph(f"\u2022 {w_escaped}", styles["ReportBody"]))
+        elements.append(Spacer(1, 6))
+
+    # --- Deep Analysis (Ghidra MCP) ---
+    deep = sample.get("deep_analysis", "")
+    if deep:
+        mode = sample.get("deep_analysis_mode", "batch")
+        score = sample.get("deep_analysis_score", 0)
+        cost = sample.get("deep_analysis_cost", 0)
+        funcs = sample.get("deep_analysis_functions_analyzed", 0)
+        mode_label = "Ghidra MCP Interactive" if mode == "ghidra_mcp_interactive" else "Ghidra Batch"
+        elements.append(Paragraph(f"2e. Deep Code Analysis ({mode_label}, score={score}, ${cost:.2f})", styles["SectionHeader"]))
+        for para in deep.split("\n\n"):
+            para = para.strip()
+            if not para:
+                continue
+            para = para.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            # Detect code blocks (lines starting with spaces/tabs or ```)
+            if para.startswith("```") or para.startswith("    ") or para.startswith("\t"):
+                para = para.replace("```", "").strip()
+                elements.append(Paragraph(para, styles["CodeBlock"]))
+            else:
+                elements.append(Paragraph(para, styles["ReportBody"]))
+            elements.append(Spacer(1, 4))
+        elements.append(Spacer(1, 6))
+
     # --- YARA Matches ---
     yara = sample.get("yara_matches", [])
     elements.append(Paragraph("3. Detection Results", styles["SectionHeader"]))
@@ -323,6 +374,44 @@ def generate_report(sample: dict, output_path: Path, styles):
             elements.append(Paragraph("<b>Files Created:</b>", styles["SubHeader"]))
             file_data = [["File Path"]] + [[truncate(f, 70)] for f in new_files[:15]]
             elements.append(make_table(file_data, col_widths=[6.5 * inch]))
+            elements.append(Spacer(1, 6))
+
+        # Filesystem diff
+        fs_changes = dyn.get("filesystem_changes", {})
+        if fs_changes and isinstance(fs_changes, dict):
+            fs_new = fs_changes.get("new", [])
+            fs_mod = fs_changes.get("modified", [])
+            fs_del = fs_changes.get("deleted", [])
+            if fs_new or fs_mod or fs_del:
+                elements.append(Paragraph("<b>Filesystem Changes:</b>", styles["SubHeader"]))
+                fs_data = [["Type", "Path"]]
+                for f in fs_new[:10]:
+                    fs_data.append(["NEW", truncate(f, 65)])
+                for f in fs_mod[:10]:
+                    fs_data.append(["MODIFIED", truncate(f, 65)])
+                for f in fs_del[:5]:
+                    fs_data.append(["DELETED", truncate(f, 65)])
+                elements.append(make_table(fs_data, col_widths=[1.2 * inch, 5.3 * inch]))
+                elements.append(Spacer(1, 6))
+
+        # Strace summary
+        strace = dyn.get("strace") or {}
+        net_ops = strace.get("network_operations", [])
+        if net_ops:
+            elements.append(Paragraph("<b>Strace Network Operations:</b>", styles["SubHeader"]))
+            net_data = [["PID", "Syscall", "Details"]]
+            for op in net_ops[:15]:
+                net_data.append([op.get("pid", "?"), op.get("syscall", "?"), truncate(op.get("args", op.get("path", "")), 50)])
+            elements.append(make_table(net_data, col_widths=[0.8 * inch, 1.5 * inch, 4.2 * inch]))
+            elements.append(Spacer(1, 6))
+
+        proc_tree = dyn.get("process_tree", [])
+        if proc_tree:
+            elements.append(Paragraph("<b>Process Tree:</b>", styles["SubHeader"]))
+            proc_data = [["PID", "PPID", "Command"]]
+            for p in proc_tree[:15]:
+                proc_data.append([str(p.get("pid", "?")), str(p.get("ppid", "?")), truncate(p.get("cmd", "?"), 55)])
+            elements.append(make_table(proc_data, col_widths=[0.8 * inch, 0.8 * inch, 4.9 * inch]))
 
     # --- IOCs ---
     section_num = (7 if ghidra else 6) if dyn else (6 if ghidra else 5)
