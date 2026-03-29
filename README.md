@@ -17,7 +17,7 @@ A full-stack security operations platform running on a Dell R640 (96 cores, 128G
  VLAN 0        VLAN 2        VLAN 40        VLAN 50        VLAN 99
   LAN           Kali       Honeypot Net   Trusted Net     Mgmt Net
 192.168.0.x   192.168.2.x  192.168.40.x   192.168.50.x   192.168.99.x
-   │              │              │              │              │
+   │              │             │              │              │
    │         ┌────▼────┐        │              │         ┌────▼─────────────┐
    │         │  Kali   │        │              │         │    Proxmox       │
    │         │  .2.160 │        │              │         │  192.168.99.160  │
@@ -60,8 +60,8 @@ A full-stack security operations platform running on a Dell R640 (96 cores, 128G
    │                            │                │
    │                            │        SSH :64295 (key auth)
    │                            │                │
-   │                       ┌────▼────────────────▼──────────┐
-   │                       │       T-Pot (192.168.40.3)      │
+   │                       ┌────▼────────────────▼────────────┐
+   │                       │        T-Pot (192.168.40.3)      │
    │                       │                                  │
    │                       │  Cowrie (SSH :22, shell mode)    │
    │                       │  Dionaea (FTP :21, MySQL :3306)  │
@@ -74,18 +74,18 @@ A full-stack security operations platform running on a Dell R640 (96 cores, 128G
    │                                │           │
    │                         SSH :22│    SSH :22│
    │                                │           │
-   │              ┌─────────────────▼┐   ┌──────▼──────────┐
+   │              ┌─────────────────▼┐    ┌──────▼──────────┐
    │              │  Sacrificial VM   │   │    REMnux       │
    │              │  192.168.40.99    │   │  192.168.40.5   │
    │              │                   │   │                 │
    │              │  Custom PAM Auth  │   │  YARA, capa     │
    │              │  Per-IP brute sim │   │  floss, strings │
-   │              │  3-100 failures   │   ��  UPX 5.0 unpack │
+   │              │  3-100 failures   │   |  UPX 5.0 unpack │
    │              │  7-day IP memory  │   │  Ghidra MCP     │
-   │              │                   │   │  (headless HTTP  │
-   │              │  20 fake users    │   │   server for     │
-   │              │  Crypto wallets   │   │   interactive    │
-   │              │                   │   │   RE via Claude) │
+   │              │                   │   │  (headless HTTP │
+   │              │  20 fake users    │   │   server for    │
+   │              │  Crypto wallets   │   │   interactive   │
+   │              │                   │   │   RE via Claude)│
    │              │                   │   │  Auto start/stop│
    │              │                   │   │  via Proxmox API│
    │              │  AWS/K8s creds    │
@@ -101,11 +101,11 @@ A full-stack security operations platform running on a Dell R640 (96 cores, 128G
    │                                      └─────────────────┘
    │
 ┌──▼──────────────────────┐
-│   Home Network Devices   │
+│   Home Network Devices  │
 │  TrueNAS, IoT, phones,  │
-│  cameras, smart bulbs    │
-│  Suricata IDS monitoring │
-└──────────────────────────┘
+│  cameras, smart bulbs   │
+│  Suricata IDS monitoring│
+└─────────────────────────┘
 ```
 
 ### Network Security Model
