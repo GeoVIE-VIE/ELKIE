@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ELKIE SOC — Live Attack Map</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0e17;color:#e0e0e0;font-family:'Segoe UI',system-ui,sans-serif;overflow:hidden}
+#map{width:100vw;height:100vh}
+
+.overlay{position:absolute;z-index:1000;pointer-events:none}
+.overlay *{pointer-events:auto}
+
+.title-bar{top:0;left:0;right:0;display:flex;justify-content:space-between;align-items:center;padding:10px 20px;background:linear-gradient(180deg,rgba(10,14,23,0.95),rgba(10,14,23,0.7),transparent)}
+.title-bar h1{font-size:18px;color:#fff;letter-spacing:1px}
+.title-bar h1 span{color:#ED4245}
+.live-dot{display:inline-block;width:8px;height:8px;background:#57F287;border-radius:50%;margin-right:6px;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+
+.stats-bar{top:50px;left:20px;display:flex;flex-direction:column;gap:6px}
+.stat-pill{background:rgba(17,24,39,0.9);border:1px solid #1f2937;border-radius:8px;padding:8px 14px;font-size:12px;backdrop-filter:blur(10px)}
+.stat-pill .v{font-size:20px;font-weight:700}
+.stat-pill .l{color:#888;font-size:10px;text-transform:uppercase}
+
+.legend{bottom:30px;left:20px;background:rgba(17,24,39,0.9);border:1px solid #1f2937;border-radius:8px;padding:12px;backdrop-filter:blur(10px)}
+.legend-item{display:flex;align-items:center;gap:8px;margin:4px 0;font-size:11px}
+.legend-dot{width:10px;height:10px;border-radius:50%}
+
+.feed{bottom:30px;right:20px;width:360px;max-height:50vh;overflow-y:auto;background:rgba(17,24,39,0.9);border:1px solid #1f2937;border-radius:8px;padding:10px;backdrop-filter:blur(10px)}
+.feed h3{font-size:11px;color:#888;text-transform:uppercase;margin-bottom:6px;letter-spacing:1px}
+.feed-item{font-size:11px;padding:4px 0;border-bottom:1px solid #0f1520;font-family:monospace;display:flex;gap:6px;align-items:center}
+.feed-item .proto{font-weight:700;font-size:10px;padding:1px 5px;border-radius:3px;min-width:36px;text-align:center}
+.feed-item .ip{color:#ED4245}
+.feed-item .detail{color:#888;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.feed-item .country{color:#57F287;font-size:10px}
+.feed-item .time{color:#555;font-size:9px}
+
+.controls{top:50px;right:20px;display:flex;flex-direction:column;gap:4px}
+.controls button{background:rgba(17,24,39,0.9);border:1px solid #333;color:#ccc;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:11px;backdrop-filter:blur(10px);font-family:inherit}
+.controls button:hover,.controls button.active{border-color:#57F287;color:#57F287}
+.controls select{background:rgba(17,24,39,0.9);border:1px solid #333;color:#ccc;padding:6px;border-radius:6px;font-size:11px}
+
+.back{position:absolute;top:12px;left:12px;z-index:1001;color:#5865F2;text-decoration:none;font-size:13px}
+.back:hover{color:#57F287}
+</style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<a href="/" class="back">&larr; SOC</a>
+
+<div class="overlay title-bar">
+    <h1><span class="live-dot"></span> <span>ELKIE</span> — Live Attack Map</h1>
+    <div id="clock" style="color:#666;font-size:12px;font-family:monospace"></div>
+</div>
+
+<div class="overlay stats-bar" id="stats"></div>
+
+<div class="overlay legend">
+    <div class="legend-item"><div class="legend-dot" style="background:#ED4245"></div> SSH</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#57F287"></div> HTTP</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#5865F2"></div> TLS/HTTPS</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#FEE75C"></div> DNS</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#FE8D2F"></div> Alert/IDS</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#E040FB"></div> Other</div>
+</div>
+
+<div class="overlay feed" id="feed">
+    <h3>Live Feed</h3>
+</div>
+
+<div class="overlay controls">
+    <button onclick="setRange('1m')" id="btn-1m">1 Min</button>
+    <button onclick="setRange('5m')" id="btn-5m" class="active">5 Min</button>
+    <button onclick="setRange('15m')" id="btn-15m">15 Min</button>
+    <button onclick="setRange('1h')" id="btn-1h">1 Hour</button>
+    <button onclick="setRange('6h')" id="btn-6h">6 Hours</button>
+    <button onclick="setRange('24h')" id="btn-24h">24 Hours</button>
+    <select id="proto-filter" onchange="refresh()">
+        <option value="">All Protocols</option>
+        <option value="ssh">SSH</option>
+        <option value="http">HTTP</option>
+        <option value="tls">TLS/HTTPS</option>
+        <option value="dns">DNS</option>
+        <option value="alert">Alerts</option>
+        <option value="flow">Flows</option>
+    </select>
+    <select id="ip-filter" onchange="refresh()">
+        <option value="">All Honeypot IPs</option>
+    </select>
+</div>
+
+<script>
+// Honeypot location (Auburn, Maine)
+const HOME = [44.0978, -70.2311];
+
+const COLORS = {
+    ssh: '#ED4245', http: '#57F287', tls: '#5865F2',
+    dns: '#FEE75C', alert: '#FE8D2F', flow: '#E040FB',
+    netflow: '#E040FB', anomaly: '#FE8D2F', default: '#E040FB'
+};
+
+const map = L.map('map', {
+    center: [25, 0], zoom: 2, minZoom: 2, maxZoom: 8,
+    zoomControl: false, attributionControl: false,
+    worldCopyJump: true
+});
+
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    subdomains: 'abcd', maxZoom: 19
+}).addTo(map);
+
+// Home marker
+L.circleMarker(HOME, {
+    radius: 8, fillColor: '#57F287', color: '#57F287',
+    weight: 2, fillOpacity: 0.8
+}).addTo(map).bindTooltip('ELKIE Honeypot — Auburn, ME', {permanent: false, className: 'tooltip-dark'});
+
+const ES = '/api/es/.ds-suricata-*/_search';
+let range = '5m';
+let arcs = [];
+let markers = [];
+let feedItems = [];
+
+function setRange(r) {
+    range = r;
+    document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+    const btn = document.getElementById('btn-' + r);
+    if (btn) btn.classList.add('active');
+    refresh();
+}
+
+function getColor(eventType) { return COLORS[eventType] || COLORS.default; }
+
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// Animated arc using polyline with gradient effect
+function drawArc(from, to, color, eventType, info, age) {
+    // Create curved path
+    const midLat = (from[0] + to[0]) / 2;
+    const midLng = (from[1] + to[1]) / 2;
+    const dist = Math.sqrt(Math.pow(from[0]-to[0], 2) + Math.pow(from[1]-to[1], 2));
+    const curve = Math.min(dist * 0.3, 20);
+    const offsetLat = midLat + curve;
+    const offsetLng = midLng;
+
+    const points = [];
+    for (let t = 0; t <= 1; t += 0.05) {
+        const lat = (1-t)*(1-t)*from[0] + 2*(1-t)*t*offsetLat + t*t*to[0];
+        const lng = (1-t)*(1-t)*from[1] + 2*(1-t)*t*offsetLng + t*t*to[1];
+        points.push([lat, lng]);
+    }
+
+    const isLive = age < 120000; // within 2 minutes = live
+
+    const line = L.polyline(points, {
+        color: color,
+        weight: isLive ? 2 : 1,
+        opacity: isLive ? 0.8 : 0.15,
+        dashArray: isLive ? '6 12' : '2 6',
+        className: isLive ? 'arc-live' : 'arc-dead'
+    }).addTo(map);
+
+    // Source marker (attacker)
+    const marker = L.circleMarker(from, {
+        radius: isLive ? 5 : 3,
+        fillColor: color, color: color,
+        weight: isLive ? 2 : 1,
+        fillOpacity: isLive ? 0.9 : 0.2
+    }).addTo(map);
+
+    if (info) {
+        marker.bindTooltip(info, {className: 'tooltip-dark'});
+    }
+
+    arcs.push(line);
+    markers.push(marker);
+
+    // Pulse on arrival for live connections
+    if (isLive) {
+        const pulse = L.circleMarker(to, {
+            radius: 6, fillColor: color, color: color,
+            weight: 2, fillOpacity: 0.9, className: 'pulse-marker'
+        }).addTo(map);
+        markers.push(pulse);
+    }
+}
+
+function clearMap() {
+    arcs.forEach(a => map.removeLayer(a));
+    markers.forEach(m => map.removeLayer(m));
+    arcs = [];
+    markers = [];
+}
+
+function addFeedItem(time, proto, srcIp, country, detail) {
+    const color = getColor(proto);
+    const item = `<div class="feed-item">
+        <span class="time">${time}</span>
+        <span class="proto" style="background:${color}22;color:${color};border:1px solid ${color}44">${proto.toUpperCase()}</span>
+        <span class="ip">${esc(srcIp)}</span>
+        <span class="country">${esc(country)}</span>
+        <span class="detail">${esc(detail)}</span>
+    </div>`;
+    feedItems.unshift(item);
+    if (feedItems.length > 50) feedItems = feedItems.slice(0, 50);
+}
+
+async function refreshIPFilter() {
+    try {
+        const r = await fetch(ES, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                size: 0,
+                query: { bool: { must: [
+                    { range: { '@timestamp': { gte: 'now-6h' } } },
+                    { term: { in_iface: 'ix1.40' } },
+                    { prefix: { dest_ip: '192.168.40.' } }
+                ]}},
+                aggs: { ips: { terms: { field: 'dest_ip', size: 20 } } }
+            })
+        });
+        const data = await r.json();
+        const sel = document.getElementById('ip-filter');
+        const current = sel.value;
+        sel.innerHTML = '<option value="">All Honeypot IPs</option>';
+        for (const b of (data.aggregations?.ips?.buckets || [])) {
+            const opt = document.createElement('option');
+            opt.value = b.key;
+            opt.textContent = `${b.key} (${b.doc_count})`;
+            if (b.key === current) opt.selected = true;
+            sel.appendChild(opt);
+        }
+    } catch(e) {}
+}
+
+async function refresh() {
+    const protoFilter = document.getElementById('proto-filter').value;
+    const ipFilterVal = document.getElementById('ip-filter').value;
+
+    // For longer ranges, use aggregations instead of raw hits
+    const isLong = ['6h', '24h'].includes(range);
+    const maxHits = isLong ? 200 : 100;
+
+    const must = [
+        { range: { '@timestamp': { gte: `now-${range}` } } },
+        { term: { in_iface: 'ix1.40' } },
+        { exists: { field: 'source.geo.location' } },
+        { bool: { must_not: [{ prefix: { src_ip: '192.168.' } }] } }
+    ];
+
+    if (ipFilterVal) {
+        must.push({ term: { dest_ip: ipFilterVal } });
+    }
+
+    if (protoFilter) {
+        must.push({ term: { event_type: protoFilter } });
+    } else {
+        must.push({ terms: { event_type: ['ssh', 'http', 'tls', 'dns', 'alert', 'flow'] } });
+    }
+
+    try {
+        const r = await fetch(ES, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                size: maxHits,
+                query: { bool: { must } },
+                sort: [{ '@timestamp': 'desc' }],
+                _source: ['@timestamp', 'event_type', 'src_ip', 'dest_ip', 'dest_port',
+                          'source.geo.location', 'source.geo.country_name', 'source.geo.city_name',
+                          'http.hostname', 'http.url', 'tls.sni', 'dns.rrname',
+                          'alert.signature', 'ssh.client.software_version',
+                          'flow.bytes_toserver', 'flow.bytes_toclient']
+            })
+        });
+        const data = await r.json();
+
+        clearMap();
+        feedItems = [];
+
+        const hits = data.hits?.hits || [];
+        let totalBytes = 0;
+        const countries = {};
+        const protocols = {};
+
+        // Process newest first but draw oldest first (so newest are on top)
+        const reversed = [...hits].reverse();
+
+        for (const h of reversed) {
+            const s = h._source;
+            const geo = s.source?.geo;
+            if (!geo?.location) continue;
+
+            const from = [geo.location.lat, geo.location.lon];
+            const et = s.event_type;
+            const color = getColor(et);
+            const country = geo.country_name || '?';
+            const city = geo.city_name || '';
+            const srcIp = s.src_ip;
+            const destPort = s.dest_port || '';
+            const time = new Date(s['@timestamp']).toLocaleTimeString();
+
+            countries[country] = (countries[country] || 0) + 1;
+            protocols[et] = (protocols[et] || 0) + 1;
+
+            if (s.flow) {
+                totalBytes += (s.flow.bytes_toserver || 0) + (s.flow.bytes_toclient || 0);
+            }
+
+            // Build detail string
+            let detail = `:${destPort}`;
+            if (s.http?.hostname) detail = `${s.http.hostname}${s.http.url || ''}`.substring(0, 60);
+            else if (s.tls?.sni) detail = s.tls.sni;
+            else if (s.dns?.rrname) detail = s.dns.rrname;
+            else if (s.alert?.signature) detail = s.alert.signature.substring(0, 50);
+            else if (s.ssh?.client?.software_version) detail = s.ssh.client.software_version;
+
+            const info = `${srcIp} (${city ? city + ', ' : ''}${country})<br>${et.toUpperCase()} → :${destPort}<br>${detail}`;
+            const eventAge = Date.now() - new Date(s['@timestamp']).getTime();
+
+            drawArc(from, HOME, color, et, info, eventAge);
+            addFeedItem(time, et, srcIp, country, detail);
+        }
+
+        // Stats
+        const topCountry = Object.entries(countries).sort((a,b) => b[1]-a[1])[0];
+        const statsHtml = `
+            <div class="stat-pill"><div class="v" style="color:#ED4245">${hits.length}</div><div class="l">Attacks</div></div>
+            <div class="stat-pill"><div class="v" style="color:#FE8D2F">${Object.keys(countries).length}</div><div class="l">Countries</div></div>
+            <div class="stat-pill"><div class="v" style="color:#57F287">${topCountry ? topCountry[0] : '-'}</div><div class="l">Top Origin</div></div>
+            <div class="stat-pill"><div class="v" style="color:#5865F2">${Object.entries(protocols).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`${v} ${k}`).slice(0,2).join(', ')}</div><div class="l">Protocols</div></div>
+        `;
+        document.getElementById('stats').innerHTML = statsHtml;
+
+        // Feed
+        document.getElementById('feed').innerHTML = '<h3>Live Feed</h3>' + feedItems.join('');
+
+    } catch(e) {
+        console.error('Query failed:', e);
+    }
+}
+
+// Clock
+setInterval(() => {
+    document.getElementById('clock').textContent = new Date().toLocaleTimeString();
+}, 1000);
+
+// Auto-refresh
+refreshIPFilter();
+refresh();
+setInterval(refresh, 10000);
+setInterval(refreshIPFilter, 60000);
+</script>
+
+<style>
+.arc-live {
+    animation: dash-flow 1s linear infinite !important;
+}
+@keyframes dash-flow {
+    to { stroke-dashoffset: -18; }
+}
+.pulse-marker {
+    animation: pulse-ring 1.5s ease-out infinite;
+}
+@keyframes pulse-ring {
+    0% { stroke-width: 2; stroke-opacity: 0.9; }
+    100% { stroke-width: 12; stroke-opacity: 0; }
+}
+.arc-dead {
+    opacity: 0.15 !important;
+    animation: none !important;
+    stroke-dasharray: 2 8 !important;
+}
+.tooltip-dark {
+    background: rgba(17,24,39,0.95) !important;
+    border: 1px solid #333 !important;
+    color: #e0e0e0 !important;
+    font-family: monospace !important;
+    font-size: 11px !important;
+    padding: 6px 10px !important;
+    border-radius: 6px !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5) !important;
+}
+.tooltip-dark::before { border-top-color: #333 !important; }
+.leaflet-container { background: #0a0e17 !important; }
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+</style>
+</body>
+</html>

@@ -261,7 +261,7 @@ async function fetchSessions() {
                     min_time: { min: { field: '@timestamp' } },
                     events: {
                         top_hits: {
-                            size: 200,
+                            size: 100,
                             sort: [{ '@timestamp': 'asc' }],
                             _source: ['@timestamp', 'honeypot', 'src_ip', 'source.geo', 'command']
                         }
@@ -276,27 +276,77 @@ async function fetchSessions() {
         size: 200,
         query: {
             bool: {
-                must: [range, { term: { log_type: 'honeypot_auth' } }, { term: { auth_success: true } }]
+                must: [range, { term: { honeypot_event: 'ssh_auth' } }, { term: { auth_success: true } }]
             }
         },
         sort: [{ '@timestamp': 'desc' }],
         _source: ['@timestamp', 'src_ip', 'password', 'username', 'source.geo', 'auth_reason', 'honeypot.password', 'honeypot.username']
     };
 
+    // 3. Attacker sessions with post-login commands (from session_correlator)
+    const sessionsQuery = {
+        size: 100,
+        query: {
+            bool: {
+                must: [{ range: { login_time: { gte: `now-${currentRange}` } } }]
+            }
+        },
+        sort: [{ login_time: 'desc' }],
+        _source: ['attacker_ip', 'country', 'org', 'login_time', 'session_duration_sec',
+                   'commands', 'command_count', 'credentials_tried', 'download_urls',
+                   'executables', 'behavior_tags', 'ssh_keys_installed', 'cron_modified',
+                   'rootkit_attempted', 'dropped_files']
+    };
+
+    // 4. Malware execution events from auditd (exec channel activity)
+    const malwareQuery = {
+        size: 50,
+        query: {
+            bool: {
+                must: [
+                    range,
+                    { term: { 'service.type': 'auditd' } },
+                    { term: { 'event.action': 'execve' } },
+                    { bool: { should: [
+                        { term: { 'agent.name': 'ds-prod-web01' } },
+                        { term: { 'agent.name': 'sacrificial-vm' } }
+                    ], minimum_should_match: 1 }},
+                    { bool: { should: [
+                        { wildcard: { 'process.executable': '/tmp/*' } },
+                        { wildcard: { 'process.executable': '/root/.config/*' } },
+                        { wildcard: { 'process.executable': '/dev/shm/*' } },
+                        { wildcard: { 'process.executable': '/var/tmp/*' } },
+                        { wildcard: { 'process.executable': './*' } }
+                    ], minimum_should_match: 1 }}
+                ]
+            }
+        },
+        sort: [{ '@timestamp': 'desc' }],
+        _source: ['@timestamp', 'process.executable', 'process.args', 'process.pid']
+    };
+
+    const SESSIONS_PROXY = '/api/es/attacker-sessions/_search';
+
     try {
-        const [cowrieResp, authResp] = await Promise.all([
+        const [cowrieResp, authResp, sessResp, malwareResp] = await Promise.all([
             fetch(ES_PROXY, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(cowrieQuery) }),
             fetch(ES_PROXY, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(authQuery) }),
+            fetch(SESSIONS_PROXY, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(sessionsQuery) }).catch(() => ({ json: async () => ({ hits: { hits: [] } }) })),
+            fetch(ES_PROXY, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(malwareQuery) }).catch(() => ({ json: async () => ({ hits: { hits: [] } }) })),
         ]);
         const cowrieData = await cowrieResp.json();
         const authData = await authResp.json();
+        const sessData = await sessResp.json();
+        const malwareData = await malwareResp.json();
         return {
             cowrieSessions: cowrieData.aggregations?.sessions?.buckets || [],
-            authHits: (authData.hits?.hits || []).map(h => h._source)
+            authHits: (authData.hits?.hits || []).map(h => h._source),
+            attackerSessions: (sessData.hits?.hits || []).map(h => h._source),
+            malwareExecs: (malwareData.hits?.hits || []).map(h => h._source)
         };
     } catch (e) {
         console.error('ES query failed:', e);
-        return { cowrieSessions: [], authHits: [] };
+        return { cowrieSessions: [], authHits: [], attackerSessions: [], malwareExecs: [] };
     }
 }
 
@@ -433,12 +483,192 @@ function buildAuthCards(authHits) {
     return html;
 }
 
+function buildAttackerSessionCards(sessions) {
+    let html = '';
+    for (const s of sessions) {
+        const ip = s.attacker_ip || 'unknown';
+        const country = s.country || '';
+        const org = s.org || '';
+        const loginTime = new Date(s.login_time);
+        const duration = s.session_duration_sec || 0;
+        const cmdCount = s.command_count || 0;
+        const isRecent = (Date.now() - loginTime.getTime()) < 120000;
+        const countryTag = country ? ` (${esc(country)})` : '';
+        const orgTag = org ? ` — ${esc(org)}` : '';
+
+        // Behavior badges
+        let badges = '';
+        for (const tag of (s.behavior_tags || [])) {
+            const colors = {
+                'persistence_cron': '#ED4245', 'makes_executable': '#FE8D2F',
+                'downloads_malware': '#ED4245', 'installs_ssh_key': '#FE8D2F',
+                'rootkit': '#ED4245', 'changes_password': '#FEE75C'
+            };
+            const c = colors[tag] || '#5865F2';
+            badges += `<span class="badge" style="background:${c}22;color:${c};border:1px solid ${c}44">${esc(tag)}</span> `;
+        }
+        if (s.ssh_keys_installed) badges += '<span class="badge" style="background:#ED424522;color:#ED4245">SSH KEY</span> ';
+        if (s.cron_modified) badges += '<span class="badge" style="background:#ED424522;color:#ED4245">CRON</span> ';
+        if (s.rootkit_attempted) badges += '<span class="badge" style="background:#ED424522;color:#ED4245">ROOTKIT</span> ';
+
+        // Terminal output
+        let terminal = '';
+
+        // Credentials
+        const creds = s.credentials_tried || [];
+        if (creds.length > 0) {
+            const pairs = [];
+            for (let i = 0; i < creds.length; i += 2) {
+                pairs.push(`${esc(creds[i] || '?')}:${esc(creds[i+1] || '?')}`);
+            }
+            if (pairs.length > 0) {
+                terminal += `<span class="timestamp">[creds]</span> <span class="cmd">${pairs.join(', ')}</span>\n`;
+            }
+        }
+
+        // Commands
+        const cmds = s.commands || '';
+        if (cmds) {
+            for (const line of cmds.split('\n').filter(l => l.trim())) {
+                const parts = line.split(' (');
+                const cmd = parts[0] || line;
+                const exe = parts[1] ? parts[1].replace(')', '') : '';
+                terminal += `<span class="prompt">root@ds-prod-web01:~#</span> <span class="cmd">${esc(cmd)}</span>`;
+                if (exe) terminal += ` <span class="output">(${esc(exe)})</span>`;
+                terminal += '\n';
+            }
+        }
+
+        // Downloads
+        const downloads = s.download_urls || [];
+        if (downloads.length > 0) {
+            terminal += `\n<span class="timestamp">[downloads]</span>\n`;
+            for (const url of downloads) {
+                terminal += `  <span class="cmd">${esc(url)}</span>\n`;
+            }
+        }
+
+        // Executables
+        const exes = s.executables || [];
+        if (exes.length > 0 && !cmds) {
+            terminal += `<span class="timestamp">[executables]</span> <span class="output">${exes.map(esc).join(', ')}</span>\n`;
+        }
+
+        // Dropped files
+        const drops = s.dropped_files || [];
+        if (drops.length > 0) {
+            terminal += `<span class="timestamp">[dropped]</span> <span class="cmd">${drops.map(esc).join(', ')}</span>\n`;
+        }
+
+        if (!terminal) {
+            terminal = '<span class="output">Login only — no post-login activity captured</span>\n';
+        }
+
+        html += `
+        <div class="session-card">
+            <div class="session-header">
+                <span>
+                    <span class="ip">${esc(ip)}</span><span class="meta">${countryTag}${orgTag}</span>
+                    <span class="meta"> — ${cmdCount} cmd(s), ${duration}s</span>
+                </span>
+                <span>
+                    ${badges}
+                    <span class="badge source-sac">Sacrificial VM</span>
+                    <span class="badge ${isRecent ? 'live' : 'ended'}">${isRecent ? 'LIVE' : 'ENDED'}</span>
+                    <span class="meta">${loginTime.toLocaleString()}</span>
+                </span>
+            </div>
+            <div class="terminal">${terminal}</div>
+        </div>`;
+    }
+    return html;
+}
+
+function buildMalwareExecCard(execs, authHits) {
+    if (!execs || execs.length === 0) return '';
+
+    // Build a time-sorted list of auth events for IP correlation
+    // If an exec happens within 60s after a login, attribute it to that IP
+    const authByTime = (authHits || [])
+        .map(a => ({ ip: a.src_ip, time: new Date(a['@timestamp']).getTime(), user: a.username || a.honeypot?.username || '?' }))
+        .sort((a, b) => a.time - b.time);
+
+    function findAttackerIP(execTime) {
+        const t = new Date(execTime).getTime();
+        let best = null;
+        for (const a of authByTime) {
+            // Exec must be after login, within 10 min window
+            if (a.time <= t && (t - a.time) < 600000) {
+                best = a;
+            }
+        }
+        return best;
+    }
+
+    // Group by executable, then by attributed IP
+    const entries = [];
+    for (const e of execs) {
+        const exe = e.process?.executable || '?';
+        const ts = e['@timestamp'];
+        const attacker = findAttackerIP(ts);
+        entries.push({ exe, ts, ip: attacker?.ip || 'unknown', user: attacker?.user || '?' });
+    }
+
+    // Group by IP
+    const byIP = {};
+    for (const e of entries) {
+        if (!byIP[e.ip]) byIP[e.ip] = [];
+        byIP[e.ip].push(e);
+    }
+
+    let html = '';
+    for (const [ip, events] of Object.entries(byIP)) {
+        // Dedupe and group by exe
+        const byExe = {};
+        for (const e of events) {
+            if (!byExe[e.exe]) byExe[e.exe] = [];
+            byExe[e.exe].push(e);
+        }
+
+        let terminal = '';
+        for (const [exe, evts] of Object.entries(byExe)) {
+            const count = evts.length;
+            const first = evts[evts.length - 1].ts;
+            const last = evts[0].ts;
+            const firstT = new Date(first).toLocaleTimeString();
+            const lastT = new Date(last).toLocaleTimeString();
+            const timeInfo = count > 1 ? `${firstT} — ${lastT}, ${count}x` : firstT;
+            terminal += `<span class="timestamp">[${timeInfo}]</span> <span class="prompt">root@ds-prod-web01:~#</span> <span class="cmd">${esc(exe)}</span>\n`;
+        }
+
+        const isRecent = (Date.now() - new Date(events[0].ts).getTime()) < 300000;
+        const ipDisplay = ip !== 'unknown' ? ip : 'Local execution (cron/persistence)';
+
+        html += `
+        <div class="session-card">
+            <div class="session-header">
+                <span>
+                    <span class="ip">${esc(ipDisplay)}</span>
+                    <span class="meta"> — ${events.length} exec(s), ${Object.keys(byExe).length} binary(s)</span>
+                </span>
+                <span>
+                    <span class="badge" style="background:#ED424522;color:#ED4245;border:1px solid #ED424544">MALWARE</span>
+                    <span class="badge source-sac">Sacrificial VM</span>
+                    <span class="badge ${isRecent ? 'live' : 'ended'}">${isRecent ? 'ACTIVE' : 'RECENT'}</span>
+                </span>
+            </div>
+            <div class="terminal">${terminal}</div>
+        </div>`;
+    }
+    return html;
+}
+
 function renderSessions(data) {
-    const { cowrieSessions, authHits } = data;
+    const { cowrieSessions, authHits, attackerSessions, malwareExecs } = data;
     const container = document.getElementById('sessions');
     const status = document.getElementById('status');
 
-    // Filter cowrie sessions that have commands/downloads/tunnels (interesting ones first)
+    // Filter cowrie sessions
     const withCmds = cowrieSessions.filter(b => {
         const hits = b.events?.hits?.hits || [];
         return hits.some(h => {
@@ -448,31 +678,46 @@ function renderSessions(data) {
     });
     const loginOnly = cowrieSessions.filter(b => !withCmds.includes(b));
 
-    const totalSessions = withCmds.length + loginOnly.length;
-    const totalAuths = authHits.length;
+    // Attacker sessions with activity vs login-only
+    const activeSessions = (attackerSessions || []).filter(s => s.command_count > 0 || (s.behavior_tags || []).length > 0);
+    const passiveSessions = (attackerSessions || []).filter(s => s.command_count === 0 && (s.behavior_tags || []).length === 0);
 
-    if (totalSessions === 0 && totalAuths === 0) {
+    const totalAuths = authHits.length;
+    const uniqueAuthIps = new Set(authHits.map(a => a.src_ip)).size;
+
+    const malExecCount = (malwareExecs || []).length;
+    if (withCmds.length === 0 && totalAuths === 0 && attackerSessions.length === 0 && malExecCount === 0) {
         container.innerHTML = '<div class="empty"><div class="big">No sessions yet</div>Waiting for attackers to connect...</div>';
         status.textContent = `No sessions in the last ${currentRange}. Last checked: ${new Date().toLocaleTimeString()}`;
         return;
     }
 
     const parts = [];
-    parts.push(`${withCmds.length} interactive Cowrie session(s)`);
-    parts.push(`${loginOnly.length} login-only Cowrie`);
-    const uniqueIps = new Set(authHits.map(a => a.src_ip)).size;
-    parts.push(`${totalAuths} sacrificial VM login(s) from ${uniqueIps} IP(s)`);
+    if (malExecCount > 0) parts.push(`${malExecCount} malware exec(s)`);
+    if (withCmds.length > 0) parts.push(`${withCmds.length} Cowrie interactive`);
+    if (activeSessions.length > 0) parts.push(`${activeSessions.length} active attacker session(s)`);
+    parts.push(`${totalAuths} auth(s) from ${uniqueAuthIps} IP(s)`);
+    if (passiveSessions.length > 0) parts.push(`${passiveSessions.length} passive`);
     status.textContent = `${parts.join(' | ')}. Refreshed: ${new Date().toLocaleTimeString()}. Auto-refresh 30s.`;
 
     let html = '';
 
-    // Interactive cowrie sessions first (most interesting)
+    // 0. Malware execution events (most critical — shows what's running NOW)
+    if ((malwareExecs || []).length > 0) html += buildMalwareExecCard(malwareExecs, authHits);
+
+    // 1. Interactive cowrie sessions
     if (withCmds.length > 0) html += buildCowrieCards(withCmds);
 
-    // Sacrificial VM logins
+    // 2. Active attacker sessions with commands/behavior
+    if (activeSessions.length > 0) html += buildAttackerSessionCards(activeSessions);
+
+    // 3. Auth-only logins
     if (totalAuths > 0) html += buildAuthCards(authHits);
 
-    // Login-only cowrie sessions last
+    // 4. Passive attacker sessions (login only, no commands)
+    if (passiveSessions.length > 0 && passiveSessions.length <= 10) html += buildAttackerSessionCards(passiveSessions);
+
+    // 5. Login-only cowrie
     if (loginOnly.length > 0) html += buildCowrieCards(loginOnly);
 
     container.innerHTML = html || '<div class="empty">Data found but nothing to display.</div>';

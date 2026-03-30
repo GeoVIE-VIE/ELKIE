@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ELKIE SOC — Honeypot Network Monitor</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Fira+Code:wght@400;500&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Rajdhani',sans-serif;background:#0a0e17;color:#e0e0e0;min-height:100vh}
+a{color:#5865F2;text-decoration:none}
+a:hover{color:#57F287}
+.back{position:absolute;top:1rem;left:1rem;font-size:1rem}
+.header{text-align:center;padding:2rem 1rem 0.5rem}
+.header h1{font-size:1.8rem;color:#fff;letter-spacing:1px}
+.header h1 span{color:#ED4245}
+.header p{color:#666;font-size:0.9rem}
+
+.controls{display:flex;justify-content:center;gap:0.5rem;padding:0.8rem;flex-wrap:wrap}
+.controls button{font-family:'Rajdhani';padding:0.3rem 0.8rem;border:1px solid #333;background:#1a1a2e;color:#ccc;border-radius:6px;cursor:pointer;font-size:0.9rem;transition:all 0.2s}
+.controls button:hover,.controls button.active{border-color:#57F287;color:#57F287;background:rgba(87,242,135,0.1)}
+.controls select{font-family:'Rajdhani';padding:0.3rem 0.8rem;border:1px solid #333;background:#1a1a2e;color:#ccc;border-radius:6px;font-size:0.9rem}
+
+.stats{display:flex;justify-content:center;gap:12px;padding:0.5rem 1rem;flex-wrap:wrap}
+.stat{background:#111827;border:1px solid #1f2937;border-radius:8px;padding:10px 18px;text-align:center;min-width:100px}
+.stat .v{font-size:1.5rem;font-weight:700}
+.stat .l{font-size:10px;color:#888;text-transform:uppercase;margin-top:2px}
+
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:1200px;margin:12px auto;padding:0 12px}
+@media(max-width:800px){.grid{grid-template-columns:1fr}}
+
+.panel{background:#111827;border:1px solid #1f2937;border-radius:10px;padding:14px;min-height:200px}
+.panel h2{font-size:13px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;border-bottom:1px solid #1f2937;padding-bottom:6px}
+.panel.full{grid-column:1/-1}
+
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{text-align:left;color:#666;font-size:10px;text-transform:uppercase;padding:4px 8px;border-bottom:1px solid #1f2937}
+td{padding:4px 8px;border-bottom:1px solid #0f1520;font-family:'Fira Code',monospace;font-size:11px}
+tr:hover{background:rgba(87,242,135,0.03)}
+.ip{color:#ED4245;cursor:pointer}.ip:hover{text-decoration:underline}
+.domain{color:#57F287}
+.port{color:#FE8D2F}
+.proto{color:#5865F2}
+.bytes{color:#FEE75C}
+.alert-row{background:rgba(237,66,69,0.05)}
+.alert-sig{color:#ED4245;font-size:10px}
+
+.bar{height:6px;border-radius:3px;background:#1f2937;overflow:hidden;margin:2px 0}
+.bar .fill{height:100%;border-radius:3px;transition:width 0.5s}
+
+#status{text-align:center;color:#555;font-size:11px;padding:4px}
+.footer{text-align:center;padding:20px;color:#333;font-size:11px;letter-spacing:2px}
+.live-dot{display:inline-block;width:8px;height:8px;background:#57F287;border-radius:50%;margin-right:4px;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+</style>
+</head>
+<body>
+
+<a href="/" class="back">&larr; SOC</a>
+
+<div class="header">
+    <h1><span class="live-dot"></span> <span>Honeypot</span> Network Monitor</h1>
+    <p>Real-time traffic from 192.168.40.0/24 — Suricata flow analysis</p>
+</div>
+
+<div class="controls">
+    <button onclick="setRange('5m')" id="btn-5m">5 Min</button>
+    <button onclick="setRange('15m')" id="btn-15m">15 Min</button>
+    <button onclick="setRange('1h')" id="btn-1h" class="active">1 Hour</button>
+    <button onclick="setRange('6h')" id="btn-6h">6 Hours</button>
+    <button onclick="setRange('24h')" id="btn-24h">24 Hours</button>
+    <select id="ipFilter" onchange="refresh()">
+        <option value="">All IPs (192.168.40.0/24)</option>
+    </select>
+    <button onclick="refresh()" style="border-color:#57F287;color:#57F287"><span class="live-dot"></span>Refresh</button>
+</div>
+
+<div id="stats" class="stats"></div>
+<div id="status"></div>
+<div id="dashboard" class="grid"></div>
+<div class="footer">ELKIE SOC — HONEYPOT NETWORK MONITOR</div>
+
+<script>
+const ES = '/api/es/.ds-suricata-*/_search';
+let range = '1h';
+let autoId = null;
+
+function setRange(r) {
+    range = r;
+    document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+    const btn = document.getElementById('btn-' + r);
+    if (btn) btn.classList.add('active');
+    refresh();
+}
+
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function fmtBytes(b) { return b > 1048576 ? (b/1048576).toFixed(1)+' MB' : b > 1024 ? (b/1024).toFixed(0)+' KB' : b+' B'; }
+
+function ipFilter() { return document.getElementById('ipFilter').value; }
+
+function buildQuery(extra) {
+    const ip = ipFilter();
+    const must = [
+        { range: { '@timestamp': { gte: `now-${range}` } } },
+        { term: { in_iface: 'ix1.40' } }
+    ];
+    if (ip) {
+        must.push({ bool: { should: [
+            { term: { src_ip: ip } },
+            { term: { dest_ip: ip } }
+        ], minimum_should_match: 1 }});
+    }
+    return { ...extra, query: { bool: { must } } };
+}
+
+async function esPost(body) {
+    const r = await fetch(ES, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    return r.json();
+}
+
+async function refresh() {
+    document.getElementById('status').textContent = 'Loading...';
+    try {
+        const [overview, flows, conns, alerts, hosts, dnsData, tlsData] = await Promise.all([
+            // Overview stats
+            esPost(buildQuery({
+                size: 0,
+                aggs: {
+                    event_types: { terms: { field: 'event_type', size: 10 } },
+                    unique_src: { cardinality: { field: 'src_ip' } },
+                    unique_dest: { cardinality: { field: 'dest_ip' } }
+                }
+            })),
+            // Bandwidth from flow events
+            esPost(buildQuery({
+                size: 0,
+                query: { bool: { must: [
+                    { range: { '@timestamp': { gte: `now-${range}` } } },
+                    { terms: { event_type: ['flow'] } },
+                    { bool: { should: [
+                        { prefix: { src_ip: '192.168.40.' } },
+                        { prefix: { dest_ip: '192.168.40.' } }
+                    ], minimum_should_match: 1 }},
+                    ...(ipFilter() ? [{ bool: { should: [{ term: { src_ip: ipFilter() }}, { term: { dest_ip: ipFilter() }}], minimum_should_match: 1 }}] : [])
+                ]}},
+                aggs: {
+                    bytes_out: { sum: { field: 'flow.bytes_toserver' } },
+                    bytes_in: { sum: { field: 'flow.bytes_toclient' } },
+                    pkts_out: { sum: { field: 'flow.pkts_toserver' } },
+                    pkts_in: { sum: { field: 'flow.pkts_toclient' } },
+                    by_internal: { filter: { prefix: { src_ip: '192.168.40.' } }, aggs: {
+                        ips: { terms: { field: 'src_ip', size: 10 }, aggs: {
+                            out: { sum: { field: 'flow.bytes_toserver' } },
+                            _in: { sum: { field: 'flow.bytes_toclient' } }
+                        }}
+                    }},
+                    by_external: { filter: { bool: { must_not: [{ prefix: { src_ip: '192.168.' }}]}}, aggs: {
+                        ips: { terms: { field: 'src_ip', size: 15 }, aggs: {
+                            out: { sum: { field: 'flow.bytes_toserver' } },
+                            _in: { sum: { field: 'flow.bytes_toclient' } }
+                        }}
+                    }},
+                    by_proto: { terms: { field: 'app_proto', size: 10 }, aggs: {
+                        bytes: { sum: { field: 'flow.bytes_toserver' } }
+                    }},
+                    over_time: { date_histogram: { field: '@timestamp', fixed_interval: range === '5m' ? '10s' : range === '15m' ? '30s' : range === '1h' ? '2m' : range === '6h' ? '10m' : '30m' }, aggs: {
+                        out: { sum: { field: 'flow.bytes_toserver' } },
+                        _in: { sum: { field: 'flow.bytes_toclient' } }
+                    }}
+                }
+            })),
+            // Recent connections (SSH, HTTP, TLS)
+            esPost(buildQuery({
+                size: 50,
+                query: { bool: { must: [
+                    { range: { '@timestamp': { gte: `now-${range}` } } },
+                    { terms: { event_type: ['ssh', 'http', 'tls'] } },
+                    { bool: { should: [
+                        { prefix: { src_ip: '192.168.40.' } },
+                        { prefix: { dest_ip: '192.168.40.' } }
+                    ], minimum_should_match: 1 }},
+                    ...(ipFilter() ? [{ bool: { should: [{ term: { src_ip: ipFilter() }}, { term: { dest_ip: ipFilter() }}], minimum_should_match: 1 }}] : [])
+                ]}},
+                sort: [{ '@timestamp': 'desc' }],
+                _source: ['@timestamp','event_type','src_ip','src_port','dest_ip','dest_port','proto','http.hostname','http.url','http.http_method','tls.sni','tls.version','ssh.client.software_version','ssh.server.software_version']
+            })),
+            // Alerts
+            esPost(buildQuery({
+                size: 20,
+                query: { bool: { must: [
+                    { range: { '@timestamp': { gte: `now-${range}` } } },
+                    { term: { event_type: 'alert' } },
+                    { bool: { should: [
+                        { prefix: { src_ip: '192.168.40.' } },
+                        { prefix: { dest_ip: '192.168.40.' } }
+                    ], minimum_should_match: 1 }},
+                    ...(ipFilter() ? [{ bool: { should: [{ term: { src_ip: ipFilter() }}, { term: { dest_ip: ipFilter() }}], minimum_should_match: 1 }}] : [])
+                ]}},
+                sort: [{ '@timestamp': 'desc' }],
+                _source: ['@timestamp','src_ip','dest_ip','dest_port','alert.signature','alert.severity','alert.category']
+            })),
+            // Internal IPs for the filter dropdown
+            esPost({
+                size: 0,
+                query: { bool: { must: [
+                    { range: { '@timestamp': { gte: 'now-6h' } } },
+                    { term: { in_iface: 'ix1.40' } }
+                ]}},
+                aggs: { ips: { terms: { field: 'src_ip', size: 20 } } }
+            }),
+            // DNS queries
+            esPost(buildQuery({
+                size: 0,
+                aggs: {
+                    domains: { terms: { field: 'dns.rrname', size: 20 } },
+                    by_type: { terms: { field: 'dns.rrtype', size: 10 } }
+                }
+            })),
+            // TLS connections
+            esPost(buildQuery({
+                size: 0,
+                aggs: {
+                    sni: { terms: { field: 'tls.sni', size: 20 } },
+                    versions: { terms: { field: 'tls.version', size: 5 } }
+                }
+            }))
+        ]);
+
+        renderStats(overview, flows);
+        renderDashboard(flows, conns, alerts, dnsData, tlsData);
+        updateIPFilter(hosts);
+
+        const now = new Date().toLocaleTimeString();
+        document.getElementById('status').innerHTML = `<span class="live-dot"></span> Updated ${now} — auto-refresh 15s`;
+    } catch(e) {
+        document.getElementById('status').textContent = 'Error: ' + e.message;
+        console.error(e);
+    }
+}
+
+function renderStats(overview, flows) {
+    const a = overview.aggregations || {};
+    const fa = flows.aggregations || {};
+    const total = overview.hits?.total?.value || 0;
+    const types = {};
+    (a.event_types?.buckets || []).forEach(b => types[b.key] = b.doc_count);
+
+    const html = `
+        <div class="stat"><div class="v" style="color:#5865F2">${total.toLocaleString()}</div><div class="l">Events</div></div>
+        <div class="stat"><div class="v" style="color:#FE8D2F">${fmtBytes(fa.bytes_out?.value||0)}</div><div class="l">Upload</div></div>
+        <div class="stat"><div class="v" style="color:#57F287">${fmtBytes(fa.bytes_in?.value||0)}</div><div class="l">Download</div></div>
+        <div class="stat"><div class="v" style="color:#ED4245">${types.alert||0}</div><div class="l">Alerts</div></div>
+        <div class="stat"><div class="v">${types.ssh||0}</div><div class="l">SSH</div></div>
+        <div class="stat"><div class="v">${types.http||0}</div><div class="l">HTTP</div></div>
+        <div class="stat"><div class="v">${a.unique_src?.value||0}</div><div class="l">Src IPs</div></div>
+    `;
+    document.getElementById('stats').innerHTML = html;
+}
+
+function renderDashboard(flows, conns, alerts, dnsData, tlsData) {
+    const fa = flows.aggregations || {};
+    let html = '';
+
+    // Bandwidth over time (ASCII sparkline)
+    const timeBuckets = fa.over_time?.buckets || [];
+    if (timeBuckets.length > 0) {
+        const maxVal = Math.max(...timeBuckets.map(b => Math.max(b.out?.value||0, b._in?.value||0)), 1);
+        let bwHtml = '<table><tr><th>Time</th><th>Upload</th><th>Download</th><th>Traffic</th></tr>';
+        for (const b of timeBuckets.slice(-20)) {
+            const t = new Date(b.key_as_string || b.key).toLocaleTimeString();
+            const outPct = ((b.out?.value||0)/maxVal*100).toFixed(0);
+            const inPct = ((b._in?.value||0)/maxVal*100).toFixed(0);
+            bwHtml += `<tr>
+                <td>${t}</td>
+                <td class="bytes">${fmtBytes(b.out?.value||0)}</td>
+                <td class="bytes">${fmtBytes(b._in?.value||0)}</td>
+                <td style="min-width:150px"><div class="bar"><div class="fill" style="width:${outPct}%;background:#FE8D2F"></div></div><div class="bar"><div class="fill" style="width:${inPct}%;background:#57F287"></div></div></td>
+            </tr>`;
+        }
+        bwHtml += '</table>';
+        html += `<div class="panel full"><h2>Bandwidth Over Time</h2>${bwHtml}</div>`;
+    }
+
+    // Honeypot hosts (internal)
+    const byInternal = fa.by_internal?.ips?.buckets || [];
+    if (byInternal.length > 0) {
+        const maxBytes = Math.max(...byInternal.map(b => b.out?.value||0), 1);
+        let tHtml = '<table><tr><th>Honeypot Host</th><th>Upload</th><th>Download</th><th></th></tr>';
+        for (const b of byInternal) {
+            const pct = ((b.out?.value||0)/maxBytes*100).toFixed(0);
+            tHtml += `<tr>
+                <td><span class="ip" onclick="filterIP('${b.key}')">${b.key}</span></td>
+                <td class="bytes">${fmtBytes(b.out?.value||0)}</td>
+                <td class="bytes">${fmtBytes(b._in?.value||0)}</td>
+                <td style="min-width:100px"><div class="bar"><div class="fill" style="width:${pct}%;background:#5865F2"></div></div></td>
+            </tr>`;
+        }
+        tHtml += '</table>';
+        html += `<div class="panel"><h2>Honeypot Hosts</h2>${tHtml}</div>`;
+    }
+
+    // External attackers
+    const byExternal = fa.by_external?.ips?.buckets || [];
+    if (byExternal.length > 0) {
+        const maxBytes = Math.max(...byExternal.map(b => b.out?.value||0), 1);
+        let tHtml = '<table><tr><th>External IP</th><th>Sent</th><th>Received</th><th></th></tr>';
+        for (const b of byExternal) {
+            const pct = ((b.out?.value||0)/maxBytes*100).toFixed(0);
+            tHtml += `<tr>
+                <td><span class="ip" onclick="filterIP('${b.key}')">${b.key}</span></td>
+                <td class="bytes">${fmtBytes(b.out?.value||0)}</td>
+                <td class="bytes">${fmtBytes(b._in?.value||0)}</td>
+                <td style="min-width:100px"><div class="bar"><div class="fill" style="width:${pct}%;background:#ED4245"></div></div></td>
+            </tr>`;
+        }
+        tHtml += '</table>';
+        html += `<div class="panel"><h2>External Attackers</h2>${tHtml}</div>`;
+    }
+
+    // By protocol
+    const byProto = fa.by_proto?.buckets || [];
+    if (byProto.length > 0) {
+        const maxP = Math.max(...byProto.map(b => b.bytes?.value||0), 1);
+        let pHtml = '<table><tr><th>Protocol</th><th>Bytes</th><th></th></tr>';
+        for (const b of byProto) {
+            const pct = ((b.bytes?.value||0)/maxP*100).toFixed(0);
+            pHtml += `<tr>
+                <td class="proto">${esc(b.key||'unknown')}</td>
+                <td class="bytes">${fmtBytes(b.bytes?.value||0)}</td>
+                <td style="min-width:100px"><div class="bar"><div class="fill" style="width:${pct}%;background:#FEE75C"></div></div></td>
+            </tr>`;
+        }
+        pHtml += '</table>';
+        html += `<div class="panel"><h2>By Protocol</h2>${pHtml}</div>`;
+    }
+
+    // Recent connections
+    const connHits = conns.hits?.hits || [];
+    if (connHits.length > 0) {
+        let cHtml = '<table><tr><th>Time</th><th>Type</th><th>Source</th><th>Destination</th><th>Detail</th></tr>';
+        for (const h of connHits.slice(0, 30)) {
+            const s = h._source;
+            const t = new Date(s['@timestamp']).toLocaleTimeString();
+            const et = s.event_type;
+            let detail = '';
+            if (et === 'http') detail = `<span class="domain">${esc(s.http?.hostname||'')}</span> ${esc(s.http?.url||'').substring(0,40)}`;
+            else if (et === 'tls') detail = `<span class="domain">${esc(s.tls?.sni||'')}</span> ${esc(s.tls?.version||'')}`;
+            else if (et === 'ssh') detail = `${esc(s.ssh?.client?.software_version||'')}`;
+            cHtml += `<tr>
+                <td>${t}</td>
+                <td class="proto">${et}</td>
+                <td><span class="ip" onclick="filterIP('${s.src_ip}')">${s.src_ip}</span>:<span class="port">${s.src_port}</span></td>
+                <td><span class="ip" onclick="filterIP('${s.dest_ip}')">${s.dest_ip}</span>:<span class="port">${s.dest_port}</span></td>
+                <td>${detail}</td>
+            </tr>`;
+        }
+        cHtml += '</table>';
+        html += `<div class="panel full"><h2>Recent Connections</h2>${cHtml}</div>`;
+    }
+
+    // DNS queries
+    const dnsBuckets = dnsData?.aggregations?.domains?.buckets || [];
+    if (dnsBuckets.length > 0) {
+        const maxD = Math.max(...dnsBuckets.map(b => b.doc_count), 1);
+        let dHtml = '<table><tr><th>Domain</th><th>Queries</th><th></th></tr>';
+        for (const b of dnsBuckets) {
+            const pct = (b.doc_count / maxD * 100).toFixed(0);
+            dHtml += `<tr><td class="domain">${esc(b.key)}</td><td>${b.doc_count}</td><td style="min-width:100px"><div class="bar"><div class="fill" style="width:${pct}%;background:#57F287"></div></div></td></tr>`;
+        }
+        dHtml += '</table>';
+        html += `<div class="panel"><h2>DNS Queries</h2>${dHtml}</div>`;
+    }
+
+    // TLS connections
+    const tlsBuckets = tlsData?.aggregations?.sni?.buckets || [];
+    if (tlsBuckets.length > 0) {
+        const maxT = Math.max(...tlsBuckets.map(b => b.doc_count), 1);
+        let tHtml = '<table><tr><th>SNI (Server Name)</th><th>Connections</th><th></th></tr>';
+        for (const b of tlsBuckets) {
+            const pct = (b.doc_count / maxT * 100).toFixed(0);
+            tHtml += `<tr><td class="domain">${esc(b.key)}</td><td>${b.doc_count}</td><td style="min-width:100px"><div class="bar"><div class="fill" style="width:${pct}%;background:#5865F2"></div></div></td></tr>`;
+        }
+        tHtml += '</table>';
+        html += `<div class="panel"><h2>TLS Connections (SNI)</h2>${tHtml}</div>`;
+    }
+
+    // Alerts
+    const alertHits = alerts.hits?.hits || [];
+    if (alertHits.length > 0) {
+        let aHtml = '<table><tr><th>Time</th><th>Source</th><th>Destination</th><th>Signature</th></tr>';
+        for (const h of alertHits) {
+            const s = h._source;
+            const t = new Date(s['@timestamp']).toLocaleTimeString();
+            aHtml += `<tr class="alert-row">
+                <td>${t}</td>
+                <td><span class="ip" onclick="filterIP('${s.src_ip}')">${s.src_ip}</span></td>
+                <td>${s.dest_ip}:<span class="port">${s.dest_port}</span></td>
+                <td class="alert-sig">${esc(s.alert?.signature||'')}</td>
+            </tr>`;
+        }
+        aHtml += '</table>';
+        html += `<div class="panel full"><h2>Suricata Alerts</h2>${aHtml}</div>`;
+    }
+
+    document.getElementById('dashboard').innerHTML = html || '<div style="text-align:center;color:#555;padding:3rem;grid-column:1/-1">No data for selected time range</div>';
+}
+
+function updateIPFilter(hosts) {
+    const sel = document.getElementById('ipFilter');
+    const current = sel.value;
+    const buckets = hosts.aggregations?.ips?.buckets || [];
+    sel.innerHTML = '<option value="">All IPs (192.168.40.0/24)</option>';
+    for (const b of buckets) {
+        const opt = document.createElement('option');
+        opt.value = b.key;
+        opt.textContent = `${b.key} (${b.doc_count} events)`;
+        if (b.key === current) opt.selected = true;
+        sel.appendChild(opt);
+    }
+}
+
+function filterIP(ip) {
+    document.getElementById('ipFilter').value = ip;
+    refresh();
+}
+
+// Auto-refresh
+refresh();
+setInterval(refresh, 15000);
+</script>
+</body>
+</html>
