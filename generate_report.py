@@ -345,10 +345,14 @@ def generate_report(sample: dict, output_path: Path, styles):
     if dyn:
         section_num = 6 if ghidra else 5
         elements.append(Paragraph(f"{section_num}. Dynamic Analysis (Sandbox Detonation)", styles["SectionHeader"]))
+        sha_short = sha256[:16]
         elements.append(Paragraph(
             f"Detonation duration: {dyn.get('detonation_duration', '?')} seconds | "
             f"PCAP size: {dyn.get('pcap_size', 0)} bytes | "
-            f"Audit log: {dyn.get('audit_log_size', 0)} bytes",
+            f"Audit log: {dyn.get('audit_log_size', 0)} bytes<br/>"
+            f"<b>Download:</b> "
+            f"<a href='/reports/{sha_short}_capture.pcap' color='blue'>PCAP</a> | "
+            f"<a href='/reports/{sha_short}_strace.log' color='blue'>Strace</a>",
             styles["ReportBody"]
         ))
         elements.append(Spacer(1, 6))

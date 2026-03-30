@@ -99,8 +99,8 @@ r = requests.post(f"{es}/{idx}/_search", json={
         {"term": {"service.type": "auditd"}},
         {"term": {"event.action": "execve"}},
         {"bool": {"should": [
-            {"term": {"agent.name": "'"$AGENT_NAME"'"}},
-            {"term": {"agent.name": "'"$AGENT_ALT"'"}}
+            {"term": {"agent.name": "$AGENT_NAME"}},
+            {"term": {"agent.name": "$AGENT_ALT"}}
         ], "minimum_should_match": 1}}
     ], "must_not": [
         {"terms": {"process.executable": [
@@ -150,8 +150,8 @@ r = requests.post(f"{es}/{idx}/_search", json={
         {"term": {"event.action": "execve"}},
         {"terms": {"process.executable": ["wget", "curl"]}},
         {"bool": {"should": [
-            {"term": {"agent.name": "'"$AGENT_NAME"'"}},
-            {"term": {"agent.name": "'"$AGENT_ALT"'"}}
+            {"term": {"agent.name": "$AGENT_NAME"}},
+            {"term": {"agent.name": "$AGENT_ALT"}}
         ], "minimum_should_match": 1}}
     ]}},
     "_source": ["process.args"],
@@ -188,8 +188,8 @@ r = requests.post(f"{es}/{idx}/_search", json={
     "size": 10,
     "query": {"bool": {"must": [
         {"bool": {"should": [
-            {"term": {"agent.name": "'"$AGENT_NAME"'"}},
-            {"term": {"agent.name": "'"$AGENT_ALT"'"}}
+            {"term": {"agent.name": "$AGENT_NAME"}},
+            {"term": {"agent.name": "$AGENT_ALT"}}
         ], "minimum_should_match": 1}},
         {"bool": {"should": [
             {"wildcard": {"message": "*ALERT*"}},

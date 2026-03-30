@@ -659,9 +659,12 @@ class SampleAnalyzer:
 
     # -- Elasticsearch helpers ---------------------------------------------
 
-    def _es_get(self, path: str) -> Optional[dict]:
+    def _es_get(self, path: str, body: dict = None) -> Optional[dict]:
         try:
-            resp = requests.get(f"{self.cfg.es_url}/{path}", timeout=15)
+            if body:
+                resp = requests.post(f"{self.cfg.es_url}/{path}", json=body, timeout=15)
+            else:
+                resp = requests.get(f"{self.cfg.es_url}/{path}", timeout=15)
             if resp.status_code == 200:
                 return resp.json()
             return None
@@ -2767,7 +2770,7 @@ Provide your response as JSON with these exact keys:
   "summary": "structured as: 1) BEHAVIORAL (what it DID during detonation — connections made, processes spawned, files created, DNS lookups), 2) STATIC (code capabilities from strings/capa/Ghidra — APIs called, embedded IPs/domains, encryption, persistence mechanisms), 3) NETWORK (all observed traffic — every connection, DNS query, TLS handshake, with protocol and port analysis), 4) IOCs (all extracted indicators with context — IPs with reputation, domains, file paths, mutex names, registry keys, C2 protocols)",
   "warrants_investigation": ["list of specific actionable items — e.g. 'IP 185.x.x.x needs AbuseIPDB/Shodan lookup for infrastructure mapping', 'encrypted config blob at offset 0x400 needs decryption', 'longer detonation needed to observe beacon interval'"],
   "mitre_attack": ["Txx.xxx — technique name — citing specific evidence"],
-  "yara_rule": "a YARA rule based on concrete strings/bytes observed in this sample"
+  "yara_rule": "A production YARA rule that reliably detects THIS specific malware family. MUST include: 1) meta block with description, author='ELKIE SOC', date, hash, 2) string patterns unique to this family (product names, C2 domains, unique error messages, API strings — NOT generic libc strings), 3) condition combining: magic bytes check (ELF/PE), file size range (within 2x of actual), AND string matches. Use 'nocase' for product/brand names. For Go binaries include '.gopclntab' or 'Go build ID'. For large binaries (>10MB) include filesize constraints. Do NOT match on generic strings like '/bin/sh', 'Connection refused', etc."
 }}
 
 --- EVIDENCE ---
@@ -2916,10 +2919,11 @@ DNS Queries: {dns}
 Files Created: {new_files}
 
 Requirements:
+- Output exactly ONE Sigma rule as valid YAML — no multiple documents, no '---' separators
 - Use logsource categories: process_creation, file_event, network_connection, or dns_query
 - Include: title, status (experimental), description, logsource, detection, level, tags (MITRE ATT&CK)
 - The rule should detect the BEHAVIOR, not specific hashes or IPs
-- Output ONLY valid YAML, no explanation"""
+- Output ONLY valid YAML, no explanation, no markdown fences"""
 
         try:
             import anthropic
@@ -2941,14 +2945,19 @@ Requirements:
             if text.endswith("```"):
                 text = "\n".join(text.split("\n")[:-1])
 
-            # Validate YAML
+            # Validate YAML — handle multi-document (Claude sometimes outputs multiple rules separated by ---)
             import yaml
-            parsed = yaml.safe_load(text)
-            if isinstance(parsed, dict) and "title" in parsed and "detection" in parsed:
-                return text
-            else:
-                self.logger.warning("Sigma rule missing required fields")
+            valid_rules = []
+            for doc in yaml.safe_load_all(text):
+                if isinstance(doc, dict) and "title" in doc and "detection" in doc:
+                    valid_rules.append(doc)
+
+            if not valid_rules:
+                self.logger.warning("Sigma generation: no valid rules in output")
                 return None
+
+            # Return the first valid rule as YAML text
+            return yaml.dump(valid_rules[0], default_flow_style=False, sort_keys=False)
 
         except Exception as e:
             self.logger.warning("Sigma generation failed: %s", e)
@@ -4524,6 +4533,22 @@ Requirements:
             self.logger.info("PDF report generated: %s", report_path)
         except Exception as e:
             self.logger.warning("PDF report generation failed: %s", e)
+
+        # Step 10.5: Copy PCAP and strace to reports dir for web access
+        try:
+            report_dir = Path(_env("REPORTS_DIR", str(ELKIE_HOME / "reports")))
+            dyn_dir = STAGING_DIR / f"{sha256}_dynamic"
+            if dyn_dir.exists():
+                pcap_src = dyn_dir / "capture.pcap"
+                strace_src = dyn_dir / "strace.log"
+                if pcap_src.exists():
+                    import shutil
+                    shutil.copy2(pcap_src, report_dir / f"{sha256[:16]}_capture.pcap")
+                if strace_src.exists():
+                    import shutil
+                    shutil.copy2(strace_src, report_dir / f"{sha256[:16]}_strace.log")
+        except Exception as e:
+            self.logger.warning("Failed to copy artifacts to reports: %s", e)
 
         # Step 11: Generate Sigma detection rules (template + LLM behavioral)
         try:
